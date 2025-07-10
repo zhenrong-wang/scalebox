@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
+import { ActionConfirmationDialog } from "./action-confirmation-dialog"
 import { useLanguage } from "../contexts/language-context"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ApiKeyService } from "../services/api-key-service"
@@ -478,24 +478,26 @@ export function ApiKeyPage() {
       </Card>
 
       {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
+      <ActionConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={closeDeleteDialog}
         onConfirm={confirmDeleteKey}
         isLoading={deleteDialog.isLoading}
         itemName={deleteDialog.keyName}
         itemType={t("table.apiKey") || "API Key"}
+        action="delete"
         warningMessage={t("apiKey.deleteWarning") || `Are you sure you want to delete the API key "${deleteDialog.keyName}"? This action cannot be undone.`}
       />
 
       {/* Disable Confirmation Dialog */}
-      <DeleteConfirmationDialog
+      <ActionConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={closeDisableDialog}
         onConfirm={confirmDisableKey}
         isLoading={disableDialog.isLoading}
         itemName={disableDialog.keyName}
         itemType={t("table.apiKey") || "API Key"}
+        action="disable"
         warningMessage={t("apiKey.disableWarning") || `Disabling this API key will immediately stop all applications and services using it. This may cause service interruptions. Are you sure you want to disable this key?`}
       />
     </div>
