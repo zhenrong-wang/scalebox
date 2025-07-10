@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Eye, EyeOff, Trash2, Search, Filter, AlertTriangle, Shield, CheckCircle, Power, PowerOff } from "lucide-react"
+import { Plus, Eye, EyeOff, Trash2, Search, Filter, AlertTriangle, Shield, CheckCircle, Power, PowerOff, Calendar, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -176,6 +176,7 @@ export function AdminApiKeyManagement() {
 
   const activeKeys = apiKeys.filter((key) => key.is_active).length
   const totalKeys = apiKeys.length
+  const filteredKeys = filteredApiKeys.length
 
   return (
     <div className="space-y-6">
@@ -203,7 +204,7 @@ export function AdminApiKeyManagement() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
@@ -213,42 +214,72 @@ export function AdminApiKeyManagement() {
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[140px]">
-            <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-            <SelectItem value="active">{t("table.active")}</SelectItem>
-            <SelectItem value="disabled">{t("table.disabled")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder={t("table.owner") || "Owner"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("table.owner") || "All Owners"}</SelectItem>
-            {owners.filter((owner): owner is string => Boolean(owner)).map(owner => (
-              <SelectItem key={owner} value={owner}>{owner}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-2">
-          <Label>{t("table.created")}</Label>
-          <Input
-            type="date"
-            value={String(dateRange.from ?? "")}
-            onChange={e => setDateRange(r => ({ ...r, from: e.target.value || null }))}
-            className="w-[120px]"
-          />
-          <span>-</span>
-          <Input
-            type="date"
-            value={String(dateRange.to ?? "")}
-            onChange={e => setDateRange(r => ({ ...r, to: e.target.value || null }))}
-            className="w-[120px]"
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+              <SelectItem value="active">{t("table.active")}</SelectItem>
+              <SelectItem value="disabled">{t("table.disabled")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder={t("table.owner") || "Owner"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("table.owner") || "All Owners"}</SelectItem>
+              {owners.filter((owner): owner is string => Boolean(owner)).map(owner => (
+                <SelectItem key={owner} value={owner}>{owner}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+          dateRange.from || dateRange.to 
+            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
+            : 'bg-muted/50 border-border'
+        }`}>
+          <Calendar className={`h-4 w-4 ${
+            dateRange.from || dateRange.to 
+              ? 'text-blue-600 dark:text-blue-400' 
+              : 'text-muted-foreground'
+          }`} />
+          <Label className={`text-sm font-medium whitespace-nowrap ${
+            dateRange.from || dateRange.to 
+              ? 'text-blue-700 dark:text-blue-300' 
+              : ''
+          }`}>{t("table.created") || "Created"}</Label>
+          <div className="flex items-center gap-1">
+            <Input
+              type="date"
+              value={String(dateRange.from ?? "")}
+              onChange={e => setDateRange(r => ({ ...r, from: e.target.value || null }))}
+              className="w-[130px] h-8 text-sm"
+              placeholder="From date"
+            />
+            <span className="text-muted-foreground text-sm">to</span>
+            <Input
+              type="date"
+              value={String(dateRange.to ?? "")}
+              onChange={e => setDateRange(r => ({ ...r, to: e.target.value || null }))}
+              className="w-[130px] h-8 text-sm"
+              placeholder="To date"
+            />
+          </div>
+          {(dateRange.from || dateRange.to) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDateRange({ from: null, to: null })}
+              className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+              title="Clear date range"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -258,9 +289,19 @@ export function AdminApiKeyManagement() {
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
             {t("nav.apiKeys") || "Admin API Key Management"}
+            {(searchTerm || statusFilter !== "all" || ownerFilter !== "all" || dateRange.from || dateRange.to) && (
+              <Badge variant="secondary" className="ml-2">
+                {filteredKeys} of {totalKeys}
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>
             {t("admin.apiKeyManagementDesc") || "View and manage all API keys across the platform. You can disable or delete keys, and users will be notified via email."}
+            {(searchTerm || statusFilter !== "all" || ownerFilter !== "all" || dateRange.from || dateRange.to) && (
+              <span className="block mt-1 text-sm text-muted-foreground">
+                Showing {filteredKeys} of {totalKeys} API keys
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <div className="p-4">
