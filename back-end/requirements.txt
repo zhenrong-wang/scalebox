@@ -10,3 +10,4 @@ aiohttp
 aiosmtplib
 email-validator
 PyJWT
+alembic
