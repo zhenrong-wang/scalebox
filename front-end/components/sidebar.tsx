@@ -62,6 +62,7 @@ export function Sidebar({
     { id: "sandbox-management", label: t("nav.sandboxManagement"), icon: Container },
     { id: "admin-billing", label: t("nav.analytics"), icon: BarChart3 },
     { id: "system", label: t("nav.systemHealth"), icon: Activity },
+    { id: "admin-api-keys", label: t("nav.apiKeys"), icon: Key },
   ]
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems

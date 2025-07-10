@@ -2,10 +2,11 @@ interface ApiKey {
   id: number;
   key_id: string;
   name: string;
+  description?: string; // New description field
   prefix: string;
   permissions: { read: true; write: boolean };
   is_active: boolean;
-  expires_at?: string;
+  expires_in_days?: number; // Changed from expires_at to expires_in_days
   last_used_at?: string;
   created_at: string;
   user_email?: string; // for admin
@@ -13,12 +14,16 @@ interface ApiKey {
 
 interface CreateApiKeyRequest {
   name: string;
+  description?: string; // New description field
   can_write: boolean;
+  expires_in_days?: number; // Changed from expires_at to expires_in_days
 }
 
 interface UpdateApiKeyRequest {
   name?: string;
+  description?: string; // New description field
   can_write?: boolean;
+  expires_in_days?: number; // Allow updating expiration
 }
 
 interface ApiKeyUsage {
@@ -120,6 +125,20 @@ export class ApiKeyService {
     return await response.json();
   }
 
+  static async toggleApiKeyStatus(keyId: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}/toggle`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to toggle API key status");
+    }
+
+    return await response.json();
+  }
+
   static async getApiKeyUsage(keyId: string, limit: number = 100): Promise<ApiKeyUsage[]> {
     const response = await fetch(`${this.API_BASE}/api-keys/${keyId}/usage?limit=${limit}`, {
       headers: this.getAuthHeaders(),
@@ -160,7 +179,7 @@ export class ApiKeyService {
     return await response.json();
   }
 
-  static async adminApiKeyAction(keyId: string, action: "disable" | "delete", reason?: string): Promise<{ message: string }> {
+  static async adminApiKeyAction(keyId: string, action: "enable" | "disable" | "delete", reason?: string): Promise<{ message: string }> {
     const response = await fetch(`${this.API_BASE}/api-keys/admin/${keyId}/action`, {
       method: "POST",
       headers: this.getAuthHeaders(),
@@ -179,23 +198,44 @@ export class ApiKeyService {
     return apiKey.substring(0, 16) + "...";
   }
 
-  static isExpired(expiresAt?: string): boolean {
-    if (!expiresAt) return false;
-    return new Date(expiresAt) < new Date();
+  static isExpired(expiresInDays?: number, createdAt?: string): boolean {
+    if (!expiresInDays || !createdAt) return false;
+    const created = new Date(createdAt);
+    const expirationDate = new Date(created.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
+    return new Date() > expirationDate;
+  }
+
+  static getDaysUntilExpiration(expiresInDays?: number, createdAt?: string): number | null {
+    if (!expiresInDays || !createdAt) return null;
+    const created = new Date(createdAt);
+    const expirationDate = new Date(created.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const diffTime = expirationDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
   }
 
   static getStatusBadge(apiKey: ApiKey): { text: string; variant: "default" | "secondary" | "destructive" | "outline" } {
     if (!apiKey.is_active) {
       return { text: "Inactive", variant: "destructive" };
     }
-    if (this.isExpired(apiKey.expires_at)) {
+    if (this.isExpired(apiKey.expires_in_days, apiKey.created_at)) {
       return { text: "Expired", variant: "destructive" };
     }
     return { text: "Active", variant: "default" };
   }
 
-  static getPermissionsText(permissions: { read: true; write: boolean }): string {
-    if (permissions.write) return "Read & Write";
-    return "Read Only";
+  static getPermissionsText(permissions: { read: true; write: boolean }, t?: (key: string, params?: any) => string): string {
+    if (permissions.write) return t ? (t("apiKey.readWrite") || "Read & Write") : "Read & Write";
+    return t ? (t("apiKey.readOnly") || "Read Only") : "Read Only";
+  }
+
+  static getExpirationText(expiresInDays?: number, createdAt?: string, t?: (key: string, params?: any) => string): string {
+    if (!expiresInDays) return t ? (t("apiKey.permanent") || "Permanent") : "Permanent";
+    const daysLeft = this.getDaysUntilExpiration(expiresInDays, createdAt);
+    if (daysLeft === null) return t ? (t("apiKey.permanent") || "Permanent") : "Permanent";
+    if (daysLeft === 0) return t ? (t("apiKey.expiresToday") || "Expires today") : "Expires today";
+    if (daysLeft < 0) return t ? (t("apiKey.expired") || "Expired") : "Expired";
+    return t ? (t("apiKey.expiresIn", { days: daysLeft }) || `Expires in ${daysLeft} days`) : `Expires in ${daysLeft} days`;
   }
 } 

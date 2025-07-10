@@ -1,11 +1,12 @@
 "use client"
-import { createContext, useContext, useState, type ReactNode } from "react"
-import { translations, type Language } from "@/lib/i18n"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { translations, type Language, tReplace } from "@/lib/i18n"
 
 interface LanguageContextType {
   language: Language
   setLanguage: (lang: Language) => void
-  t: (key: string) => string
+  t: (key: string, vars?: Record<string, string>) => string
+  isHydrated: boolean
 }
 
 const LanguageContext = createContext<LanguageContextType | null>(null)
@@ -19,16 +20,25 @@ export function LanguageProvider({
   storageKey?: string
   defaultLanguage?: Language
 }) {
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(storageKey) as Language | null
-      if (stored && stored in translations) return stored
+  const [language, setLanguage] = useState<Language>(defaultLanguage)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  // Initialize language after hydration to prevent SSR/client mismatch
+  useEffect(() => {
+    const stored = localStorage.getItem(storageKey) as Language | null
+    if (stored && stored in translations) {
+      setLanguage(stored)
+    } else {
       const nav = navigator.language.toLowerCase()
-      if (nav.startsWith("zh-cn") || nav === "zh") return "zh-CN"
-      if (nav.startsWith("zh-tw") || nav.startsWith("zh-hk")) return "zh-TW"
+      if (nav.startsWith("zh-cn") || nav === "zh") {
+        setLanguage("zh-CN")
+      } else if (nav.startsWith("zh-tw") || nav.startsWith("zh-hk")) {
+        setLanguage("zh-TW")
+      }
+      // If none of the above, keep the default language
     }
-    return defaultLanguage
-  })
+    setIsHydrated(true)
+  }, [storageKey])
 
   const changeLang = (lang: Language) => {
     setLanguage(lang)
@@ -38,7 +48,11 @@ export function LanguageProvider({
   const value: LanguageContextType = {
     language,
     setLanguage: changeLang,
-    t: (k) => translations[language][k] ?? translations.en[k] ?? k,
+    t: (k, vars) => {
+      const str = translations[language][k] ?? translations.en[k] ?? k;
+      return vars ? tReplace(str, vars) : str;
+    },
+    isHydrated,
   }
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>

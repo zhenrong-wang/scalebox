@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Copy, Eye, EyeOff, Trash2, Search, Filter } from "lucide-react"
+import { Plus, Copy, Eye, EyeOff, Trash2, Search, Filter, Power, PowerOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -14,9 +14,15 @@ import { useLanguage } from "../contexts/language-context"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ApiKeyService } from "../services/api-key-service"
 import type { ApiKey } from "../services/api-key-service"
+import { format, parseISO } from "date-fns"
+
+// Extended interface to include the full API key for display
+interface ApiKeyWithFullKey extends ApiKey {
+  full_key?: string; // The full API key for display
+}
 
 export function ApiKeyPage() {
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [apiKeys, setApiKeys] = useState<ApiKeyWithFullKey[]>([])
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [newKeyName, setNewKeyName] = useState("")
   const [newKeyWrite, setNewKeyWrite] = useState(true)
@@ -25,8 +31,9 @@ export function ApiKeyPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState<string>("")
-  const [createdKey, setCreatedKey] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [newKeyExpiresIn, setNewKeyExpiresIn] = useState<string>("30"); // default 30 days
+  const [newKeyDescription, setNewKeyDescription] = useState("");
 
   // Delete confirmation state
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -60,13 +67,13 @@ export function ApiKeyPage() {
     }
   }
 
-  const toggleKeyVisibility = (id: string) => {
-    setShowKeys((prev) => ({ ...prev, [id]: !prev[id] }))
+  const toggleKeyVisibility = (keyId: string) => {
+    setShowKeys((prev) => ({ ...prev, [keyId]: !prev[keyId] }))
   }
 
   const copyToClipboard = (key: string) => {
     navigator.clipboard.writeText(key)
-    setSuccess(t("action.copied") || "Copied!")
+    setSuccess(t("apiKey.copied") || "Copied!")
     setTimeout(() => setSuccess("") , 1500)
   }
 
@@ -74,6 +81,18 @@ export function ApiKeyPage() {
     setApiKeys((prev) =>
       prev.map((key) => (key.key_id === id ? { ...key, is_active: !key.is_active } : key)),
     )
+  }
+
+  const handleToggleKeyStatus = async (keyId: string) => {
+    setError("");
+    setSuccess("");
+    try {
+      await ApiKeyService.toggleApiKeyStatus(keyId);
+      toggleKeyStatus(keyId);
+      setSuccess(t("apiKey.statusUpdated") || "API key status updated successfully!");
+    } catch (e: any) {
+      setError(e.message || "Failed to update API key status");
+    }
   }
 
   const openDeleteDialog = (keyId: string, keyName: string) => {
@@ -109,29 +128,45 @@ export function ApiKeyPage() {
   }
 
   const createNewKey = async () => {
-    setError("")
-    setSuccess("")
-    setCreatedKey(null)
-    if (!newKeyName.trim()) return
+    setError("");
+    setSuccess("");
+    if (!newKeyName.trim()) return;
     if (apiKeys.length >= 5) {
-      setError("Maximum of 5 API keys allowed. Delete one to create a new key.")
-      return
+      setError(t("apiKey.maxKeysReached") || "Maximum of 5 API keys allowed. Delete one to create a new key.");
+      return;
     }
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await ApiKeyService.createApiKey({ name: newKeyName, can_write: newKeyWrite })
-      setCreatedKey(res.api_key)
-      setSuccess("API key created! Please copy and store it securely. It will not be shown again.")
-      setIsDialogOpen(false)
-      setNewKeyName("")
-      setNewKeyWrite(true)
-      fetchApiKeys()
+      const expires_in_days = newKeyExpiresIn === "permanent" ? undefined : parseInt(newKeyExpiresIn, 10);
+      const res = await ApiKeyService.createApiKey({ name: newKeyName, description: newKeyDescription, can_write: newKeyWrite, expires_in_days });
+      
+      // Add the new key to the list with the full key for display
+      const newKey: ApiKeyWithFullKey = {
+        id: 0, // Will be set by the backend
+        key_id: res.key_id,
+        name: newKeyName,
+        description: newKeyDescription,
+        prefix: res.prefix,
+        permissions: { read: true, write: newKeyWrite },
+        is_active: true,
+        expires_in_days,
+        created_at: new Date().toISOString(),
+        full_key: res.api_key // Store the full key for persistent display
+      };
+      
+      setApiKeys(prev => [...prev, newKey]);
+      setSuccess("API key created successfully!");
+      setIsDialogOpen(false);
+      setNewKeyName("");
+      setNewKeyWrite(true);
+      setNewKeyDescription("");
+      setNewKeyExpiresIn("30");
     } catch (e: any) {
-      setError(e.message || "Failed to create API key")
+      setError(e.message || "Failed to create API key");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const filteredApiKeys = apiKeys.filter((apiKey) => {
     const matchesSearch = apiKey.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -165,39 +200,62 @@ export function ApiKeyPage() {
             <DialogTrigger asChild>
               <Button className="w-full" disabled={apiKeys.length >= 5}>
                 <Plus className="h-4 w-4 mr-2" />
-                {t("action.createKey")}
+                {t("apiKey.createKey") || "Create Key"}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{t("action.createKey")}</DialogTitle>
+                <DialogTitle>{t("apiKey.createKey") || "Create API Key"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="keyName">{t("table.name")}</Label>
+                  <Label htmlFor="keyName">{t("apiKey.keyName") || "Key Name"}</Label>
                   <Input
                     id="keyName"
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
-                    placeholder={t("table.name")}
+                    placeholder={t("apiKey.keyName") || "Enter key name"}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="keyDescription">{t("apiKey.keyDescription") || "Description"}</Label>
+                  <Input
+                    id="keyDescription"
+                    value={newKeyDescription}
+                    onChange={(e) => setNewKeyDescription(e.target.value)}
+                    placeholder={t("apiKey.keyDescription") || "Enter description"}
                   />
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" checked readOnly disabled className="mr-1" />
-                  <Label>Read</Label>
+                  <Label>{t("apiKey.readOnly") || "Read Only"}</Label>
                   <input
                     type="checkbox"
                     checked={newKeyWrite}
                     onChange={e => setNewKeyWrite(e.target.checked)}
                     className="ml-4 mr-1"
                   />
-                  <Label>Write</Label>
+                  <Label>{t("apiKey.readWrite") || "Read & Write"}</Label>
+                </div>
+                <div>
+                  <Label htmlFor="expiresIn">{t("apiKey.expirationPeriod") || "Expiration Period"}</Label>
+                  <Select value={newKeyExpiresIn} onValueChange={setNewKeyExpiresIn}>
+                    <SelectTrigger id="expiresIn">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 {t("apiKey.days") || "days"}</SelectItem>
+                      <SelectItem value="60">60 {t("apiKey.days") || "days"}</SelectItem>
+                      <SelectItem value="90">90 {t("apiKey.days") || "days"}</SelectItem>
+                      <SelectItem value="180">180 {t("apiKey.days") || "days"}</SelectItem>
+                      <SelectItem value="permanent">{t("apiKey.permanent") || "Permanent"}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button onClick={createNewKey} className="w-full" disabled={apiKeys.length >= 5 || !newKeyName.trim()}>
-                  {t("action.createKey")}
+                  {t("apiKey.createKey") || "Create Key"}
                 </Button>
-                {apiKeys.length >= 5 && <div className="text-red-600 text-sm">Maximum of 5 API keys allowed. Delete one to create a new key.</div>}
-                {createdKey && <div className="text-green-700 text-sm">API Key: <span className="font-mono">{createdKey}</span></div>}
+                {apiKeys.length >= 5 && <div className="text-red-600 text-sm">{t("apiKey.maxKeysReached") || "Maximum of 5 API keys allowed. Delete one to create a new key."}</div>}
               </div>
             </DialogContent>
           </Dialog>
@@ -224,8 +282,8 @@ export function ApiKeyPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-              <SelectItem value="active">{t("table.active")}</SelectItem>
-              <SelectItem value="disabled">{t("table.disabled")}</SelectItem>
+              <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
+              <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -241,29 +299,81 @@ export function ApiKeyPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("table.name")}</TableHead>
-                <TableHead>{t("table.status")}</TableHead>
-                <TableHead>{t("table.permissions")}</TableHead>
-                <TableHead>{t("table.created")}</TableHead>
-                <TableHead>{t("table.actions")}</TableHead>
+                <TableHead>{t("table.name") || "Name"}</TableHead>
+                <TableHead>{t("apiKey.description") || "Description"}</TableHead>
+                <TableHead>{t("table.status") || "Status"}</TableHead>
+                <TableHead>{t("apiKey.expiration") || "Expiration"}</TableHead>
+                <TableHead>{t("table.permissions") || "Permissions"}</TableHead>
+                <TableHead>{t("apiKey.keyValue") || "Key Value"}</TableHead>
+                <TableHead>{t("table.created") || "Created"}</TableHead>
+                <TableHead>{t("table.actions") || "Actions"}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredApiKeys.map((key) => (
                 <TableRow key={key.key_id}>
                   <TableCell>{key.name}</TableCell>
+                  <TableCell>{key.description || "-"}</TableCell>
                   <TableCell>
                     <Badge variant={key.is_active ? "default" : "destructive"}>
-                      {key.is_active ? t("status.active") || "Active" : t("status.disabled") || "Disabled"}
+                      {key.is_active ? "Active" : "Disabled"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{ApiKeyService.getPermissionsText(key.permissions)}</TableCell>
+                  <TableCell>
+                    {key.expires_in_days ? ApiKeyService.getExpirationText(key.expires_in_days, key.created_at, (k, vars) => t(k, vars)) : (t("apiKey.permanent") || "Permanent")}
+                  </TableCell>
+                  <TableCell>{ApiKeyService.getPermissionsText(key.permissions, t)}</TableCell>
+                  <TableCell>
+                    {key.full_key ? (
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                          {showKeys[key.key_id] ? key.full_key : "••••••••••••••••••••••••••••••••••••••••••••••••"}
+                        </div>
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          onClick={() => toggleKeyVisibility(key.key_id)}
+                          title={showKeys[key.key_id] ? (t("apiKey.hide") || "Hide") : (t("apiKey.view") || "View")}
+                          disabled={!key.full_key}
+                        >
+                          {showKeys[key.key_id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          onClick={() => copyToClipboard(key.full_key!)}
+                          title={t("apiKey.copy") || "Copy"}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                          {key.prefix}...
+                        </div>
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          onClick={() => copyToClipboard(key.prefix + "...")}
+                          title={t("apiKey.copy") || "Copy"}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</TableCell>
                   <TableCell className="flex gap-2">
-                    <Button size="icon" variant="outline" onClick={() => copyToClipboard(key.prefix + "... (full key only shown on creation)") } title="Copy API Key Prefix">
-                      <Copy className="h-4 w-4" />
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      onClick={() => handleToggleKeyStatus(key.key_id)} 
+                      title={key.is_active ? (t("apiKey.disable") || "Disable") : (t("apiKey.enable") || "Enable")}
+                    >
+                      {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                     </Button>
-                    <Button size="icon" variant="outline" onClick={() => openDeleteDialog(key.key_id, key.name)} title="Delete API Key">
+                    <Button size="icon" variant="outline" onClick={() => openDeleteDialog(key.key_id, key.name)} title={t("apiKey.deleteKey") || "Delete API Key"}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -271,8 +381,8 @@ export function ApiKeyPage() {
               ))}
               {filteredApiKeys.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    {loading ? "Loading..." : t("table.noKeys") || "No API keys found."}
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    {loading ? "Loading..." : (t("table.noKeys") || "No API keys found.")}
                   </TableCell>
                 </TableRow>
               )}

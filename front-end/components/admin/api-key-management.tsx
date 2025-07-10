@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Copy, Eye, EyeOff, Trash2, Search, Filter, AlertTriangle, Shield } from "lucide-react"
+import { Plus, Eye, EyeOff, Trash2, Search, Filter, AlertTriangle, Shield, CheckCircle, Power, PowerOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { ApiKeyService } from "../../services/api-key-service"
 import type { ApiKey } from "../../services/api-key-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { format } from "date-fns"
 
 export function AdminApiKeyManagement() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
@@ -24,6 +25,10 @@ export function AdminApiKeyManagement() {
   const [success, setSuccess] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<{ total_keys: number; active_keys: number; expired_keys: number; usage_last_30_days: number } | null>(null)
+  const [sortBy, setSortBy] = useState<string>("created_at")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+  const [ownerFilter, setOwnerFilter] = useState<string>("all")
+  const [dateRange, setDateRange] = useState<{ from: string | null, to: string | null }>({ from: null, to: null })
 
   // Admin action confirmation state
   const [actionDialog, setActionDialog] = useState<{
@@ -31,7 +36,7 @@ export function AdminApiKeyManagement() {
     keyId: string
     keyName: string
     userEmail: string
-    action: "disable" | "delete"
+    action: "enable" | "disable" | "delete"
     reason: string
     isLoading: boolean
   }>({
@@ -73,7 +78,7 @@ export function AdminApiKeyManagement() {
     }
   }
 
-  const openActionDialog = (keyId: string, keyName: string, userEmail: string, action: "disable" | "delete") => {
+  const openActionDialog = (keyId: string, keyName: string, userEmail: string, action: "enable" | "disable" | "delete") => {
     setActionDialog({
       isOpen: true,
       keyId,
@@ -111,23 +116,62 @@ export function AdminApiKeyManagement() {
         // Update the key status in the list
         setApiKeys((prev) => prev.map((key) => 
           key.key_id === actionDialog.keyId 
-            ? { ...key, is_active: false }
+            ? { ...key, is_active: actionDialog.action === "enable" }
             : key
         ))
       }
       
-      setSuccess(`API key "${actionDialog.keyName}" has been ${actionDialog.action}. A notification email has been sent to ${actionDialog.userEmail}.`)
+      const actionText = actionDialog.action === "enable" ? "enabled" : actionDialog.action === "disable" ? "disabled" : "deleted"
+      setSuccess(`API key "${actionDialog.keyName}" has been ${actionText}. A notification email has been sent to ${actionDialog.userEmail}.`)
       closeActionDialog()
     } catch (e: any) {
       setError(e.message || `Failed to ${actionDialog.action} API key`)
     }
   }
 
-  const filteredApiKeys = apiKeys.filter((apiKey) => {
+  // Get unique owners for filter dropdown
+  const owners = Array.from(new Set(apiKeys.map(k => k.user_email).filter(Boolean)))
+
+  // Sorting logic
+  const sortedApiKeys = [...apiKeys].sort((a, b) => {
+    let aVal = a[sortBy as keyof ApiKey]
+    let bVal = b[sortBy as keyof ApiKey]
+    // Handle undefined
+    if (typeof aVal === 'undefined' || aVal === null) aVal = ''
+    if (typeof bVal === 'undefined' || bVal === null) bVal = ''
+    // Handle booleans (e.g., is_active)
+    if (typeof aVal === 'boolean') aVal = aVal ? 1 : 0
+    if (typeof bVal === 'boolean') bVal = bVal ? 1 : 0
+    // Handle objects (e.g., permissions)
+    if (typeof aVal === 'object') aVal = ''
+    if (typeof bVal === 'object') bVal = ''
+    if (sortBy === "created_at") {
+      aVal = a.created_at ? new Date(a.created_at).getTime() : 0
+      bVal = b.created_at ? new Date(b.created_at).getTime() : 0
+    }
+    if (sortBy === "name" || sortBy === "user_email") {
+      aVal = (aVal || "").toString().toLowerCase()
+      bVal = (bVal || "").toString().toLowerCase()
+    }
+    if (aVal === bVal) return 0
+    if (sortOrder === "asc") return aVal > bVal ? 1 : -1
+    return aVal < bVal ? 1 : -1
+  })
+
+  // Filtering logic
+  const filteredApiKeys = sortedApiKeys.filter((apiKey) => {
     const matchesSearch = apiKey.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (apiKey.user_email && apiKey.user_email.toLowerCase().includes(searchTerm.toLowerCase()))
+      (apiKey.user_email && apiKey.user_email.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesStatus = statusFilter === "all" || (apiKey.is_active ? "active" : "disabled") === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesOwner = ownerFilter === "all" || apiKey.user_email === ownerFilter
+    let matchesDate = true
+    if (dateRange.from) {
+      matchesDate = matchesDate && new Date(apiKey.created_at) >= new Date(dateRange.from)
+    }
+    if (dateRange.to) {
+      matchesDate = matchesDate && new Date(apiKey.created_at) <= new Date(dateRange.to)
+    }
+    return matchesSearch && matchesStatus && matchesOwner && matchesDate
   })
 
   const activeKeys = apiKeys.filter((key) => key.is_active).length
@@ -142,19 +186,19 @@ export function AdminApiKeyManagement() {
       <div className="grid gap-4 md:grid-cols-4">
         <div className="bg-card p-4 rounded-lg border border-border">
           <div className="text-2xl font-bold text-foreground">{totalKeys}</div>
-          <div className="text-sm text-muted-foreground">Total Keys</div>
+          <div className="text-sm text-muted-foreground">{t("table.totalKeys") || "Total Keys"}</div>
         </div>
         <div className="bg-card p-4 rounded-lg border border-border">
           <div className="text-2xl font-bold text-green-600">{activeKeys}</div>
-          <div className="text-sm text-muted-foreground">Active Keys</div>
+          <div className="text-sm text-muted-foreground">{t("table.activeKeys") || "Active Keys"}</div>
         </div>
         <div className="bg-card p-4 rounded-lg border border-border">
           <div className="text-2xl font-bold text-foreground">{totalKeys - activeKeys}</div>
-          <div className="text-sm text-muted-foreground">Disabled Keys</div>
+          <div className="text-sm text-muted-foreground">{t("table.disabledKeys") || "Disabled Keys"}</div>
         </div>
         <div className="bg-card p-4 rounded-lg border border-border">
           <div className="text-2xl font-bold text-blue-600">{stats?.usage_last_30_days || 0}</div>
-          <div className="text-sm text-muted-foreground">API Calls (30d)</div>
+          <div className="text-sm text-muted-foreground">{t("table.apiCalls") || "API Calls"} (30d)</div>
         </div>
       </div>
 
@@ -163,22 +207,49 @@ export function AdminApiKeyManagement() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search by key name or user email..."
+            placeholder={t("apiKey.search") || "Search by key name or user email..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter by status" />
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
+            <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+            <SelectItem value="active">{t("table.active")}</SelectItem>
+            <SelectItem value="disabled">{t("table.disabled")}</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder={t("table.owner") || "Owner"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("table.owner") || "All Owners"}</SelectItem>
+            {owners.filter((owner): owner is string => Boolean(owner)).map(owner => (
+              <SelectItem key={owner} value={owner}>{owner}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <Label>{t("table.created")}</Label>
+          <Input
+            type="date"
+            value={String(dateRange.from ?? "")}
+            onChange={e => setDateRange(r => ({ ...r, from: e.target.value || null }))}
+            className="w-[120px]"
+          />
+          <span>-</span>
+          <Input
+            type="date"
+            value={String(dateRange.to ?? "")}
+            onChange={e => setDateRange(r => ({ ...r, to: e.target.value || null }))}
+            className="w-[120px]"
+          />
+        </div>
       </div>
 
       {/* Table */}
@@ -186,69 +257,77 @@ export function AdminApiKeyManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Admin API Key Management
+            {t("nav.apiKeys") || "Admin API Key Management"}
           </CardTitle>
           <CardDescription>
-            View and manage all API keys across the platform. You can disable or delete keys, and users will be notified via email.
+            {t("admin.apiKeyManagementDesc") || "View and manage all API keys across the platform. You can disable or delete keys, and users will be notified via email."}
           </CardDescription>
         </CardHeader>
         <div className="p-4">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Key Name</TableHead>
-                <TableHead>Owner</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Permissions</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Last Used</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead onClick={() => { setSortBy("name"); setSortOrder(sortBy === "name" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("apiKey.keyName")} {sortBy === "name" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
+                <TableHead>{t("apiKey.description")}</TableHead>
+                <TableHead onClick={() => { setSortBy("is_active"); setSortOrder(sortBy === "is_active" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("table.status")} {sortBy === "is_active" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
+                <TableHead>{t("apiKey.expiration")}</TableHead>
+                <TableHead>{t("table.permissions") || "Permissions"}</TableHead>
+                <TableHead>{t("apiKey.keyValue")}</TableHead>
+                <TableHead onClick={() => { setSortBy("user_email"); setSortOrder(sortBy === "user_email" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("table.owner")} {sortBy === "user_email" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
+                <TableHead onClick={() => { setSortBy("created_at"); setSortOrder(sortBy === "created_at" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("table.created")} {sortBy === "created_at" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
+                <TableHead>{t("table.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredApiKeys.map((key) => (
                 <TableRow key={key.key_id}>
-                  <TableCell className="font-medium">{key.name}</TableCell>
-                  <TableCell>{key.user_email || "Unknown"}</TableCell>
+                  <TableCell>{key.name}</TableCell>
+                  <TableCell>{key.description || "-"}</TableCell>
                   <TableCell>
                     <Badge variant={key.is_active ? "default" : "destructive"}>
                       {key.is_active ? "Active" : "Disabled"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{ApiKeyService.getPermissionsText(key.permissions)}</TableCell>
+                  <TableCell>
+                    {key.expires_in_days ? ApiKeyService.getExpirationText(key.expires_in_days, key.created_at, t) : (t("apiKey.permanent") || "Permanent")}
+                  </TableCell>
+                  <TableCell>{ApiKeyService.getPermissionsText(key.permissions, t)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                        {key.prefix}...
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {t("apiKey.adminViewNote") || "Full key not available in admin view"}
+                    </div>
+                  </TableCell>
+                  <TableCell>{key.user_email || "-"}</TableCell>
                   <TableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</TableCell>
-                  <TableCell>{key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : "Never"}</TableCell>
                   <TableCell className="flex gap-2">
-                    {key.is_active && (
-                      <>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", "disable")}
-                          className="text-orange-600 hover:text-orange-700"
-                        >
-                          Disable
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", "delete")}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                    {!key.is_active && (
-                      <span className="text-muted-foreground text-sm">No actions available</span>
-                    )}
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", key.is_active ? "disable" : "enable")} 
+                      title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
+                    >
+                      {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", "delete")} 
+                      title={t("apiKey.deleteKey") || "Delete API Key"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {filteredApiKeys.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    {loading ? "Loading..." : "No API keys found."}
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    {loading ? "Loading..." : t("table.noKeys") || "No API keys found."}
                   </TableCell>
                 </TableRow>
               )}
@@ -263,7 +342,12 @@ export function AdminApiKeyManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-600" />
-              {actionDialog.action === "disable" ? "Disable API Key" : "Delete API Key"}
+              {actionDialog.action === "enable" 
+                ? t("action.enable") + " " + t("table.apiKey")
+                : actionDialog.action === "disable" 
+                ? t("action.disable") + " " + t("table.apiKey")
+                : t("action.delete") + " " + t("table.apiKey")
+              }
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -272,38 +356,47 @@ export function AdminApiKeyManagement() {
                 <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5" />
                 <div>
                   <p className="font-medium text-orange-800">
-                    {actionDialog.action === "disable" 
-                      ? "This will disable the API key and prevent any further API access."
-                      : "This will permanently delete the API key. This action cannot be undone."
+                    {actionDialog.action === "enable" 
+                      ? t("admin.enableApiKeyWarning") || "This will enable the API key and allow API access."
+                      : actionDialog.action === "disable"
+                      ? t("admin.disableApiKeyWarning") || "This will disable the API key and prevent any further API access."
+                      : t("admin.deleteApiKeyWarning") || "This will permanently delete the API key. This action cannot be undone."
                     }
                   </p>
                   <p className="text-sm text-orange-700 mt-1">
-                    A notification email will be sent to <strong>{actionDialog.userEmail}</strong> informing them of this action.
+                    {t("admin.notificationEmailSent") || "A notification email will be sent to"} <strong>{actionDialog.userEmail}</strong> {t("admin.informingAction") || "informing them of this action."}
                   </p>
                 </div>
               </div>
             </div>
             
             <div>
-              <Label htmlFor="reason">Reason (optional)</Label>
+              <Label htmlFor="reason">{t("admin.reason") || "Reason"} ({t("admin.optional") || "optional"})</Label>
               <Input
                 id="reason"
                 value={actionDialog.reason}
                 onChange={(e) => setActionDialog(prev => ({ ...prev, reason: e.target.value }))}
-                placeholder="Enter a reason for this action..."
+                placeholder={t("admin.enterReason") || "Enter a reason for this action..."}
               />
             </div>
             
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={closeActionDialog}>
-                Cancel
+                {t("action.cancel")}
               </Button>
               <Button 
                 variant={actionDialog.action === "delete" ? "destructive" : "default"}
                 onClick={confirmAction}
                 disabled={actionDialog.isLoading}
               >
-                {actionDialog.isLoading ? "Processing..." : actionDialog.action === "disable" ? "Disable Key" : "Delete Key"}
+                {actionDialog.isLoading 
+                  ? t("admin.processing") || "Processing..." 
+                  : actionDialog.action === "enable" 
+                  ? t("action.enable") + " " + t("table.apiKey")
+                  : actionDialog.action === "disable" 
+                  ? t("action.disable") + " " + t("table.apiKey")
+                  : t("action.delete") + " " + t("table.apiKey")
+                }
               </Button>
             </div>
           </div>

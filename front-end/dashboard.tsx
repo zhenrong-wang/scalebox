@@ -29,6 +29,7 @@ import { SandboxManagement } from "./components/admin/sandbox-management"
 import { UserService } from "./services/user-service"
 import { useLanguage } from "./contexts/language-context"
 import { LanguageToggle } from "./components/language-toggle"
+import { AdminApiKeyManagement } from "./components/admin/api-key-management"
 
 export type PageType =
   | "sandboxes"
@@ -42,6 +43,7 @@ export type PageType =
   | "admin-billing"
   | "system"
   | "sandbox-management"
+  | "admin-api-keys"
 type AuthState = "landing" | "signin" | "signup" | "verification" | "reset-password-request" | "reset-password-confirm" | "authenticated"
 
 function DashboardContent() {
@@ -281,6 +283,8 @@ function DashboardContent() {
         return <BudgetPage />
       case "billings":
         return <BillingsPage />
+      case "admin-api-keys":
+        return isAdmin ? <AdminApiKeyManagement /> : <div className="text-center py-8 text-muted-foreground">{t("dashboard.accessDenied")}</div>;
       default:
         return isAdmin ? <AdminDashboard /> : <ProjectManagement />
     }

@@ -22,7 +22,7 @@ interface ApiKey {
   key_id: string;
   name: string;
   prefix: string;
-  permissions?: Record<string, any>;
+  permissions: { read: true; write: boolean };
   is_active: boolean;
   expires_at?: string;
   last_used_at?: string;
@@ -98,8 +98,8 @@ export function ApiKeyManagement() {
     try {
       const request = {
         name: createForm.name.trim(),
-        expires_in_days: createForm.expires_in_days ? parseInt(createForm.expires_in_days) : undefined,
-        permissions: createForm.permissions ? JSON.parse(createForm.permissions) : undefined
+        can_write: true, // Default to read-write permissions
+        expires_in_days: createForm.expires_in_days ? parseInt(createForm.expires_in_days) : undefined
       }
 
       const result = await ApiKeyService.createApiKey(request)
@@ -444,7 +444,7 @@ export function ApiKeyManagement() {
           <DialogHeader>
             <DialogTitle>API Key Created Successfully</DialogTitle>
             <DialogDescription>
-              Copy your API key now. You won't be able to see it again for security reasons.
+              Your API key has been created successfully. You can view and copy it anytime using the eye icon in the table.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -467,7 +467,7 @@ export function ApiKeyManagement() {
             </div>
             <Alert>
               <AlertDescription>
-                <strong>Important:</strong> Store this API key securely. You won't be able to view it again.
+                <strong>Note:</strong> You can view this API key anytime using the eye icon in the table.
               </AlertDescription>
             </Alert>
           </div>

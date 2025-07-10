@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from pydantic import BaseModel, validator
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, func, Text, JSON
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, func, Text, JSON, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from passlib.context import CryptContext
@@ -32,18 +32,23 @@ Base = declarative_base()
 # Models
 class ApiKey(Base):
     __tablename__ = "api_keys"
+    __table_args__ = (
+        UniqueConstraint('user_id', 'name', name='uq_userid_apikeyname'),
+    )
     id = Column(Integer, primary_key=True, index=True)
     key_id = Column(String(64), unique=True, index=True, nullable=False)
     user_id = Column(Integer, nullable=False)
     name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)  # New description field
     key_hash = Column(String(255), nullable=False)
+    full_key = Column(Text, nullable=True)  # Store the full key for display
     prefix = Column(String(16), nullable=False)
     permissions = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=True)
-    expires_at = Column(DateTime, nullable=True)
-    last_used_at = Column(DateTime, nullable=True)
+    expires_in_days = Column(Integer, nullable=True)  # Changed from expires_at to expires_in_days
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    last_used_at = Column(DateTime, nullable=True)
 
 class ApiKeyUsage(Base):
     __tablename__ = "api_key_usage"
@@ -71,7 +76,9 @@ class ApiRateLimit(Base):
 # Pydantic models
 class CreateApiKeyRequest(BaseModel):
     name: str
+    description: Optional[str] = None  # New description field
     can_write: bool = True  # Default to R&W permissions
+    expires_in_days: Optional[int] = None  # Changed from expires_at to expires_in_days
 
     @validator('name')
     def validate_name(cls, v):
@@ -81,18 +88,35 @@ class CreateApiKeyRequest(BaseModel):
             raise ValueError('Name too long')
         return v.strip()
 
+    @validator('expires_in_days')
+    def validate_expires_in_days(cls, v):
+        if v is not None:
+            if v < 30 or v > 180:
+                raise ValueError('Expiration must be between 30 and 180 days, or null for permanent')
+        return v
+
+    @validator('description')
+    def validate_description(cls, v):
+        if v is not None and len(v) > 1000:
+            raise ValueError('Description too long (max 1000 characters)')
+        return v
+
 class UpdateApiKeyRequest(BaseModel):
     name: Optional[str] = None
+    description: Optional[str] = None  # New description field
     can_write: Optional[bool] = None
+    expires_in_days: Optional[int] = None  # Allow updating expiration
 
 class ApiKeyResponse(BaseModel):
     id: int
     key_id: str
     name: str
+    description: Optional[str]  # New description field
     prefix: str
+    full_key: Optional[str] = None  # Full API key for display
     permissions: Dict[str, bool]
     is_active: bool
-    expires_at: Optional[datetime.datetime]
+    expires_in_days: Optional[int]  # Changed from expires_at to expires_in_days
     last_used_at: Optional[datetime.datetime]
     created_at: datetime.datetime
     user_email: Optional[str] = None  # For admin view
@@ -144,9 +168,13 @@ def get_api_key_user(api_key: str = Depends(get_api_key_from_header), db: Sessio
         raise HTTPException(status_code=401, detail="Invalid API key")
     
     # Check if expired
-    expires_at = getattr(db_api_key, 'expires_at', None)
-    if expires_at and expires_at < datetime.datetime.utcnow():
-        raise HTTPException(status_code=401, detail="API key expired")
+    expires_in_days = getattr(db_api_key, 'expires_in_days', None)
+    if expires_in_days is not None:
+        # Calculate expiration date based on creation time and days
+        created_at = getattr(db_api_key, 'created_at', datetime.datetime.utcnow())
+        expiration_date = created_at + datetime.timedelta(days=expires_in_days)
+        if datetime.datetime.utcnow() > expiration_date:
+            raise HTTPException(status_code=401, detail="API key expired")
     
     # Get user
     user = db.query(User).filter(User.id == db_api_key.user_id).first()
@@ -188,15 +216,36 @@ def log_api_usage(
 
 async def send_admin_action_notification(user_email: str, action: str, key_name: str, reason: Optional[str] = None):
     """Send notification email to user when admin takes action on their API key"""
-    subject = f"Your ScaleBox API Key has been {action}"
+    # Map action to proper past tense for email subject
+    action_map = {
+        "enable": "enabled",
+        "disable": "disabled", 
+        "delete": "deleted"
+    }
+    action_past = action_map.get(action, action)
+    
+    subject = f"Your ScaleBox API Key has been {action_past} by Admin"
+    
+    # Create action-specific message
+    if action == "enable":
+        action_message = "Your API key has been re-enabled and you can now use it for API access."
+    elif action == "disable":
+        action_message = "Your API key has been disabled and can no longer be used for API access."
+    elif action == "delete":
+        action_message = "Your API key has been permanently deleted and can no longer be used."
+    else:
+        action_message = f"Your API key has been {action}."
+    
     body = f"""
     Hello,
 
-    Your API key "{key_name}" has been {action} by an administrator.
+    {action_message}
     
-    {f"Reason: {reason}" if reason else ""}
+    Key Name: {key_name}
     
-    If you have any questions or concerns, please contact the administrator.
+    {f"Reason provided by administrator: {reason}" if reason else "No specific reason was provided by the administrator."}
+    
+    If you have any questions or concerns about this action, please contact the administrator.
     
     Best regards,
     ScaleBox Team
@@ -241,45 +290,30 @@ def create_api_key(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new API key for the current user"""
-    # Check if user has reached the 5-key limit
+    # Enforce max 5 keys per user
     existing_keys = db.query(ApiKey).filter(ApiKey.user_id == current_user.id).count()
     if existing_keys >= 5:
-        raise HTTPException(
-            status_code=400, 
-            detail="Maximum of 5 API keys allowed per account. Please delete an existing key first."
-        )
-    
-    # Generate the API key
+        raise HTTPException(status_code=400, detail="Maximum 5 API keys allowed.")
+    # Enforce unique name per user
+    if db.query(ApiKey).filter(ApiKey.user_id == current_user.id, ApiKey.name == request.name).first():
+        raise HTTPException(status_code=400, detail="API key name must be unique for your account.")
     full_key, key_hash, prefix = generate_api_key()
-    
-    # Set permissions (read is always true, write is configurable)
-    permissions = {
-        "read": True,
-        "write": request.can_write
-    }
-    
-    # Create the API key record
+    permissions = {"read": True, "write": request.can_write}
     api_key = ApiKey(
         key_id=str(uuid.uuid4()),
         user_id=current_user.id,
         name=request.name,
+        description=request.description,
         key_hash=key_hash,
+        full_key=full_key,  # Store the full key
         prefix=prefix,
         permissions=permissions,
-        is_active=True
+        is_active=True,
+        expires_in_days=request.expires_in_days,
     )
-    
     db.add(api_key)
     db.commit()
-    db.refresh(api_key)
-    
-    return {
-        "message": "API key created successfully",
-        "api_key": full_key,
-        "key_id": api_key.key_id,
-        "prefix": prefix
-    }
+    return {"api_key": full_key, "key_id": api_key.key_id, "prefix": prefix}
 
 @router.get("/", response_model=List[ApiKeyResponse])
 def list_api_keys(
@@ -293,10 +327,12 @@ def list_api_keys(
             id=getattr(key, 'id'),
             key_id=getattr(key, 'key_id'),
             name=getattr(key, 'name'),
+            description=getattr(key, 'description'),
             prefix=getattr(key, 'prefix'),
+            full_key=getattr(key, 'full_key'),  # Include the full key
             permissions=getattr(key, 'permissions') or {"read": True, "write": True},
             is_active=getattr(key, 'is_active'),
-            expires_at=getattr(key, 'expires_at'),
+            expires_in_days=getattr(key, 'expires_in_days'),
             last_used_at=getattr(key, 'last_used_at'),
             created_at=getattr(key, 'created_at')
         )
@@ -322,10 +358,12 @@ def get_api_key(
         id=getattr(api_key, 'id'),
         key_id=getattr(api_key, 'key_id'),
         name=getattr(api_key, 'name'),
+        description=getattr(api_key, 'description'),
         prefix=getattr(api_key, 'prefix'),
+        full_key=getattr(api_key, 'full_key'),  # Include the full key
         permissions=getattr(api_key, 'permissions') or {"read": True, "write": True},
         is_active=getattr(api_key, 'is_active'),
-        expires_at=getattr(api_key, 'expires_at'),
+        expires_in_days=getattr(api_key, 'expires_in_days'),
         last_used_at=getattr(api_key, 'last_used_at'),
         created_at=getattr(api_key, 'created_at')
     )
@@ -346,9 +384,14 @@ def update_api_key(
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
     
-    # Update fields
-    if request.name is not None:
+    # Enforce unique name per user if updating name
+    if request.name is not None and request.name != api_key.name:
+        if db.query(ApiKey).filter(ApiKey.user_id == current_user.id, ApiKey.name == request.name).first():
+            raise HTTPException(status_code=400, detail="API key name must be unique for your account.")
         setattr(api_key, 'name', request.name)
+    
+    if request.description is not None:
+        setattr(api_key, 'description', request.description)
     
     if request.can_write is not None:
         # Ensure read permission is always true
@@ -357,6 +400,9 @@ def update_api_key(
             "write": request.can_write
         })
     
+    if request.expires_in_days is not None:
+        setattr(api_key, 'expires_in_days', request.expires_in_days)
+    
     db.commit()
     db.refresh(api_key)
     
@@ -364,10 +410,11 @@ def update_api_key(
         id=getattr(api_key, 'id'),
         key_id=getattr(api_key, 'key_id'),
         name=getattr(api_key, 'name'),
+        description=getattr(api_key, 'description'),
         prefix=getattr(api_key, 'prefix'),
         permissions=getattr(api_key, 'permissions') or {"read": True, "write": True},
         is_active=getattr(api_key, 'is_active'),
-        expires_at=getattr(api_key, 'expires_at'),
+        expires_in_days=getattr(api_key, 'expires_in_days'),
         last_used_at=getattr(api_key, 'last_used_at'),
         created_at=getattr(api_key, 'created_at')
     )
@@ -391,6 +438,53 @@ def delete_api_key(
     db.commit()
     
     return {"message": "API key deleted successfully"}
+
+@router.post("/{key_id}/toggle")
+def toggle_api_key_status(
+    key_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle API key status (enable/disable) for the current user"""
+    api_key = db.query(ApiKey).filter(
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    # Toggle the status
+    setattr(api_key, 'is_active', not getattr(api_key, 'is_active'))
+    db.commit()
+    
+    status = "enabled" if getattr(api_key, 'is_active') else "disabled"
+    return {"message": f"API key {status} successfully"}
+
+@router.get("/{key_id}/full-key")
+def get_full_api_key(
+    key_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get the full API key for display (only for newly created keys)"""
+    api_key = db.query(ApiKey).filter(
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    # Only return full key if it was created recently (within last 5 minutes)
+    # This is a security measure - full keys are only shown immediately after creation
+    created_time = getattr(api_key, 'created_at')
+    if created_time and (datetime.datetime.utcnow() - created_time).total_seconds() > 300:  # 5 minutes
+        raise HTTPException(status_code=403, detail="Full API key is only available immediately after creation")
+    
+    # For security, we don't store the full key, so we can't return it
+    # The full key should be returned only in the create response
+    raise HTTPException(status_code=403, detail="Full API key is only available immediately after creation")
 
 @router.get("/{key_id}/usage", response_model=List[ApiKeyUsageResponse])
 def get_api_key_usage(
@@ -447,10 +541,11 @@ def get_all_api_keys(
             id=getattr(key, 'id'),
             key_id=getattr(key, 'key_id'),
             name=getattr(key, 'name'),
+            description=getattr(key, 'description'),
             prefix=getattr(key, 'prefix'),
             permissions=getattr(key, 'permissions') or {"read": True, "write": True},
             is_active=getattr(key, 'is_active'),
-            expires_at=getattr(key, 'expires_at'),
+            expires_in_days=getattr(key, 'expires_in_days'),
             last_used_at=getattr(key, 'last_used_at'),
             created_at=getattr(key, 'created_at'),
             user_email=user_emails.get(getattr(key, 'user_id'))
@@ -466,10 +561,14 @@ def get_api_key_stats(
     """Get API key statistics (admin only)"""
     total_keys = db.query(ApiKey).count()
     active_keys = db.query(ApiKey).filter(ApiKey.is_active.is_(True)).count()
-    expired_keys = db.query(ApiKey).filter(
-        ApiKey.expires_at.isnot(None),
-        ApiKey.expires_at < datetime.datetime.utcnow()
-    ).count()
+    # Count expired keys by checking if current time > creation_time + expires_in_days
+    expired_keys = 0
+    all_keys = db.query(ApiKey).filter(ApiKey.expires_in_days.isnot(None)).all()
+    for key in all_keys:
+        created_at = getattr(key, 'created_at', datetime.datetime.utcnow())
+        expiration_date = created_at + datetime.timedelta(days=getattr(key, 'expires_in_days', 0))
+        if datetime.datetime.utcnow() > expiration_date:
+            expired_keys += 1
     
     # Get usage in last 30 days
     thirty_days_ago = datetime.datetime.utcnow() - timedelta(days=30)
@@ -502,7 +601,11 @@ async def admin_api_key_action(
     if not user:
         raise HTTPException(status_code=404, detail="Key owner not found")
     
-    if action_request.action == "disable":
+    if action_request.action == "enable":
+        setattr(api_key, 'is_active', True)
+        db.commit()
+        message = "API key enabled successfully"
+    elif action_request.action == "disable":
         setattr(api_key, 'is_active', False)
         db.commit()
         message = "API key disabled successfully"
@@ -511,7 +614,7 @@ async def admin_api_key_action(
         db.commit()
         message = "API key deleted successfully"
     else:
-        raise HTTPException(status_code=400, detail="Invalid action. Use 'disable' or 'delete'")
+        raise HTTPException(status_code=400, detail="Invalid action. Use 'enable', 'disable' or 'delete'")
     
     # Send notification email to the user
     background_tasks.add_task(
