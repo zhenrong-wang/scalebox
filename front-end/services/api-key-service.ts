@@ -3,23 +3,22 @@ interface ApiKey {
   key_id: string;
   name: string;
   prefix: string;
-  permissions?: Record<string, any>;
+  permissions: { read: true; write: boolean };
   is_active: boolean;
   expires_at?: string;
   last_used_at?: string;
   created_at: string;
+  user_email?: string; // for admin
 }
 
 interface CreateApiKeyRequest {
   name: string;
-  permissions?: Record<string, any>;
-  expires_in_days?: number;
+  can_write: boolean;
 }
 
 interface UpdateApiKeyRequest {
   name?: string;
-  permissions?: Record<string, any>;
-  is_active?: boolean;
+  can_write?: boolean;
 }
 
 interface ApiKeyUsage {
@@ -39,6 +38,7 @@ interface ApiKeyStats {
   usage_last_30_days: number;
 }
 
+export type { ApiKey };
 export class ApiKeyService {
   static API_BASE = "http://localhost:8000";
 
@@ -50,7 +50,7 @@ export class ApiKeyService {
     };
   }
 
-  static async createApiKey(request: CreateApiKeyRequest): Promise<{ message: string; api_key: string; key_id: string; prefix: string; expires_at?: string }> {
+  static async createApiKey(request: CreateApiKeyRequest): Promise<{ message: string; api_key: string; key_id: string; prefix: string }> {
     const response = await fetch(`${this.API_BASE}/api-keys/`, {
       method: "POST",
       headers: this.getAuthHeaders(),
@@ -160,6 +160,19 @@ export class ApiKeyService {
     return await response.json();
   }
 
+  static async adminApiKeyAction(keyId: string, action: "disable" | "delete", reason?: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.API_BASE}/api-keys/admin/${keyId}/action`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ action, reason }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `Failed to ${action} API key`);
+    }
+    return await response.json();
+  }
+
   // Utility functions
   static formatApiKey(apiKey: string): string {
     // Show only the prefix for security
@@ -181,10 +194,8 @@ export class ApiKeyService {
     return { text: "Active", variant: "default" };
   }
 
-  static getPermissionsText(permissions?: Record<string, any>): string {
-    if (!permissions || Object.keys(permissions).length === 0) {
-      return "Full access";
-    }
-    return Object.keys(permissions).join(", ");
+  static getPermissionsText(permissions: { read: true; write: boolean }): string {
+    if (permissions.write) return "Read & Write";
+    return "Read Only";
   }
 } 

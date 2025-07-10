@@ -10,4 +10,10 @@ aiohttp
 aiosmtplib
 email-validator
 PyJWT
-alembic
+# Performance and monitoring
+prometheus-client
+redis
+celery[redis]
+# High-performance dependencies
+uvloop
+httptools

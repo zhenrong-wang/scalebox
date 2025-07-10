@@ -8,6 +8,7 @@ import { UserManagement } from "./user-management"
 import { UsageAnalytics } from "./usage-analytics"
 import { BillingOverview } from "./billing-overview"
 import { SystemHealth } from "./system-health"
+import { AdminApiKeyManagement } from "./api-key-management"
 import { useLanguage } from "../../contexts/language-context"
 
 // Mock admin stats
@@ -58,11 +59,12 @@ export function AdminDashboard() {
 
       {/* Admin Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">{t("admin.overview")}</TabsTrigger>
           <TabsTrigger value="users">{t("admin.userManagement")}</TabsTrigger>
           <TabsTrigger value="analytics">{t("admin.usageAnalytics")}</TabsTrigger>
           <TabsTrigger value="billing">{t("admin.billingOverview")}</TabsTrigger>
+          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -79,6 +81,10 @@ export function AdminDashboard() {
 
         <TabsContent value="billing" className="space-y-4">
           <BillingOverview />
+        </TabsContent>
+
+        <TabsContent value="api-keys" className="space-y-4">
+          <AdminApiKeyManagement />
         </TabsContent>
       </Tabs>
     </div>
