@@ -10,6 +10,7 @@ import { Sidebar } from "./components/sidebar"
 import { SandboxPage } from "./components/sandbox-page"
 import { TemplatesPage } from "./components/templates-page"
 import { ApiKeyPage } from "./components/api-key-page"
+import { ApiKeyManagement } from "./components/api-key-management"
 import { BudgetPage } from "./components/budget-page"
 import { BillingsPage } from "./components/billings-page"
 import { Button } from "@/components/ui/button"
@@ -275,14 +276,7 @@ function DashboardContent() {
           </div>
         )
       case "api-key":
-        return isAdmin ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <div className="text-lg font-medium mb-2">{t("dashboard.accessRestricted")}</div>
-            <div>{t("dashboard.adminNoApiKeys")}</div>
-          </div>
-        ) : (
-          <ApiKeyPage />
-        )
+        return <ApiKeyManagement />
       case "budget":
         return <BudgetPage />
       case "billings":
@@ -463,7 +457,11 @@ function DashboardContent() {
           </div>
 
           {/* Account Settings Modal */}
-          <AccountSettings isOpen={isAccountSettingsOpen} onClose={() => setIsAccountSettingsOpen(false)} />
+          <AccountSettings 
+            isOpen={isAccountSettingsOpen} 
+            onClose={() => setIsAccountSettingsOpen(false)}
+            onLogout={handleLogout}
+          />
 
           {/* Resize cursor overlay */}
           {isResizing && <div className="fixed inset-0 cursor-col-resize z-50" style={{ pointerEvents: "none" }} />}

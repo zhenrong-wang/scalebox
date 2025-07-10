@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Mail, Lock, Copy, Check } from "lucide-react"
+import { User, Mail, Lock, Copy, Check, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,7 @@ import { UserService } from "../services/user-service";
 interface AccountSettingsProps {
   isOpen: boolean
   onClose: () => void
+  onLogout?: () => void
 }
 
 // Update UserData type
@@ -30,7 +31,7 @@ type UserData = {
   // ...other fields as needed
 };
 
-export function AccountSettings({ isOpen, onClose }: AccountSettingsProps) {
+export function AccountSettings({ isOpen, onClose, onLogout }: AccountSettingsProps) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isEditing, setIsEditing] = useState({
     username: false,
@@ -392,6 +393,32 @@ export function AccountSettings({ isOpen, onClose }: AccountSettingsProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Logout Section */}
+          {onLogout && (
+            <Card className="border-destructive/20">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+                  <LogOut className="h-5 w-5" />
+                  {t("account.logout") || "Logout"}
+                </CardTitle>
+                <CardDescription>{t("account.logoutDescription") || "Sign out of your account"}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    onLogout();
+                    onClose();
+                  }}
+                  className="w-full"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {t("account.logout") || "Logout"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>
