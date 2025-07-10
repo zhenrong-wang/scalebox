@@ -62,7 +62,7 @@ export function SandboxManagement() {
       if (filters.dateRange.from && new Date(sb.createdAt) < new Date(filters.dateRange.from)) return false
       if (filters.dateRange.to && new Date(sb.createdAt) > new Date(filters.dateRange.to)) return false
       // Search filter
-      if (searchTerm && !(
+      if (searchTerm.trim() && !(
         sb.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sb.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sb.framework.toLowerCase().includes(searchTerm.toLowerCase())

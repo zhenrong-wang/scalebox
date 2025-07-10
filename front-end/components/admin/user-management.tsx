@@ -112,7 +112,7 @@ export function UserManagement() {
   useEffect(() => {
     let filtered = users
 
-    if (searchTerm) {
+    if (searchTerm.trim()) {
       filtered = filtered.filter(
         (user) =>
           (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
