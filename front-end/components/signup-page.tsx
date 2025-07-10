@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Eye, EyeOff, ArrowLeft, Box, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +48,7 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
   const [showVerification, setShowVerification] = useState(false)
   const [inputCode, setInputCode] = useState("")
   const [verificationError, setVerificationError] = useState("")
+  const captchaRef = useRef<{ validate: () => void }>(null)
 
   const { t } = useLanguage()
 
@@ -107,10 +108,23 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
       if (!acceptTerms) setError(t("signup.terms.required"))
       return
     }
+    
+    // Validate captcha if not already verified
     if (!recaptchaVerified) {
-      setError(t("signup.recaptcha.required"))
+      if (captchaValue.trim() === "") {
+        setError(t("signup.recaptcha.required"))
+        return
+      }
+      // Trigger captcha validation
+      captchaRef.current?.validate()
       return
     }
+    
+    // Proceed with form submission
+    await submitForm()
+  }
+
+  const submitForm = async () => {
     setIsLoading(true)
 
     try {
@@ -357,6 +371,7 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
 
               {/* reCAPTCHA */}
               <RecaptchaMock 
+                ref={captchaRef}
                 onVerify={() => setRecaptchaVerified(true)} 
                 disabled={isLoading || recaptchaVerified}
                 value={captchaValue}
@@ -365,6 +380,12 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
                 clearError={() => setCaptchaError("")}
                 regenerateOnError={shouldRegenerateCaptcha}
                 onRegenerate={() => setShouldRegenerateCaptcha(false)}
+                onValidate={(isValid) => {
+                  if (isValid) {
+                    // Captcha is valid, proceed with form submission
+                    submitForm()
+                  }
+                }}
               />
               {captchaError && (
                 <div className="text-xs text-destructive">

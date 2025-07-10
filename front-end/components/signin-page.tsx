@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Eye, EyeOff, ArrowLeft, Box } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,6 +32,7 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
   const [captchaValue, setCaptchaValue] = useState("")
   const [captchaError, setCaptchaError] = useState("")
   const [shouldRegenerateCaptcha, setShouldRegenerateCaptcha] = useState(false)
+  const captchaRef = useRef<{ validate: () => void }>(null)
   const { t } = useLanguage()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,11 +45,22 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
       return
     }
 
+    // Validate captcha if not already verified
     if (!recaptchaVerified) {
-      setError(t("signin.error.recaptcha"))
+      if (captchaValue.trim() === "") {
+        setError(t("signin.error.recaptcha"))
+        return
+      }
+      // Trigger captcha validation
+      captchaRef.current?.validate()
       return
     }
 
+    // Proceed with sign in
+    await submitSignIn()
+  }
+
+  const submitSignIn = async () => {
     setIsLoading(true)
 
     try {
@@ -152,6 +164,7 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
 
               {/* reCAPTCHA */}
               <RecaptchaMock 
+                ref={captchaRef}
                 onVerify={() => setRecaptchaVerified(true)} 
                 disabled={isLoading || recaptchaVerified}
                 value={captchaValue}
@@ -160,6 +173,12 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
                 clearError={() => setCaptchaError("")}
                 regenerateOnError={shouldRegenerateCaptcha}
                 onRegenerate={() => setShouldRegenerateCaptcha(false)}
+                onValidate={(isValid) => {
+                  if (isValid) {
+                    // Captcha is valid, proceed with sign in
+                    submitSignIn()
+                  }
+                }}
               />
               {captchaError && (
                 <div className="text-xs text-destructive">

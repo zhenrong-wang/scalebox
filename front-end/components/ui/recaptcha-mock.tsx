@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react"
 import { RefreshCw } from "lucide-react"
 import { Button } from "./button"
 import { Input } from "./input"
@@ -16,12 +16,19 @@ interface RecaptchaMockProps {
   clearError: () => void
   regenerateOnError?: boolean
   onRegenerate?: () => void
+  onValidate?: (isValid: boolean) => void
 }
 
-export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, clearError, regenerateOnError = false, onRegenerate }: RecaptchaMockProps) {
+export const RecaptchaMock = forwardRef<{ validate: () => void }, RecaptchaMockProps>(
+  ({ onVerify, disabled, value, onChange, onError, clearError, regenerateOnError = false, onRegenerate, onValidate }, ref) => {
   const { t } = useLanguage()
   const [captchaText, setCaptchaText] = useState("")
   const [isVerified, setIsVerified] = useState(false)
+
+  // Expose validate function to parent component
+  useImperativeHandle(ref, () => ({
+    validate: validateInput
+  }))
 
   // Generate random captcha text
   const generateCaptcha = useCallback((isRegeneration = false) => {
@@ -61,6 +68,9 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
       setIsVerified(true)
       clearError()
       onVerify()
+      if (onValidate) {
+        onValidate(true)
+      }
     } else {
       onError(t("recaptcha.error") || "Incorrect captcha")
       setIsVerified(false)
@@ -69,6 +79,9 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
       // Only regenerate captcha if explicitly requested
       if (regenerateOnError) {
         generateCaptcha(true)
+      }
+      if (onValidate) {
+        onValidate(false)
       }
     }
   }
@@ -224,4 +237,4 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
       )}
     </div>
   )
-} 
+})
