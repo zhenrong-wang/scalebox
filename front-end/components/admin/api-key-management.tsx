@@ -237,37 +237,70 @@ export function AdminApiKeyManagement() {
             </SelectContent>
           </Select>
         </div>
-        <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+        <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
           dateRange.from || dateRange.to 
             ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
             : 'bg-muted/50 border-border'
         }`}>
-          <Calendar className={`h-4 w-4 ${
-            dateRange.from || dateRange.to 
-              ? 'text-blue-600 dark:text-blue-400' 
-              : 'text-muted-foreground'
-          }`} />
           <Label className={`text-sm font-medium whitespace-nowrap ${
             dateRange.from || dateRange.to 
               ? 'text-blue-700 dark:text-blue-300' 
               : ''
           }`}>{t("table.created") || "Created"}</Label>
           <div className="flex items-center gap-1">
-            <Input
-              type="date"
-              value={String(dateRange.from ?? "")}
-              onChange={e => setDateRange(r => ({ ...r, from: e.target.value || null }))}
-              className="w-[130px] h-8 text-sm"
-              placeholder="From date"
-            />
+            <div className="relative">
+              <Input
+                type="text"
+                value={dateRange.from ? new Date(dateRange.from).toLocaleDateString() : ""}
+                readOnly
+                className="w-[100px] h-8 text-sm cursor-pointer"
+                placeholder="From"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'date';
+                  input.style.position = 'absolute';
+                  input.style.opacity = '0';
+                  input.style.pointerEvents = 'none';
+                  document.body.appendChild(input);
+                  input.click();
+                  input.onchange = (e) => {
+                    const target = e.target as HTMLInputElement;
+                    if (target.value) {
+                      setDateRange(r => ({ ...r, from: target.value }));
+                    }
+                    document.body.removeChild(input);
+                  };
+                }}
+              />
+              <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
             <span className="text-muted-foreground text-sm">to</span>
-            <Input
-              type="date"
-              value={String(dateRange.to ?? "")}
-              onChange={e => setDateRange(r => ({ ...r, to: e.target.value || null }))}
-              className="w-[130px] h-8 text-sm"
-              placeholder="To date"
-            />
+            <div className="relative">
+              <Input
+                type="text"
+                value={dateRange.to ? new Date(dateRange.to).toLocaleDateString() : ""}
+                readOnly
+                className="w-[100px] h-8 text-sm cursor-pointer"
+                placeholder="To"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'date';
+                  input.style.position = 'absolute';
+                  input.style.opacity = '0';
+                  input.style.pointerEvents = 'none';
+                  document.body.appendChild(input);
+                  input.click();
+                  input.onchange = (e) => {
+                    const target = e.target as HTMLInputElement;
+                    if (target.value) {
+                      setDateRange(r => ({ ...r, to: target.value }));
+                    }
+                    document.body.removeChild(input);
+                  };
+                }}
+              />
+              <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
           </div>
           {(dateRange.from || dateRange.to) && (
             <Button
