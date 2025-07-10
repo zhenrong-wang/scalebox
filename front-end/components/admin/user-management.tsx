@@ -334,63 +334,63 @@ export function UserManagement() {
                     if (!user || typeof user !== "object") return null;
                     return (
                       <TableRow key={user.account_id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{user.name}</div>
-                            <div className="text-sm text-muted-foreground">{user.email}</div>
-                          </div>
-                        </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                      </div>
+                    </TableCell>
                         <TableCell>
                           <div className="text-sm font-mono text-muted-foreground">
                             {user.account_id ? user.account_id.substring(0, 8) + '...' : '-'}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge className={getRoleColor(user.role)}>{user.role}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(user.status)}>{user.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
+                    <TableCell>
+                      <Badge className={getRoleColor(user.role)}>{user.role}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(user.status)}>{user.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
                             <div>{user.currentUsage?.projects ?? 0} {t("admin.projects")}</div>
                             <div className="text-muted-foreground">{user.currentUsage?.sandboxes ?? 0} {t("admin.sandboxes")}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
+                      </div>
+                    </TableCell>
+                    <TableCell>
                           <div className="font-medium">
                             ${user && !isNaN(Number(user.totalSpent)) ? Number(user.totalSpent).toFixed(2) : "0.00"}
                           </div>
-                        </TableCell>
-                        <TableCell>
+                    </TableCell>
+                    <TableCell>
                           <div className="text-sm">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "-"}</div>
-                        </TableCell>
-                        <TableCell>
+                    </TableCell>
+                    <TableCell>
                           <div className="text-sm">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "-"}</div>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setSelectedUser(user.account_id)}>{t("action.viewDetails")}</DropdownMenuItem>
-                              {user.status === "active" && (
-                                <>
+                          {user.status === "active" && (
+                            <>
                                   <DropdownMenuItem onClick={() => handleStatusChange(user.account_id, "disabled")}>{t("admin.disableUser")}</DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleStatusChange(user.account_id, "suspended")}>{t("admin.suspendUser")}</DropdownMenuItem>
-                                </>
-                              )}
-                              {user.status !== "active" && (
+                            </>
+                          )}
+                          {user.status !== "active" && (
                                 <DropdownMenuItem onClick={() => handleStatusChange(user.account_id, "active")}>{t("admin.activateUser")}</DropdownMenuItem>
-                              )}
+                          )}
                               <DropdownMenuItem onClick={() => handleDeleteUser(user.account_id)} className="text-red-600">{t("action.deleteUser")}</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
                     );
                   })
                   .filter(Boolean)

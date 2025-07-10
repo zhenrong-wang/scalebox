@@ -1,582 +1,743 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Play, Square, Trash2, BarChart3, Plus, Search, Filter, MoreHorizontal, FolderOpen } from "lucide-react"
+import { Play, Square, Trash2, Search, Filter, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useLanguage } from "../contexts/language-context"
-import { tReplace } from "../lib/i18n"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useLanguage } from "../contexts/language-context"
+import { SandboxService } from "../services/sandbox-service"
+import type { Sandbox, SandboxStats } from "../types/sandbox"
+import { Label } from "@/components/ui/label"
 
-interface Sandbox {
-  id: string
-  name: string
-  description?: string
-  status: "running" | "stopped"
-  cpu: string
-  memory: string
-  uptime: string
-  created: string
-  projectId?: string
-  projectName?: string
-}
-
-const mockSandboxes: Sandbox[] = [
-  {
-    id: "sb-001",
-    name: "Web Development",
-    description: "Frontend development environment with React and TypeScript",
-    status: "running",
-    cpu: "2.4%",
-    memory: "512MB",
-    uptime: "2h 15m",
-    created: "2024-01-15",
-    projectId: "proj_001",
-    projectName: "E-commerce Platform",
-  },
-  {
-    id: "sb-002",
-    name: "API Testing",
-    description: "Backend API testing and development environment",
-    status: "stopped",
-    cpu: "0%",
-    memory: "0MB",
-    uptime: "0m",
-    created: "2024-01-10",
-    projectId: "proj_002",
-    projectName: "Mobile App Backend",
-  },
-  {
-    id: "sb-003",
-    name: "Data Processing",
-    description: "Data analysis and processing pipeline",
-    status: "running",
-    cpu: "15.7%",
-    memory: "1.2GB",
-    uptime: "45m",
-    created: "2024-01-08",
-    projectId: "proj_001",
-    projectName: "E-commerce Platform",
-  },
-  {
-    id: "sb-004",
-    name: "Machine Learning",
-    description: "ML model training and experimentation environment",
-    status: "running",
-    cpu: "8.3%",
-    memory: "2.1GB",
-    uptime: "1h 30m",
-    created: "2024-01-05",
-    projectId: "proj_003",
-    projectName: "Analytics Dashboard",
-  },
-  {
-    id: "sb-005",
-    name: "Database Testing",
-    description: "Database performance testing and optimization",
-    status: "stopped",
-    cpu: "0%",
-    memory: "0MB",
-    uptime: "0m",
-    created: "2024-01-03",
-  },
-]
+type SortField = "name" | "framework" | "status" | "createdAt" | "uptime"
+type SortOrder = "asc" | "desc"
 
 export function SandboxPage() {
-  const [sandboxes, setSandboxes] = useState<Sandbox[]>(mockSandboxes)
+  const [sandboxes, setSandboxes] = useState<Sandbox[]>([])
+  const [stats, setStats] = useState<SandboxStats | null>(null)
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  // Define columns with type safety
-  const { t } = useLanguage()
-  const columns: Array<{ key: keyof Sandbox | 'manage'; label: string; sortable?: boolean }> = [
-    { key: "name", label: t("table.name"), sortable: true },
-    { key: "status", label: t("table.status"), sortable: true },
-    { key: "cpu", label: t("table.cpu"), sortable: true },
-    { key: "memory", label: t("table.memory"), sortable: true },
-    { key: "uptime", label: t("table.uptime"), sortable: true },
-    { key: "created", label: t("table.created"), sortable: true },
-    { key: "projectName", label: t("table.project"), sortable: true },
-    { key: "manage", label: t("table.manage"), sortable: false },
-  ]
-  // Only allow sortBy to be a real Sandbox key
-  const [sortBy, setSortBy] = useState<keyof Sandbox | null>(null)
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
-  const [colWidths, setColWidths] = useState<number[]>([180, 120, 100, 120, 120, 120, 150, 200])
-  const tableRef = useRef<HTMLTableElement>(null)
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; sandbox: Sandbox | null }>({ open: false, sandbox: null })
-  const [batchDeleteDialog, setBatchDeleteDialog] = useState(false)
-  const [batchStopDialog, setBatchStopDialog] = useState(false)
-  const [deleteInput, setDeleteInput] = useState("")
-  const [selected, setSelected] = useState<string[]>([])
-  const [projectFilter, setProjectFilter] = useState<string>("all")
-  const [assignProjectDialog, setAssignProjectDialog] = useState<{ open: boolean; sandbox: Sandbox | null }>({ open: false, sandbox: null })
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("")
-
-  // Mock projects for assignment
-  const mockProjects = [
-    { id: "proj_001", name: "E-commerce Platform" },
-    { id: "proj_002", name: "Mobile App Backend" },
-    { id: "proj_003", name: "Analytics Dashboard" },
-    { id: "default", name: "Default" },
-  ]
-
-  let filteredSandboxes = sandboxes.filter((sandbox) => {
-    const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || sandbox.status === statusFilter
-    const matchesProject = projectFilter === "all" || 
-          (projectFilter === "default" && !sandbox.projectId) ||
-    (projectFilter !== "default" && sandbox.projectId === projectFilter)
-    return matchesSearch && matchesStatus && matchesProject
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [selectedSandboxes, setSelectedSandboxes] = useState<Set<string>>(new Set())
+  const [sortField, setSortField] = useState<SortField>("createdAt")
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
+  const [dateRange, setDateRange] = useState<{ from: string | null, to: string | null }>({ from: null, to: null })
+  
+  // Confirmation dialogs
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
+    isOpen: false,
+    sandboxId: null,
+    isBatch: false
+  })
+  const [stopDialog, setStopDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
+    isOpen: false,
+    sandboxId: null,
+    isBatch: false
+  })
+  const [startDialog, setStartDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
+    isOpen: false,
+    sandboxId: null,
+    isBatch: false
   })
 
-  if (sortBy) {
-    filteredSandboxes = [...filteredSandboxes].sort((a, b) => {
-      const aVal = a[sortBy] || ""
-      const bVal = b[sortBy] || ""
-      if (aVal < bVal) return sortDir === "asc" ? -1 : 1
-      if (aVal > bVal) return sortDir === "asc" ? 1 : -1
-      return 0
-    })
-  }
-
-  const isAllSelected = selected.length > 0 && selected.length === filteredSandboxes.length
-  const isIndeterminate = selected.length > 0 && selected.length < filteredSandboxes.length
+  const { t } = useLanguage()
 
   useEffect(() => {
-    if (tableRef.current) {
-      const selectAllCheckbox = tableRef.current.querySelector('input[type="checkbox"]');
-      if (selectAllCheckbox) {
-        (selectAllCheckbox as HTMLInputElement).indeterminate = isIndeterminate;
+    loadSandboxes()
+    loadStats()
+  }, [])
+
+  const loadSandboxes = async () => {
+    try {
+      const data = await SandboxService.listSandboxes()
+      setSandboxes(data)
+    } catch (error) {
+      console.error('Failed to load sandboxes:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadStats = async () => {
+    try {
+      const data = await SandboxService.getSandboxStats()
+      // Map API response to match TypeScript interface
+      const mappedStats: SandboxStats = {
+        total: data.total_sandboxes,
+        running: data.running_sandboxes,
+        stopped: data.stopped_sandboxes,
+        deleted: data.deleted_sandboxes,
+        error: data.error_sandboxes,
+        totalCost: data.total_cost,
+        avgCpuUsage: data.avg_cpu_usage,
+        avgMemoryUsage: data.avg_memory_usage,
+        totalUptime: data.total_uptime_hours,
+        topFrameworks: [],
+        topUsers: [],
+        regionDistribution: []
+      }
+      setStats(mappedStats)
+    } catch (error) {
+      console.error('Failed to load stats:', error)
+    }
+  }
+
+  const handleStartSandbox = async (sandboxId: string) => {
+    try {
+      await SandboxService.startSandbox(sandboxId)
+      await loadSandboxes()
+      await loadStats()
+    } catch (error) {
+      console.error('Failed to start sandbox:', error)
+    }
+  }
+
+  const handleStopSandbox = async (sandboxId: string) => {
+    try {
+      await SandboxService.stopSandbox(sandboxId)
+      await loadSandboxes()
+      await loadStats()
+    } catch (error) {
+      console.error('Failed to stop sandbox:', error)
+    }
+  }
+
+  const handleDeleteSandbox = async (sandboxId: string) => {
+    try {
+      await SandboxService.deleteSandbox(sandboxId)
+      await loadSandboxes()
+      await loadStats()
+    } catch (error) {
+      console.error('Failed to delete sandbox:', error)
+    }
+  }
+
+  const handleBatchStart = async () => {
+    try {
+      const promises = Array.from(selectedSandboxes).map(id => 
+        SandboxService.startSandbox(id)
+      )
+      await Promise.all(promises)
+      await loadSandboxes()
+      await loadStats()
+      setSelectedSandboxes(new Set())
+    } catch (error) {
+      console.error('Failed to start sandboxes:', error)
+    }
+  }
+
+  const handleBatchStop = async () => {
+    try {
+      const promises = Array.from(selectedSandboxes).map(id => 
+        SandboxService.stopSandbox(id)
+      )
+      await Promise.all(promises)
+      await loadSandboxes()
+      await loadStats()
+      setSelectedSandboxes(new Set())
+    } catch (error) {
+      console.error('Failed to stop sandboxes:', error)
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    try {
+      const promises = Array.from(selectedSandboxes).map(id => 
+        SandboxService.deleteSandbox(id)
+      )
+      await Promise.all(promises)
+      await loadSandboxes()
+      await loadStats()
+      setSelectedSandboxes(new Set())
+    } catch (error) {
+      console.error('Failed to delete sandboxes:', error)
+    }
+  }
+
+  const formatUptime = (uptimeMinutes: number): string => {
+    if (uptimeMinutes === 0) return "0m"
+    const hours = Math.floor(uptimeMinutes / 60)
+    const minutes = uptimeMinutes % 60
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    }
+    return `${minutes}m`
+  }
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      running: "default",
+      stopped: "secondary",
+      error: "destructive",
+      deleted: "destructive",
+    } as const
+
+    const statusTranslations = {
+      running: t("table.running") || "Running",
+      stopped: t("table.stopped") || "Stopped",
+      error: t("table.error") || "Error",
+      deleted: t("table.deleted") || "Deleted",
+    }
+
+    return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
+      {statusTranslations[status as keyof typeof statusTranslations] || status}
+    </Badge>
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortOrder("asc")
+    }
+  }
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null
+    return sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+  }
+
+  const handleSelectAll = () => {
+    if (selectedSandboxes.size === filteredSandboxes.length) {
+      setSelectedSandboxes(new Set())
+    } else {
+      setSelectedSandboxes(new Set(filteredSandboxes.map(s => s.id)))
+    }
+  }
+
+  const handleSelectSandbox = (sandboxId: string, checked: boolean) => {
+    const newSelected = new Set(selectedSandboxes)
+    if (checked) {
+      newSelected.add(sandboxId)
+    } else {
+      newSelected.delete(sandboxId)
+    }
+    setSelectedSandboxes(newSelected)
+  }
+
+  const filteredSandboxes = sandboxes.filter((sandbox) => {
+    const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sandbox.description && sandbox.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesStatus = statusFilter === "all" || sandbox.status === statusFilter
+    
+    let matchesDate = true
+    if (dateRange.from) {
+      matchesDate = matchesDate && new Date(sandbox.createdAt) >= new Date(dateRange.from)
+    }
+    if (dateRange.to) {
+      matchesDate = matchesDate && new Date(sandbox.createdAt) <= new Date(dateRange.to)
+    }
+    
+    return matchesSearch && matchesStatus && matchesDate
+  })
+
+  const sortedSandboxes = [...filteredSandboxes].sort((a, b) => {
+    let aVal: any, bVal: any
+    
+    switch (sortField) {
+      case "name":
+        aVal = a.name.toLowerCase()
+        bVal = b.name.toLowerCase()
+        break
+      case "framework":
+        aVal = a.framework.toLowerCase()
+        bVal = b.framework.toLowerCase()
+        break
+      case "status":
+        aVal = a.status.toLowerCase()
+        bVal = b.status.toLowerCase()
+        break
+      case "createdAt":
+        aVal = new Date(a.createdAt).getTime()
+        bVal = new Date(b.createdAt).getTime()
+        break
+      case "uptime":
+        aVal = a.uptime
+        bVal = b.uptime
+        break
+      default:
+        return 0
+    }
+    
+    if (sortOrder === "asc") {
+      return aVal > bVal ? 1 : -1
+    } else {
+      return aVal < bVal ? 1 : -1
+    }
+  })
+
+  const openDatePicker = (type: 'from' | 'to', event: React.MouseEvent<HTMLButtonElement>) => {
+    // Get the button element that was clicked
+    const button = event.currentTarget
+    const buttonRect = button.getBoundingClientRect()
+    
+    // Create a visible date input positioned relative to the button
+    const input = document.createElement('input')
+    input.type = 'date'
+    input.style.position = 'fixed'
+    input.style.top = `${buttonRect.bottom + 5}px` // 5px below the button
+    input.style.left = `${buttonRect.left}px`
+    input.style.zIndex = '9999'
+    input.style.padding = '8px'
+    input.style.border = '1px solid #d1d5db'
+    input.style.borderRadius = '6px'
+    input.style.fontSize = '14px'
+    input.style.backgroundColor = 'white'
+    input.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
+    input.style.minWidth = '140px'
+    
+    document.body.appendChild(input)
+    
+    // Focus and show the input
+    input.focus()
+    
+    // Try to show the picker for modern browsers
+    if (input.showPicker) {
+      input.showPicker()
+    }
+    
+    input.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement
+      if (target.value) {
+        setDateRange(prev => ({ ...prev, [type]: target.value }))
+      }
+      document.body.removeChild(input)
+    })
+    
+    // Track if the input has been removed
+    let isRemoved = false
+    
+    const removeInput = () => {
+      if (!isRemoved && document.body.contains(input)) {
+        document.body.removeChild(input)
+        isRemoved = true
+        document.removeEventListener('keydown', handleEscape)
       }
     }
-  }, [isIndeterminate]);
-
-  const closeDeleteDialog = () => setDeleteDialog({ open: false, sandbox: null })
-  const confirmDelete = () => {
-    if (deleteDialog.sandbox) {
-      setSandboxes((prev) => prev.filter((sb) => sb.id !== deleteDialog.sandbox!.id))
-      closeDeleteDialog()
+    
+    input.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement
+      if (target.value) {
+        setDateRange(prev => ({ ...prev, [type]: target.value }))
+      }
+      removeInput()
+    })
+    
+    input.addEventListener('blur', () => {
+      // Remove the input if user clicks away
+      setTimeout(removeInput, 100)
+    })
+    
+    // Also handle escape key - use keyup to catch it after the input processes it
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        removeInput()
+      }
     }
-  }
-  const handleBatchStop = () => {
-    setSandboxes((prev) => prev.map((sb) => selected.includes(sb.id) && sb.status === "running" ? { ...sb, status: "stopped", cpu: "0%", memory: "0MB", uptime: "0m" } : sb))
-    setSelected([])
-    setBatchStopDialog(false)
-  }
-
-  const handleSort = (col: keyof Sandbox | 'manage') => {
-    if (col === 'manage') return;
-    setSortBy(col)
-    setSortDir(sortBy === col && sortDir === 'asc' ? 'desc' : 'asc')
-  }
-
-  const startResize = (idx: number, e: React.MouseEvent) => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startWidth = colWidths[idx]
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientX - startX
-      setColWidths((widths) => {
-        const newWidths = [...widths]
-        newWidths[idx] = Math.max(60, startWidth + delta)
-        return newWidths
-      })
-    }
-    const onMouseUp = () => {
-      window.removeEventListener("mousemove", onMouseMove)
-      window.removeEventListener("mouseup", onMouseUp)
-    }
-    window.addEventListener("mousemove", onMouseMove)
-    window.addEventListener("mouseup", onMouseUp)
-  }
-
-  const handleStop = (id: string) => {
-    setSandboxes((prev) =>
-      prev.map((sb) =>
-        sb.id === id ? { ...sb, status: "stopped" as const, cpu: "0%", memory: "0MB", uptime: "0m" } : sb,
-      ),
-    )
-  }
-
-  const handleStart = (id: string) => {
-    setSandboxes((prev) =>
-      prev.map((sb) =>
-        sb.id === id ? { ...sb, status: "running" as const, cpu: "1.2%", memory: "256MB", uptime: "0m" } : sb,
-      ),
-    )
-  }
-
-  const handleDelete = (id: string) => {
-    setSandboxes((prev) => prev.filter((sb) => sb.id !== id))
-  }
-
-  const handleAssignProject = (sandboxId: string, projectId: string) => {
-    const project = mockProjects.find(p => p.id === projectId)
-    setSandboxes((prev) =>
-      prev.map((sb) =>
-        sb.id === sandboxId 
-          ? { 
-              ...sb, 
-                    projectId: projectId === "default" ? undefined : projectId,
-      projectName: projectId === "default" ? undefined : project?.name
-            } 
-          : sb
-      )
-    )
-    setAssignProjectDialog({ open: false, sandbox: null })
-    setSelectedProjectId("")
-  }
-
-  const openAssignProjectDialog = (sandbox: Sandbox) => {
-    setAssignProjectDialog({ open: true, sandbox })
-    setSelectedProjectId(sandbox.projectId || "default")
-  }
-
-  const runningSandboxes = sandboxes.filter((sb) => sb.status === "running").length
-  const totalSandboxes = sandboxes.length
-
-  const toggleSelectAll = () => {
-    if (isAllSelected) setSelected([])
-    else setSelected(filteredSandboxes.map((sb) => sb.id))
-  }
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id])
-  }
-  const handleBatchDelete = () => {
-    setSandboxes((prev) => prev.filter((sb) => !selected.includes(sb.id)))
-    setSelected([])
-    setBatchDeleteDialog(false)
+    document.addEventListener('keyup', handleEscape)
   }
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="text-2xl font-bold text-foreground">{totalSandboxes}</div>
-          <div className="text-sm text-muted-foreground">{t("table.totalSandboxes") || "Total Sandboxes"}</div>
+      {/* Summary Cards */}
+      {stats && (
+        <div className="grid gap-4 md:grid-cols-5">
+          <div className="bg-card p-4 rounded-lg border border-border">
+            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+            <div className="text-sm text-muted-foreground">
+              {t("table.totalSandboxes") || "Total Sandboxes"}
+            </div>
+          </div>
+          <div className="bg-card p-4 rounded-lg border border-border">
+            <div className="text-2xl font-bold text-blue-600">{stats.avgCpuUsage.toFixed(1)}%</div>
+            <div className="text-sm text-muted-foreground">
+              {t("table.avgCpuUsage") || "Avg CPU Usage"}
+            </div>
+          </div>
+          <div className="bg-card p-4 rounded-lg border border-border">
+            <div className="text-2xl font-bold text-foreground">{stats.avgMemoryUsage.toFixed(1)}%</div>
+            <div className="text-sm text-muted-foreground">
+              {t("table.avgMemoryUsage") || "Avg Memory Usage"}
+            </div>
+          </div>
+          <div className="bg-card p-4 rounded-lg border border-border">
+            <div className="text-2xl font-bold text-foreground">${stats.totalCost.toFixed(2)}</div>
+            <div className="text-sm text-muted-foreground">
+              {t("table.totalCost") || "Total Cost"}
+            </div>
+          </div>
+          <div className="bg-card p-4 rounded-lg border border-border">
+            <Button asChild className="w-full">
+              <a href="https://docs.scalebox.dev/sandboxes" target="_blank" rel="noopener noreferrer">
+                <Plus className="h-4 w-4 mr-2" />
+                {t("action.createSandbox") || "Create Sandbox"}
+              </a>
+            </Button>
+          </div>
         </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="text-2xl font-bold text-green-600 text-foreground">{runningSandboxes}</div>
-          <div className="text-sm text-muted-foreground">{t("table.running") || "Running"}</div>
-        </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="text-2xl font-bold text-foreground">{totalSandboxes - runningSandboxes}</div>
-          <div className="text-sm text-muted-foreground">{t("table.stopped") || "Stopped"}</div>
-        </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <Button className="w-full">
-            <Plus className="h-4 w-4 mr-2" />
-            {t("action.createSandbox")}
-          </Button>
-        </div>
-      </div>
+      )}
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-lg border border-border">
-        <div className="flex gap-4 items-center">
-          <div className="relative" style={{ maxWidth: 320, flex: '0 1 auto' }}>
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder={t("sandbox.search") || "Search sandboxes..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 max-w-xs"
-              style={{ minWidth: 0 }}
-            />
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder={t("sandbox.search") || "Search sandboxes..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                  <SelectItem value="running">{t("table.running") || "Running"}</SelectItem>
+                  <SelectItem value="stopped">{t("table.stopped") || "Stopped"}</SelectItem>
+                  <SelectItem value="error">{t("table.error") || "Error"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
+              dateRange.from || dateRange.to 
+                ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
+                : 'bg-muted/50 border-border'
+            }`}>
+              <Label className={`text-sm font-medium whitespace-nowrap ${
+                dateRange.from || dateRange.to 
+                  ? 'text-blue-700 dark:text-blue-300' 
+                  : ''
+              }`}>{t("table.created") || "Created"}</Label>
+              <div className="flex items-center gap-1">
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => openDatePicker('from', e)}
+                    className="w-[120px] h-8 text-sm justify-start"
+                  >
+                    {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
+                  </Button>
+                </div>
+                <span className="text-muted-foreground text-sm">to</span>
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => openDatePicker('to', e)}
+                    className="w-[120px] h-8 text-sm justify-start"
+                  >
+                    {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
+                  </Button>
+                </div>
+              </div>
+              {(dateRange.from || dateRange.to) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange({ from: null, to: null })}
+                  className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  title="Clear date range"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-              <SelectItem value="running">{t("table.running") || "Running"}</SelectItem>
-              <SelectItem value="stopped">{t("table.stopped") || "Stopped"}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-40">
-              <FolderOpen className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              <SelectItem value="default">Default</SelectItem>
-              {mockProjects.filter(p => p.id !== "default").map(project => (
-                <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
+
+      {/* Batch Actions */}
+      {selectedSandboxes.size > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {t("table.itemsSelected", { count: String(selectedSandboxes.size), plural: selectedSandboxes.size > 1 ? 's' : '' }) || `${selectedSandboxes.size} items selected`}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStartDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                >
+                  <Play className="h-4 w-4 mr-1" />
+                  {t("table.startSelected") || "Start Selected"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStopDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                >
+                  <Square className="h-4 w-4 mr-1" />
+                  {t("table.stopSelected") || "Stop Selected"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {t("table.deleteSelected") || "Delete Selected"}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sandboxes Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>{t("table.sandboxes") || "Sandboxes"}</CardTitle>
-            <CardDescription>
-              {filteredSandboxes.length} {t("table.sandboxes") || "sandboxes"} found
-            </CardDescription>
-          </div>
-          {selected.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {selected.length} {selected.length === 1 ? t("table.sandbox") || "sandbox" : t("table.sandboxes") || "sandboxes"} selected
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSandboxes((prev) =>
-                    prev.map((sb) =>
-                      selected.includes(sb.id) && sb.status === "stopped"
-                        ? { ...sb, status: "running" as const, cpu: "1.2%", memory: "256MB", uptime: "0m" }
-                        : sb,
-                    ),
-                  )
-                  setSelected([])
-                }}
-                disabled={!selected.every(id => sandboxes.find(sb => sb.id === id)?.status === "stopped")}
-              >
-                <Play className="h-4 w-4 mr-2" />
-                {t("action.start") || "Start"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setBatchStopDialog(true)}
-                disabled={!selected.every(id => sandboxes.find(sb => sb.id === id)?.status === "running")}
-              >
-                <Square className="h-4 w-4 mr-2" />
-                {t("action.stop") || "Stop"}
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setBatchDeleteDialog(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {t("action.delete") || "Delete"}
-              </Button>
-            </div>
-          )}
-        </CardHeader>
         <CardContent>
-          <Table ref={tableRef}>
-            <TableHeader>
-              <TableRow>
-                <TableHead style={{ width: 40, minWidth: 40 }}>
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </TableHead>
-                {columns.map((col, idx) => (
-                  <TableHead
-                    key={col.key}
-                    style={{ width: colWidths[idx], minWidth: 60, position: "relative", userSelect: "none", cursor: col.sortable ? "pointer" : undefined }}
-                    onClick={col.sortable ? () => handleSort(col.key as keyof Sandbox) : undefined}
-                    className={col.key === "manage" ? "text-right" : ""}
-                  >
-                    <span className="flex items-center">
-                      {col.label}
-                      {col.sortable && sortBy === col.key && (
-                        <span className="ml-1">{sortDir === "asc" ? <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 2l3 4H2z" fill="currentColor"/></svg> : <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 8l3-4H2z" fill="currentColor"/></svg>}</span>
-                      )}
-                    </span>
-                    {idx < colWidths.length - 1 && (
-                      <span
-                        onMouseDown={(e) => startResize(idx, e)}
-                        style={{ position: "absolute", right: 0, top: 0, height: "100%", width: 6, cursor: "col-resize", zIndex: 10 }}
-                      >
-                        <span style={{ display: "block", width: 2, height: "100%", background: "#e5e7eb" }} />
-                      </span>
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSandboxes.map((sandbox) => (
-                <TableRow key={sandbox.id} className="hover:bg-accent">
-                  <TableCell style={{ width: 40, minWidth: 40 }}>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">{t("table.loading") || "Loading sandboxes..."}</div>
+            </div>
+          ) : filteredSandboxes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>{t("sandbox.noSandboxes") || "No sandboxes found."}</p>
+              <p className="text-sm mt-2">
+                {t("sandbox.createFirst") || "Create your first sandbox to get started."}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
                     <Checkbox
-                      checked={selected.includes(sandbox.id)}
-                      onCheckedChange={() => toggleSelect(sandbox.id)}
+                      checked={selectedSandboxes.size === filteredSandboxes.length && filteredSandboxes.length > 0}
+                      onCheckedChange={handleSelectAll}
                     />
-                  </TableCell>
-                  <TableCell style={{ width: colWidths[0], minWidth: 60 }}>
-                  <div>
-                    <div className="font-medium">{sandbox.name}</div>
-                    <div className="text-sm text-muted-foreground max-w-xs truncate">{sandbox.description || "No description"}</div>
-                  </div>
-                </TableCell>
-                  <TableCell style={{ width: colWidths[1], minWidth: 60 }}>
-                    <Badge
-                      variant={sandbox.status === "running" ? "default" : "secondary"}
-                      className={sandbox.status === "running" ? "bg-green-100 text-green-800" : ""}
-                    >
-                      {t(`table.${sandbox.status}`) || sandbox.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell style={{ width: colWidths[2], minWidth: 60 }}>{sandbox.cpu}</TableCell>
-                  <TableCell style={{ width: colWidths[3], minWidth: 60 }}>{sandbox.memory}</TableCell>
-                  <TableCell style={{ width: colWidths[4], minWidth: 60 }}>{sandbox.uptime}</TableCell>
-                  <TableCell style={{ width: colWidths[5], minWidth: 60 }}>{sandbox.created}</TableCell>
-                                  <TableCell style={{ width: colWidths[6], minWidth: 60 }}>
-                  {sandbox.projectName ? (
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{sandbox.projectName}</span>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.name") || "Name"}
+                      {getSortIcon("name")}
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-muted-foreground">Default</span>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort("framework")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.framework") || "Framework"}
+                      {getSortIcon("framework")}
                     </div>
-                  )}
-                </TableCell>
-                  <TableCell style={{ width: colWidths[7], minWidth: 60 }} className="pl-2 flex gap-2 items-center">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => alert(t("action.metrics") + " for " + sandbox.name)}>
-                            <BarChart3 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("action.metrics")}</TooltipContent>
-                      </Tooltip>
-                      {sandbox.status === "running" ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => handleStop(sandbox.id)}>
-                              <Square className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t("action.stop")}</TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => handleStart(sandbox.id)}>
-                              <Play className="h-4 w-4 text-green-600" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t("action.start")}</TooltipContent>
-                        </Tooltip>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openAssignProjectDialog(sandbox)}>
-                            <FolderOpen className="h-4 w-4 mr-2" />
-                            {sandbox.projectId ? "Switch Project" : "Add to Project"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setDeleteDialog({ open: true, sandbox })}>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            {t("action.delete")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TooltipProvider>
-                  </TableCell>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.status") || "Status"}
+                      {getSortIcon("status")}
+                    </div>
+                  </TableHead>
+                  <TableHead>{t("table.cpu") || "CPU"}</TableHead>
+                  <TableHead>{t("table.memory") || "Memory"}</TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort("uptime")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.uptime") || "Uptime"}
+                      {getSortIcon("uptime")}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort("createdAt")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.created") || "Created"}
+                      {getSortIcon("createdAt")}
+                    </div>
+                  </TableHead>
+                  <TableHead>{t("table.actions") || "Actions"}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sortedSandboxes.map((sandbox) => (
+                  <TableRow key={sandbox.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedSandboxes.has(sandbox.id)}
+                        onCheckedChange={(checked) => handleSelectSandbox(sandbox.id, checked as boolean)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{sandbox.name}</div>
+                        <div className="text-sm text-muted-foreground max-w-xs truncate">
+                          {sandbox.description || t("sandbox.noDescription") || "No description"}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{sandbox.framework}</Badge>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(sandbox.status)}</TableCell>
+                    <TableCell>{sandbox.resources.cpu.toFixed(1)}%</TableCell>
+                    <TableCell>{sandbox.resources.memory.toFixed(1)}%</TableCell>
+                    <TableCell>{formatUptime(sandbox.uptime)}</TableCell>
+                    <TableCell>{formatDate(sandbox.createdAt)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {sandbox.status === "stopped" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                            title={t("action.start") || "Start"}
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {sandbox.status === "running" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                            title={t("action.stop") || "Stop"}
+                          >
+                            <Square className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {sandbox.status !== "deleted" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                            title={t("action.delete") || "Delete"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog.open} onOpenChange={closeDeleteDialog}>
+
+      {/* Confirmation Dialogs */}
+      <Dialog open={deleteDialog.isOpen} onOpenChange={(open) => !open && setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tReplace(t("dialog.delete.title"), { itemType: t("table.sandbox") || "Sandbox" })}</DialogTitle>
+            <DialogTitle>{t("table.confirmDelete") || "Confirm Delete"}</DialogTitle>
             <DialogDescription>
-              {tReplace(t("dialog.delete.desc"), { itemType: t("table.sandbox") || "sandbox" })}
+              {deleteDialog.isBatch 
+                ? t("table.confirmDeleteMessage") || `Are you sure you want to delete ${selectedSandboxes.size} sandbox${selectedSandboxes.size > 1 ? 'es' : ''}? This action cannot be undone.`
+                : t("table.confirmDeleteMessage") || "Are you sure you want to delete this sandbox? This action cannot be undone."
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2 justify-end mt-4">
-            <Button variant="outline" onClick={closeDeleteDialog}>{t("action.cancel")}</Button>
-            <Button variant="destructive" onClick={confirmDelete}>{t("action.delete")}</Button>
-          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={async () => {
+                if (deleteDialog.isBatch) {
+                  await handleBatchDelete()
+                } else if (deleteDialog.sandboxId) {
+                  await handleDeleteSandbox(deleteDialog.sandboxId)
+                }
+                setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })
+              }}
+            >
+              {t("action.delete") || "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Batch Delete Confirmation Dialog */}
-      <Dialog open={batchDeleteDialog} onOpenChange={setBatchDeleteDialog}>
+
+      <Dialog open={stopDialog.isOpen} onOpenChange={(open) => !open && setStopDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tReplace(t("dialog.delete.batch.title"), { itemType: t("table.sandbox") || "Sandboxes" })}</DialogTitle>
+            <DialogTitle>{t("table.confirmStop") || "Confirm Stop"}</DialogTitle>
             <DialogDescription>
-              {tReplace(t("dialog.delete.batch.desc"), { count: selected.length, itemType: t("table.sandbox") || "sandboxes" })}
+              {stopDialog.isBatch 
+                ? t("table.confirmStopMessage", { count: String(selectedSandboxes.size), plural: selectedSandboxes.size > 1 ? 'es' : '' }) || `Are you sure you want to stop ${selectedSandboxes.size} sandbox${selectedSandboxes.size > 1 ? 'es' : ''}?`
+                : t("table.confirmStopMessage", { count: "1", plural: "" }) || "Are you sure you want to stop this sandbox?"
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2 justify-end mt-4">
-            <Button variant="outline" onClick={() => setBatchDeleteDialog(false)}>{t("action.cancel")}</Button>
-            <Button variant="destructive" onClick={handleBatchDelete}>{t("action.delete")}</Button>
-          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStopDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (stopDialog.isBatch) {
+                  await handleBatchStop()
+                } else if (stopDialog.sandboxId) {
+                  await handleStopSandbox(stopDialog.sandboxId)
+                }
+                setStopDialog({ isOpen: false, sandboxId: null, isBatch: false })
+              }}
+            >
+              {t("action.stop") || "Stop"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Batch Stop Confirmation Dialog */}
-      <Dialog open={batchStopDialog} onOpenChange={setBatchStopDialog}>
+
+      <Dialog open={startDialog.isOpen} onOpenChange={(open) => !open && setStartDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tReplace(t("dialog.delete.batch.stop.title"), { itemType: t("table.sandbox") || "Sandboxes" })}</DialogTitle>
+            <DialogTitle>{t("table.confirmStart") || "Confirm Start"}</DialogTitle>
             <DialogDescription>
-              {tReplace(t("dialog.delete.batch.stop.desc"), { itemType: t("table.sandbox") || "sandboxes" })}
+              {startDialog.isBatch 
+                ? t("table.confirmStartMessage", { count: String(selectedSandboxes.size), plural: selectedSandboxes.size > 1 ? 'es' : '' }) || `Are you sure you want to start ${selectedSandboxes.size} sandbox${selectedSandboxes.size > 1 ? 'es' : ''}?`
+                : t("table.confirmStartMessage", { count: "1", plural: "" }) || "Are you sure you want to start this sandbox?"
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2 justify-end mt-4">
-            <Button variant="outline" onClick={() => setBatchStopDialog(false)}>{t("action.cancel")}</Button>
-            <Button variant="secondary" onClick={handleBatchStop}>{t("action.stop")}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Project Assignment Dialog */}
-      <Dialog open={assignProjectDialog.open} onOpenChange={(open) => setAssignProjectDialog({ open, sandbox: null })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {assignProjectDialog.sandbox?.projectId ? "Switch Project" : "Add to Project"}
-            </DialogTitle>
-            <DialogDescription>
-              Select a project for "{assignProjectDialog.sandbox?.name}"
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockProjects.map(project => (
-                  <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAssignProjectDialog({ open: false, sandbox: null })}>
-                {t("action.cancel")}
-              </Button>
-              <Button onClick={() => handleAssignProject(assignProjectDialog.sandbox!.id, selectedProjectId)}>
-                {assignProjectDialog.sandbox?.projectId ? "Switch" : "Add"}
-              </Button>
-            </div>
-          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStartDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (startDialog.isBatch) {
+                  await handleBatchStart()
+                } else if (startDialog.sandboxId) {
+                  await handleStartSandbox(startDialog.sandboxId)
+                }
+                setStartDialog({ isOpen: false, sandboxId: null, isBatch: false })
+              }}
+            >
+              {t("action.start") || "Start"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

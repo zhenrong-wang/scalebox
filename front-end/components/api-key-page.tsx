@@ -186,8 +186,8 @@ export function ApiKeyPage() {
     } catch (e: any) {
       setError(e.message || "Failed to delete API key")
     } finally {
-      closeDeleteDialog()
-    }
+    closeDeleteDialog()
+  }
   }
 
   const createNewKey = async () => {
@@ -207,7 +207,7 @@ export function ApiKeyPage() {
       const newKey: ApiKeyWithFullKey = {
         id: 0, // Will be set by the backend
         key_id: res.key_id,
-        name: newKeyName,
+      name: newKeyName,
         description: newKeyDescription,
         prefix: res.prefix,
         permissions: { read: true, write: newKeyWrite },
@@ -371,7 +371,7 @@ export function ApiKeyPage() {
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>{t("table.apiKeys") || "API Keys"}</CardTitle>
+            <CardTitle>{t("table.apiKeys") || "API Keys"}</CardTitle>
           <CardDescription>{t("table.apiKeysDesc") || "Manage your API keys. You can have up to 5 active keys."}</CardDescription>
         </CardHeader>
         <div className="p-4">
@@ -424,7 +424,7 @@ export function ApiKeyPage() {
                           title={t("apiKey.copy") || "Copy"}
                         >
                           <Copy className="h-4 w-4" />
-                        </Button>
+                      </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
@@ -437,9 +437,9 @@ export function ApiKeyPage() {
                           onClick={() => copyToClipboard(key.prefix + "...")}
                           title={t("apiKey.copy") || "Copy"}
                         >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
                     )}
                   </TableCell>
                   <TableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</TableCell>
@@ -451,17 +451,17 @@ export function ApiKeyPage() {
                       title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
                     >
                       {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                    </Button>
-                    <Button 
+                      </Button>
+                      <Button
                       size="icon" 
-                      variant="outline" 
+                        variant="outline"
                       onClick={() => openDeleteDialog(key.key_id, key.name)} 
                       title={key.is_active ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") : (t("apiKey.deleteKey") || "Delete API Key")}
                       disabled={key.is_active}
                       className={key.is_active ? "opacity-50 cursor-not-allowed" : ""}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                   </TableCell>
                 </TableRow>
               ))}

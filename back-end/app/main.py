@@ -4,6 +4,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 import time
 from .users import router as users_router
 from .api_keys import router as api_keys_router
+from .sandboxes import router as sandboxes_router
 
 app = FastAPI(
     title="ScaleBox API",
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(users_router)
 app.include_router(api_keys_router)
+app.include_router(sandboxes_router)
 
 @app.get("/health")
 def health():

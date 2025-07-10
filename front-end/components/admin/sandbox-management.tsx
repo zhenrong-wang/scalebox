@@ -39,8 +39,15 @@ export function SandboxManagement() {
 
   // Load sandboxes on component mount
   useEffect(() => {
-    const allSandboxes = SandboxService.getAllSandboxes()
+    const loadSandboxes = async () => {
+      try {
+        const allSandboxes = await SandboxService.getAllSandboxes()
     setSandboxes(allSandboxes)
+      } catch (error) {
+        console.error('Failed to load sandboxes:', error)
+      }
+    }
+    loadSandboxes()
   }, [])
 
   // Apply filters and search
@@ -115,25 +122,15 @@ export function SandboxManagement() {
     return { total, running, stopped, errored, deleted, totalCost, avgCpu, avgMemory }
   }, [filteredSandboxes])
 
-  const handleSandboxAction = (sandboxId: string, action: "start" | "stop" | "delete") => {
-    let newStatus: Sandbox["status"]
-
-    switch (action) {
-      case "start":
-        newStatus = "running"
-        break
-      case "stop":
-        newStatus = "stopped"
-        break
-      case "delete":
-        newStatus = "deleted"
-        break
-    }
-
-    SandboxService.updateSandbox(sandboxId, { status: newStatus })
+  const handleSandboxAction = async (sandboxId: string, action: "start" | "stop" | "delete") => {
+    try {
+      await SandboxService.adminSandboxAction(sandboxId, action)
     // Refresh sandboxes
-    const updatedSandboxes = SandboxService.getAllSandboxes()
+      const updatedSandboxes = await SandboxService.getAllSandboxes()
     setSandboxes(updatedSandboxes)
+    } catch (error) {
+      console.error('Failed to perform sandbox action:', error)
+    }
   }
 
   const getStatusBadge = (status: Sandbox["status"]) => {

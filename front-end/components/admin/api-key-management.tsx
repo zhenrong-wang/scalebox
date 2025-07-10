@@ -249,57 +249,147 @@ export function AdminApiKeyManagement() {
           }`}>{t("table.created") || "Created"}</Label>
           <div className="flex items-center gap-1">
             <div className="relative">
-              <Input
-                type="text"
-                value={dateRange.from ? new Date(dateRange.from).toLocaleDateString() : ""}
-                readOnly
-                className="w-[100px] h-8 text-sm cursor-pointer"
-                placeholder="From"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'date';
-                  input.style.position = 'absolute';
-                  input.style.opacity = '0';
-                  input.style.pointerEvents = 'none';
-                  document.body.appendChild(input);
-                  input.click();
-                  input.onchange = (e) => {
-                    const target = e.target as HTMLInputElement;
-                    if (target.value) {
-                      setDateRange(r => ({ ...r, from: target.value }));
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  // Get the button element that was clicked
+                  const button = e.currentTarget
+                  const buttonRect = button.getBoundingClientRect()
+                  
+                  // Create a visible date input positioned relative to the button
+                  const input = document.createElement('input')
+                  input.type = 'date'
+                  input.style.position = 'fixed'
+                  input.style.top = `${buttonRect.bottom + 5}px` // 5px below the button
+                  input.style.left = `${buttonRect.left}px`
+                  input.style.zIndex = '9999'
+                  input.style.padding = '8px'
+                  input.style.border = '1px solid #d1d5db'
+                  input.style.borderRadius = '6px'
+                  input.style.fontSize = '14px'
+                  input.style.backgroundColor = 'white'
+                  input.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
+                  input.style.minWidth = '140px'
+                  
+                  document.body.appendChild(input)
+                  
+                  // Track if the input has been removed
+                  let isRemoved = false
+                  
+                  const removeInput = () => {
+                    if (!isRemoved && document.body.contains(input)) {
+                      document.body.removeChild(input)
+                      isRemoved = true
+                      document.removeEventListener('keyup', handleEscape)
                     }
-                    document.body.removeChild(input);
-                  };
+                  }
+                  
+                  // Focus and show the input
+                  input.focus()
+                  
+                  // Try to show the picker for modern browsers
+                  if (input.showPicker) {
+                    input.showPicker()
+                  }
+                  
+                  input.addEventListener('change', (e) => {
+                    const target = e.target as HTMLInputElement
+                    if (target.value) {
+                      setDateRange(r => ({ ...r, from: target.value }))
+                    }
+                    removeInput()
+                  })
+                  
+                  input.addEventListener('blur', () => {
+                    // Remove the input if user clicks away
+                    setTimeout(removeInput, 100)
+                  })
+                  
+                  // Also handle escape key - use keyup to catch it after the input processes it
+                  const handleEscape = (e: KeyboardEvent) => {
+                    if (e.key === 'Escape') {
+                      removeInput()
+                    }
+                  }
+                  document.addEventListener('keyup', handleEscape)
                 }}
-              />
-              <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                className="w-[100px] h-8 text-sm justify-start"
+              >
+                {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
+              </Button>
             </div>
             <span className="text-muted-foreground text-sm">to</span>
             <div className="relative">
-              <Input
-                type="text"
-                value={dateRange.to ? new Date(dateRange.to).toLocaleDateString() : ""}
-                readOnly
-                className="w-[100px] h-8 text-sm cursor-pointer"
-                placeholder="To"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'date';
-                  input.style.position = 'absolute';
-                  input.style.opacity = '0';
-                  input.style.pointerEvents = 'none';
-                  document.body.appendChild(input);
-                  input.click();
-                  input.onchange = (e) => {
-                    const target = e.target as HTMLInputElement;
-                    if (target.value) {
-                      setDateRange(r => ({ ...r, to: target.value }));
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  // Get the button element that was clicked
+                  const button = e.currentTarget
+                  const buttonRect = button.getBoundingClientRect()
+                  
+                  // Create a visible date input positioned relative to the button
+                  const input = document.createElement('input')
+                  input.type = 'date'
+                  input.style.position = 'fixed'
+                  input.style.top = `${buttonRect.bottom + 5}px` // 5px below the button
+                  input.style.left = `${buttonRect.left}px`
+                  input.style.zIndex = '9999'
+                  input.style.padding = '8px'
+                  input.style.border = '1px solid #d1d5db'
+                  input.style.borderRadius = '6px'
+                  input.style.fontSize = '14px'
+                  input.style.backgroundColor = 'white'
+                  input.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
+                  input.style.minWidth = '140px'
+                  
+                  document.body.appendChild(input)
+                  
+                  // Track if the input has been removed
+                  let isRemoved = false
+                  
+                  const removeInput = () => {
+                    if (!isRemoved && document.body.contains(input)) {
+                      document.body.removeChild(input)
+                      isRemoved = true
+                      document.removeEventListener('keyup', handleEscape)
                     }
-                    document.body.removeChild(input);
-                  };
+                  }
+                  
+                  // Focus and show the input
+                  input.focus()
+                  
+                  // Try to show the picker for modern browsers
+                  if (input.showPicker) {
+                    input.showPicker()
+                  }
+                  
+                  input.addEventListener('change', (e) => {
+                    const target = e.target as HTMLInputElement
+                    if (target.value) {
+                      setDateRange(r => ({ ...r, to: target.value }))
+                    }
+                    removeInput()
+                  })
+                  
+                  input.addEventListener('blur', () => {
+                    // Remove the input if user clicks away
+                    setTimeout(removeInput, 100)
+                  })
+                  
+                  // Also handle escape key - use keyup to catch it after the input processes it
+                  const handleEscape = (e: KeyboardEvent) => {
+                    if (e.key === 'Escape') {
+                      removeInput()
+                    }
+                  }
+                  document.addEventListener('keyup', handleEscape)
                 }}
-              />
-              <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                className="w-[100px] h-8 text-sm justify-start"
+              >
+                {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
+              </Button>
             </div>
           </div>
           {(dateRange.from || dateRange.to) && (
