@@ -24,7 +24,7 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
   const [isVerified, setIsVerified] = useState(false)
 
   // Generate random captcha text
-  const generateCaptcha = useCallback(() => {
+  const generateCaptcha = useCallback((isRegeneration = false) => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     let result = ""
     for (let i = 0; i < 6; i++) {
@@ -33,8 +33,8 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
     setCaptchaText(result)
     setIsVerified(false)
     clearError()
-    // Call onRegenerate callback if provided
-    if (onRegenerate) {
+    // Call onRegenerate callback only if this is a regeneration (not initial generation)
+    if (isRegeneration && onRegenerate) {
       onRegenerate()
     }
   }, [clearError, onRegenerate])
@@ -57,7 +57,7 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
       onChange("")
       // Only regenerate captcha if explicitly requested
       if (regenerateOnError) {
-        generateCaptcha()
+        generateCaptcha(true)
       }
     }
   }
@@ -119,7 +119,7 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
             type="button"
             variant="ghost"
             size="sm"
-            onClick={generateCaptcha}
+            onClick={() => generateCaptcha(true)}
             disabled={disabled}
             className="h-7 w-7 p-0"
             title={t("recaptcha.refresh")}
