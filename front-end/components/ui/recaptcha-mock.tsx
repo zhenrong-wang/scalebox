@@ -15,9 +15,10 @@ interface RecaptchaMockProps {
   onError: (error: string) => void
   clearError: () => void
   regenerateOnError?: boolean
+  onRegenerate?: () => void
 }
 
-export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, clearError, regenerateOnError = false }: RecaptchaMockProps) {
+export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, clearError, regenerateOnError = false, onRegenerate }: RecaptchaMockProps) {
   const { t } = useLanguage()
   const [captchaText, setCaptchaText] = useState("")
   const [isVerified, setIsVerified] = useState(false)
@@ -32,7 +33,11 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
     setCaptchaText(result)
     setIsVerified(false)
     clearError()
-  }, [clearError])
+    // Call onRegenerate callback if provided
+    if (onRegenerate) {
+      onRegenerate()
+    }
+  }, [clearError, onRegenerate])
 
   // Generate initial captcha on mount
   useEffect(() => {

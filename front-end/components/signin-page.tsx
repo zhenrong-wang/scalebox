@@ -159,6 +159,7 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
                 onError={setCaptchaError}
                 clearError={() => setCaptchaError("")}
                 regenerateOnError={shouldRegenerateCaptcha}
+                onRegenerate={() => setShouldRegenerateCaptcha(false)}
               />
               {captchaError && (
                 <div className="text-xs text-destructive">
