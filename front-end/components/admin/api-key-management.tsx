@@ -204,93 +204,82 @@ export function AdminApiKeyManagement() {
       </div>
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-lg border border-border">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="relative w-full lg:w-80">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder={t("apiKey.search") || "Search by key name or user email..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+              <SelectItem value="active">{t("table.active")}</SelectItem>
+              <SelectItem value="disabled">{t("table.disabled")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder={t("table.owner") || "Owner"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("table.owner") || "All Owners"}</SelectItem>
+              {owners.filter((owner): owner is string => Boolean(owner)).map(owner => (
+                <SelectItem key={owner} value={owner}>{owner}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+          dateRange.from || dateRange.to 
+            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
+            : 'bg-muted/50 border-border'
+        }`}>
+          <Calendar className={`h-4 w-4 ${
+            dateRange.from || dateRange.to 
+              ? 'text-blue-600 dark:text-blue-400' 
+              : 'text-muted-foreground'
+          }`} />
+          <Label className={`text-sm font-medium whitespace-nowrap ${
+            dateRange.from || dateRange.to 
+              ? 'text-blue-700 dark:text-blue-300' 
+              : ''
+          }`}>{t("table.created") || "Created"}</Label>
+          <div className="flex items-center gap-1">
             <Input
-              placeholder={t("apiKey.search") || "Search by key name or user email..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-10"
+              type="date"
+              value={String(dateRange.from ?? "")}
+              onChange={e => setDateRange(r => ({ ...r, from: e.target.value || null }))}
+              className="w-[130px] h-8 text-sm"
+              placeholder="From date"
+            />
+            <span className="text-muted-foreground text-sm">to</span>
+            <Input
+              type="date"
+              value={String(dateRange.to ?? "")}
+              onChange={e => setDateRange(r => ({ ...r, to: e.target.value || null }))}
+              className="w-[130px] h-8 text-sm"
+              placeholder="To date"
             />
           </div>
-          
-          {/* Status Filter */}
-          <div>
-            <Label className="text-sm font-medium mb-2 block">{t("table.status") || "Status"}</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-                <SelectItem value="active">{t("table.active")}</SelectItem>
-                <SelectItem value="disabled">{t("table.disabled")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Owner Filter */}
-          <div>
-            <Label className="text-sm font-medium mb-2 block">{t("table.owner") || "Owner"}</Label>
-            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder={t("table.owner") || "Owner"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("table.owner") || "All Owners"}</SelectItem>
-                {owners.filter((owner): owner is string => Boolean(owner)).map(owner => (
-                  <SelectItem key={owner} value={owner}>{owner}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Date Range Filter */}
-          <div>
-            <Label className="text-sm font-medium mb-2 block">{t("table.created") || "Created"}</Label>
-            <div className={`flex items-center gap-2 p-2 rounded-md border transition-colors h-10 ${
-              dateRange.from || dateRange.to 
-                ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
-                : 'bg-background border-border'
-            }`}>
-              <Calendar className={`h-4 w-4 ${
-                dateRange.from || dateRange.to 
-                  ? 'text-blue-600 dark:text-blue-400' 
-                  : 'text-muted-foreground'
-              }`} />
-              <div className="flex items-center gap-1 flex-1">
-                <Input
-                  type="date"
-                  value={String(dateRange.from ?? "")}
-                  onChange={e => setDateRange(r => ({ ...r, from: e.target.value || null }))}
-                  className="w-[110px] h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0"
-                  placeholder="From"
-                />
-                <span className="text-muted-foreground text-xs">to</span>
-                <Input
-                  type="date"
-                  value={String(dateRange.to ?? "")}
-                  onChange={e => setDateRange(r => ({ ...r, to: e.target.value || null }))}
-                  className="w-[110px] h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0"
-                  placeholder="To"
-                />
-              </div>
-              {(dateRange.from || dateRange.to) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDateRange({ from: null, to: null })}
-                  className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                  title="Clear date range"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          </div>
+          {(dateRange.from || dateRange.to) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDateRange({ from: null, to: null })}
+              className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+              title="Clear date range"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       </div>
 
