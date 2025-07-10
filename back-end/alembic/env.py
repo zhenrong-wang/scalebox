@@ -10,6 +10,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 load_dotenv(os.path.join(os.path.dirname(__file__), 'app', '.env'))
 from app.users import Base, User
+from app.api_keys import ApiKey, ApiKeyUsage, ApiRateLimit
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

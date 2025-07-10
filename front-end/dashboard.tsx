@@ -276,7 +276,7 @@ function DashboardContent() {
           </div>
         )
       case "api-key":
-        return <ApiKeyManagement />
+        return isAdmin ? <ApiKeyManagement /> : <ApiKeyPage />
       case "budget":
         return <BudgetPage />
       case "billings":
