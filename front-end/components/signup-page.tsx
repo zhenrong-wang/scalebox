@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef } from "react"
+import React, { useState, useRef } from "react"
 import { Eye, EyeOff, ArrowLeft, Box, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,9 +19,11 @@ interface SignUpPageProps {
   onSignUp: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>
   onBackToLanding: () => void
   onSwitchToSignIn: () => void
+  onAuthError?: () => void
 }
 
-export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: SignUpPageProps) {
+export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpPageProps>(
+  ({ onSignUp, onBackToLanding, onSwitchToSignIn, onAuthError }, ref) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -51,6 +51,16 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
   const captchaRef = useRef<{ validate: () => void; regenerate: () => void }>(null)
 
   const { t } = useLanguage()
+
+  // Expose resetCaptcha function via ref
+  React.useImperativeHandle(ref, () => ({
+    resetCaptcha: () => {
+      setRecaptchaVerified(false)
+      setCaptchaValue("")
+      setShouldRegenerateCaptcha(true)
+      captchaRef.current?.regenerate()
+    }
+  }))
 
   const validateName = (name: string) => {
     if (!name.trim()) return t("signup.fullName.required")
@@ -133,6 +143,10 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
         setRecaptchaVerified(false)
         setCaptchaValue("")
         setShouldRegenerateCaptcha(true);
+        // Call parent callback if provided
+        if (onAuthError) {
+          onAuthError();
+        }
       }
     } catch (err) {
       setError(t("signup.unexpectedError"));
@@ -140,6 +154,10 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
       setRecaptchaVerified(false)
       setCaptchaValue("")
       setShouldRegenerateCaptcha(true);
+      // Call parent callback if provided
+      if (onAuthError) {
+        onAuthError();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -441,4 +459,4 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
       </div>
     </div>
   )
-}
+})

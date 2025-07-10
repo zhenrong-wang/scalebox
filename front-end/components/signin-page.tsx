@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef } from "react"
+import React, { useState, useRef } from "react"
 import { Eye, EyeOff, ArrowLeft, Box } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,9 +16,11 @@ interface SignInPageProps {
   onBackToLanding: () => void
   onSwitchToSignUp: () => void
   onForgotPassword: () => void
+  onAuthError?: () => void
 }
 
-export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForgotPassword }: SignInPageProps) {
+export const SignInPage = React.forwardRef<{ resetCaptcha: () => void }, SignInPageProps>(
+  ({ onSignIn, onBackToLanding, onSwitchToSignUp, onForgotPassword, onAuthError }, ref) => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -34,6 +34,16 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
   const [shouldRegenerateCaptcha, setShouldRegenerateCaptcha] = useState(false)
   const captchaRef = useRef<{ validate: () => void; regenerate: () => void }>(null)
   const { t } = useLanguage()
+
+  // Expose resetCaptcha function via ref
+  React.useImperativeHandle(ref, () => ({
+    resetCaptcha: () => {
+      setRecaptchaVerified(false)
+      setCaptchaValue("")
+      setShouldRegenerateCaptcha(true)
+      captchaRef.current?.regenerate()
+    }
+  }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,6 +77,10 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
         setRecaptchaVerified(false)
         setCaptchaValue("")
         setShouldRegenerateCaptcha(true)
+        // Call parent callback if provided
+        if (onAuthError) {
+          onAuthError()
+        }
       }
     } catch (err) {
       setError(t("signin.error.unexpectedError"))
@@ -74,6 +88,10 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
       setRecaptchaVerified(false)
       setCaptchaValue("")
       setShouldRegenerateCaptcha(true)
+      // Call parent callback if provided
+      if (onAuthError) {
+        onAuthError()
+      }
     } finally {
       setIsLoading(false)
     }
@@ -213,4 +231,4 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
       </div>
     </div>
   )
-}
+})

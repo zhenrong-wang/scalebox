@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { User } from "lucide-react"
 import { useResizableSidebar } from "./hooks/use-resizable-sidebar"
 import { ThemeProvider } from "./contexts/theme-context"
@@ -73,6 +73,10 @@ function DashboardContent() {
   const [resetToken, setResetToken] = useState<string | null>(null)
   const { sidebarWidth, isCollapsed, isResizing, sidebarRef, startResizing, toggleCollapse } = useResizableSidebar()
   const { t } = useLanguage()
+  
+  // Refs for captcha reset
+  const signinRef = useRef<{ resetCaptcha: () => void }>(null)
+  const signupRef = useRef<{ resetCaptcha: () => void }>(null)
 
   // Load current user data
   useEffect(() => {
@@ -104,18 +108,28 @@ function DashboardContent() {
   }, [currentUser, isAdmin, currentPage])
 
   const handleSignIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const result = await UserService.signin(email, password);
-    if (!result || !result.access_token) {
+    try {
+      const result = await UserService.signin(email, password);
+      if (!result || !result.access_token) {
+        // Reset captcha on authentication failure
+        signinRef.current?.resetCaptcha();
+        return { success: false, error: "Invalid email or password" };
+      }
+      // Fetch user profile
+      const user = await UserService.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+        setAuthState("authenticated");
+        return { success: true };
+      }
+      // Reset captcha on profile fetch failure
+      signinRef.current?.resetCaptcha();
+      return { success: false, error: "Failed to fetch user profile" };
+    } catch (error) {
+      // Reset captcha on any error
+      signinRef.current?.resetCaptcha();
       return { success: false, error: "Invalid email or password" };
     }
-    // Fetch user profile
-    const user = await UserService.getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setAuthState("authenticated");
-      return { success: true };
-    }
-    return { success: false, error: "Failed to fetch user profile" };
   };
 
   const handleSignUp = async (
@@ -123,14 +137,22 @@ function DashboardContent() {
     password: string,
     name: string,
   ): Promise<{ success: boolean; error?: string }> => {
-    const result = await UserService.signup({ email, password, name });
-    if (result && !result.error && !result.detail) {
-      // Store verification data and go to verification state
-      setVerificationData({ email, password, name });
-      setAuthState("verification");
-      return { success: true };
+    try {
+      const result = await UserService.signup({ email, password, name });
+      if (result && !result.error && !result.detail) {
+        // Store verification data and go to verification state
+        setVerificationData({ email, password, name });
+        setAuthState("verification");
+        return { success: true };
+      }
+      // Reset captcha on signup failure
+      signupRef.current?.resetCaptcha();
+      return { success: false, error: result?.detail || result?.error || "Signup failed" };
+    } catch (error) {
+      // Reset captcha on any error
+      signupRef.current?.resetCaptcha();
+      return { success: false, error: "Signup failed" };
     }
-    return { success: false, error: result?.detail || result?.error || "Signup failed" };
   };
 
   const handleVerification = async (code: string): Promise<{ success: boolean; error?: string }> => {
@@ -307,6 +329,7 @@ function DashboardContent() {
     case "signin":
       return (
         <SignInPage
+          ref={signinRef}
           onSignIn={handleSignIn}
           onBackToLanding={() => setAuthState("landing")}
           onSwitchToSignUp={() => setAuthState("signup")}
@@ -317,6 +340,7 @@ function DashboardContent() {
     case "signup":
       return (
         <SignUpPage
+          ref={signupRef}
           onSignUp={handleSignUp}
           onBackToLanding={() => setAuthState("landing")}
           onSwitchToSignIn={() => setAuthState("signin")}
