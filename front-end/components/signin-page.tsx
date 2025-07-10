@@ -47,11 +47,7 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
 
     // Validate captcha if not already verified
     if (!recaptchaVerified) {
-      if (captchaValue.trim() === "") {
-        setError(t("signin.error.recaptcha"))
-        return
-      }
-      // Trigger captcha validation
+      // Trigger captcha validation - it will handle empty input internally
       captchaRef.current?.validate()
       return
     }

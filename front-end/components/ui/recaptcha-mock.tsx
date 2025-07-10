@@ -64,6 +64,16 @@ export const RecaptchaMock = forwardRef<{ validate: () => void }, RecaptchaMockP
 
   // Validate user input
   const validateInput = () => {
+    // Check if input is empty
+    if (value.trim() === "") {
+      onError(t("recaptcha.required") || "Please complete the reCAPTCHA")
+      setIsVerified(false)
+      if (onValidate) {
+        onValidate(false)
+      }
+      return
+    }
+    
     if (value.toUpperCase() === captchaText) {
       setIsVerified(true)
       clearError()

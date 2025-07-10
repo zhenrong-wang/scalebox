@@ -111,11 +111,7 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
     
     // Validate captcha if not already verified
     if (!recaptchaVerified) {
-      if (captchaValue.trim() === "") {
-        setError(t("signup.recaptcha.required"))
-        return
-      }
-      // Trigger captcha validation
+      // Trigger captcha validation - it will handle empty input internally
       captchaRef.current?.validate()
       return
     }
