@@ -49,6 +49,19 @@ export function ApiKeyPage() {
     isLoading: false,
   })
 
+  // Disable confirmation state
+  const [disableDialog, setDisableDialog] = useState<{
+    isOpen: boolean
+    keyId: string
+    keyName: string
+    isLoading: boolean
+  }>({
+    isOpen: false,
+    keyId: "",
+    keyName: "",
+    isLoading: false,
+  })
+
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -85,6 +98,22 @@ export function ApiKeyPage() {
   }
 
   const handleToggleKeyStatus = async (keyId: string) => {
+    // Find the key to check if we're enabling or disabling
+    const key = apiKeys.find(k => k.key_id === keyId);
+    if (!key) return;
+
+    // If we're disabling, show confirmation dialog
+    if (key.is_active) {
+      setDisableDialog({
+        isOpen: true,
+        keyId,
+        keyName: key.name,
+        isLoading: false,
+      });
+      return;
+    }
+
+    // If we're enabling, proceed directly
     setError("");
     setSuccess("");
     try {
@@ -97,6 +126,16 @@ export function ApiKeyPage() {
   }
 
   const openDeleteDialog = (keyId: string, keyName: string) => {
+    // Find the key to check if it's active
+    const key = apiKeys.find(k => k.key_id === keyId);
+    if (!key) return;
+
+    // Prevent deletion of active keys
+    if (key.is_active) {
+      setError(t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.");
+      return;
+    }
+
     setDeleteDialog({
       isOpen: true,
       keyId,
@@ -112,6 +151,29 @@ export function ApiKeyPage() {
       keyName: "",
       isLoading: false,
     })
+  }
+
+  const closeDisableDialog = () => {
+    setDisableDialog({
+      isOpen: false,
+      keyId: "",
+      keyName: "",
+      isLoading: false,
+    })
+  }
+
+  const confirmDisableKey = async () => {
+    setDisableDialog((prev) => ({ ...prev, isLoading: true }))
+    setError("")
+    setSuccess("")
+    try {
+      await ApiKeyService.toggleApiKeyStatus(disableDialog.keyId);
+      toggleKeyStatus(disableDialog.keyId);
+      setSuccess(t("apiKey.statusUpdated") || "API key status updated successfully!");
+      closeDisableDialog();
+    } catch (e: any) {
+      setError(e.message || "Failed to update API key status");
+    }
   }
 
   const confirmDeleteKey = async () => {
@@ -390,7 +452,14 @@ export function ApiKeyPage() {
                     >
                       {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                     </Button>
-                    <Button size="icon" variant="outline" onClick={() => openDeleteDialog(key.key_id, key.name)} title={t("apiKey.deleteKey") || "Delete API Key"}>
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      onClick={() => openDeleteDialog(key.key_id, key.name)} 
+                      title={key.is_active ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") : (t("apiKey.deleteKey") || "Delete API Key")}
+                      disabled={key.is_active}
+                      className={key.is_active ? "opacity-50 cursor-not-allowed" : ""}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -417,6 +486,17 @@ export function ApiKeyPage() {
         itemName={deleteDialog.keyName}
         itemType={t("table.apiKey") || "API Key"}
         warningMessage={t("apiKey.deleteWarning") || `Are you sure you want to delete the API key "${deleteDialog.keyName}"? This action cannot be undone.`}
+      />
+
+      {/* Disable Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={disableDialog.isOpen}
+        onClose={closeDisableDialog}
+        onConfirm={confirmDisableKey}
+        isLoading={disableDialog.isLoading}
+        itemName={disableDialog.keyName}
+        itemType={t("table.apiKey") || "API Key"}
+        warningMessage={t("apiKey.disableWarning") || `Disabling this API key will immediately stop all applications and services using it. This may cause service interruptions. Are you sure you want to disable this key?`}
       />
     </div>
   )
