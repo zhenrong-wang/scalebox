@@ -39,10 +39,21 @@ export function RecaptchaMock({ onVerify, disabled, value, onChange, onError, cl
     }
   }, [clearError, onRegenerate])
 
+  // Generate initial captcha on mount - separate from generateCaptcha to avoid dependency issues
+  const generateInitialCaptcha = useCallback(() => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let result = ""
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setCaptchaText(result)
+    setIsVerified(false)
+  }, [])
+
   // Generate initial captcha on mount
   useEffect(() => {
-    generateCaptcha()
-  }, [generateCaptcha])
+    generateInitialCaptcha()
+  }, [generateInitialCaptcha])
 
   // Validate user input
   const validateInput = () => {
