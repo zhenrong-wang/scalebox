@@ -32,6 +32,7 @@ export function ApiKeyPage() {
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState<string>("")
   const [loading, setLoading] = useState(false)
+  const [dialogError, setDialogError] = useState<string>("")
   const [newKeyExpiresIn, setNewKeyExpiresIn] = useState<string>("30"); // default 30 days
   const [newKeyDescription, setNewKeyDescription] = useState("");
 
@@ -128,11 +129,11 @@ export function ApiKeyPage() {
   }
 
   const createNewKey = async () => {
-    setError("");
+    setDialogError("");
     setSuccess("");
     if (!newKeyName.trim()) return;
     if (apiKeys.length >= 5) {
-      setError(t("apiKey.maxKeysReached") || "Maximum of 5 API keys allowed. Delete one to create a new key.");
+      setDialogError(t("apiKey.maxKeysReached") || "Maximum of 5 API keys allowed. Delete one to create a new key.");
       return;
     }
     setLoading(true);
@@ -157,12 +158,18 @@ export function ApiKeyPage() {
       setApiKeys(prev => [...prev, newKey]);
       setSuccess("API key created successfully!");
       setIsDialogOpen(false);
+      setDialogError("");
       setNewKeyName("");
       setNewKeyWrite(true);
       setNewKeyDescription("");
       setNewKeyExpiresIn("30");
     } catch (e: any) {
-      setError(e.message || "Failed to create API key");
+      // Check if it's a duplicate name error and use the translated message
+      if (e.message && e.message.includes("must be unique")) {
+        setDialogError(t("apiKey.duplicateName") || "An API key with this name already exists. Please choose a different name.");
+      } else {
+        setDialogError(e.message || "Failed to create API key");
+      }
     } finally {
       setLoading(false);
     }
@@ -196,7 +203,16 @@ export function ApiKeyPage() {
           <div className="text-sm text-muted-foreground">{t("table.disabledKeys") || "Disabled Keys"}</div>
         </div>
         <div className="bg-card p-4 rounded-lg border border-border">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setDialogError("");
+              setNewKeyName("");
+              setNewKeyDescription("");
+              setNewKeyExpiresIn("30");
+              setNewKeyWrite(true);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="w-full" disabled={apiKeys.length >= 5}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -208,6 +224,7 @@ export function ApiKeyPage() {
                 <DialogTitle>{t("apiKey.createKey") || "Create API Key"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {dialogError && <div className="text-red-600 text-sm font-medium">{dialogError}</div>}
                 <div>
                   <Label htmlFor="keyName">{t("apiKey.keyName") || "Key Name"}</Label>
                   <Input
