@@ -25,9 +25,10 @@ export const RecaptchaMock = forwardRef<{ validate: () => void }, RecaptchaMockP
   const [captchaText, setCaptchaText] = useState("")
   const [isVerified, setIsVerified] = useState(false)
 
-  // Expose validate function to parent component
+  // Expose validate and regenerate functions to parent component
   useImperativeHandle(ref, () => ({
-    validate: validateInput
+    validate: validateInput,
+    regenerate: () => generateCaptcha(true)
   }))
 
   // Generate random captcha text

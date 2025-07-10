@@ -32,7 +32,7 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
   const [captchaValue, setCaptchaValue] = useState("")
   const [captchaError, setCaptchaError] = useState("")
   const [shouldRegenerateCaptcha, setShouldRegenerateCaptcha] = useState(false)
-  const captchaRef = useRef<{ validate: () => void }>(null)
+  const captchaRef = useRef<{ validate: () => void; regenerate: () => void }>(null)
   const { t } = useLanguage()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,10 +63,16 @@ export function SignInPage({ onSignIn, onBackToLanding, onSwitchToSignUp, onForg
       const result = await onSignIn(formData.email, formData.password)
       if (!result.success) {
         setError(result.error || t("signin.error.signInFailed"))
+        // Reset captcha on authentication error
+        setRecaptchaVerified(false)
+        setCaptchaValue("")
         setShouldRegenerateCaptcha(true)
       }
     } catch (err) {
       setError(t("signin.error.unexpectedError"))
+      // Reset captcha on authentication error
+      setRecaptchaVerified(false)
+      setCaptchaValue("")
       setShouldRegenerateCaptcha(true)
     } finally {
       setIsLoading(false)

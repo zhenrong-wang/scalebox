@@ -48,7 +48,7 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
   const [showVerification, setShowVerification] = useState(false)
   const [inputCode, setInputCode] = useState("")
   const [verificationError, setVerificationError] = useState("")
-  const captchaRef = useRef<{ validate: () => void }>(null)
+  const captchaRef = useRef<{ validate: () => void; regenerate: () => void }>(null)
 
   const { t } = useLanguage()
 
@@ -129,10 +129,16 @@ export function SignUpPage({ onSignUp, onBackToLanding, onSwitchToSignIn }: Sign
         setShowVerification(true);
       } else {
         setError(result.error || t("signup.unexpectedError"));
+        // Reset captcha on authentication error
+        setRecaptchaVerified(false)
+        setCaptchaValue("")
         setShouldRegenerateCaptcha(true);
       }
     } catch (err) {
       setError(t("signup.unexpectedError"));
+      // Reset captcha on authentication error
+      setRecaptchaVerified(false)
+      setCaptchaValue("")
       setShouldRegenerateCaptcha(true);
     } finally {
       setIsLoading(false);
