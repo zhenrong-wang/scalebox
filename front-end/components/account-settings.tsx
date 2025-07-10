@@ -151,8 +151,8 @@ export function AccountSettings({ isOpen, onClose, onLogout }: AccountSettingsPr
     setIsLoading({ ...isLoading, password: true });
     if (!userData?.email) return;
     const result = await UserService.resetPassword(userData.email);
-    setAlerts({
-      ...alerts,
+      setAlerts({
+        ...alerts,
       password: result?.msg || tReplace(t("account.passwordResetSent"), { email: userData.email }),
     });
     setIsLoading({ ...isLoading, password: false });
@@ -377,7 +377,7 @@ export function AccountSettings({ isOpen, onClose, onLogout }: AccountSettingsPr
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                   <Badge className={userData?.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
                     {userData?.isActive ? t("account.active") : t("account.inactive")}
                   </Badge>

@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useLanguage } from "../contexts/language-context"
 
 interface ActionConfirmationDialogProps {
   isOpen: boolean
@@ -40,10 +41,11 @@ export function ActionConfirmationDialog({
 }: ActionConfirmationDialogProps) {
   const [confirmationText, setConfirmationText] = useState("")
   const [error, setError] = useState("")
+  const { t } = useLanguage()
 
   const handleConfirm = () => {
     if (requireConfirmation && confirmationText !== itemName) {
-      setError(`Please type "${itemName}" exactly to confirm`)
+      setError(t("dialog.pleaseTypeToConfirm", { name: itemName }) || `Please type "${itemName}" exactly to confirm`)
       return
     }
 
@@ -63,36 +65,36 @@ export function ActionConfirmationDialog({
     switch (action) {
       case "delete":
         return {
-          title: "Delete",
-          description: `This action cannot be undone. This will permanently delete the ${itemType.toLowerCase()} and remove all associated data.`,
-          buttonText: "Delete",
+          title: t("action.delete") || "Delete",
+          description: t("dialog.deleteDescription", { itemType: itemType.toLowerCase() }) || `This action cannot be undone. This will permanently delete the ${itemType.toLowerCase()} and remove all associated data.`,
+          buttonText: t("action.delete") || "Delete",
           buttonVariant: "destructive" as const,
           icon: Trash2,
           requireConfirmation: true,
         }
       case "disable":
         return {
-          title: "Disable",
-          description: `This will disable the ${itemType.toLowerCase()} and prevent any further access.`,
-          buttonText: "Disable",
+          title: t("action.disable") || "Disable",
+          description: t("dialog.disableDescription", { itemType: itemType.toLowerCase() }) || `This will disable the ${itemType.toLowerCase()} and prevent any further access.`,
+          buttonText: t("action.disable") || "Disable",
           buttonVariant: "default" as const,
           icon: PowerOff,
           requireConfirmation: false,
         }
       case "enable":
         return {
-          title: "Enable",
-          description: `This will enable the ${itemType.toLowerCase()} and allow access.`,
-          buttonText: "Enable",
+          title: t("action.enable") || "Enable",
+          description: t("dialog.enableDescription", { itemType: itemType.toLowerCase() }) || `This will enable the ${itemType.toLowerCase()} and allow access.`,
+          buttonText: t("action.enable") || "Enable",
           buttonVariant: "default" as const,
           icon: Power,
           requireConfirmation: false,
         }
       default:
         return {
-          title: "Confirm",
-          description: `Are you sure you want to perform this action on the ${itemType.toLowerCase()}?`,
-          buttonText: "Confirm",
+          title: t("action.confirm") || "Confirm",
+          description: t("dialog.confirmDescription", { itemType: itemType.toLowerCase() }) || `Are you sure you want to perform this action on the ${itemType.toLowerCase()}?`,
+          buttonText: t("action.confirm") || "Confirm",
           buttonVariant: "default" as const,
           icon: AlertTriangle,
           requireConfirmation: false,
@@ -125,14 +127,14 @@ export function ActionConfirmationDialog({
           )}
 
           <div className="bg-muted p-3 rounded-lg">
-            <div className="text-sm font-medium text-muted-foreground mb-1">{itemType} to be {action}d:</div>
+            <div className="text-sm font-medium text-muted-foreground mb-1">{t("dialog.itemToBeActioned", { itemType, action: t(`action.${action}`) || action }) || `${itemType} to be ${action}d:`}</div>
             <div className="font-mono text-sm bg-background px-2 py-1 rounded border">{itemName}</div>
           </div>
 
           {requireConfirmation && (
             <div className="space-y-2">
               <Label htmlFor="confirmation">
-                Type <span className="font-mono font-semibold">{itemName}</span> to confirm:
+                {t("dialog.typeToConfirm", { name: itemName }) || `Type ${itemName} to confirm:`}
               </Label>
               <Input
                 id="confirmation"
@@ -141,7 +143,7 @@ export function ActionConfirmationDialog({
                   setConfirmationText(e.target.value)
                   if (error) setError("")
                 }}
-                placeholder={`Type "${itemName}" here`}
+                placeholder={t("dialog.typeNameHere", { name: itemName }) || `Type "${itemName}" here`}
                 className={error ? "border-destructive" : ""}
                 disabled={isLoading}
               />
@@ -152,7 +154,7 @@ export function ActionConfirmationDialog({
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
-            Cancel
+            {t("action.cancel") || "Cancel"}
           </Button>
           <Button 
             variant={config.buttonVariant} 
@@ -163,7 +165,7 @@ export function ActionConfirmationDialog({
             {isLoading ? (
               <>
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                {config.buttonText}ing...
+                {t("dialog.processing", { action: config.buttonText }) || `${config.buttonText}ing...`}
               </>
             ) : (
               <>

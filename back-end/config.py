@@ -11,7 +11,7 @@ class Settings:
     DB_USER = os.getenv('DB_USER', 'root')
     DB_PASSWORD = os.getenv('DB_PASSWORD', '')
     DB_NAME = os.getenv('DB_NAME', 'scalebox')
-    
+
     # Database connection pooling
     DB_POOL_SIZE = int(os.getenv('DB_POOL_SIZE', 20))
     DB_MAX_OVERFLOW = int(os.getenv('DB_MAX_OVERFLOW', 30))

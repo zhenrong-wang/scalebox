@@ -223,17 +223,17 @@ export const RecaptchaMock = forwardRef<{ validate: () => void }, RecaptchaMockP
       {/* User Input - Compact Design */}
       {!isVerified && (
         <div className="space-y-2">
-          <Input
-            type="text"
+            <Input
+              type="text"
             value={value}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            placeholder={t("recaptcha.placeholder")}
-            disabled={disabled}
+              onChange={handleInputChange}
+              onKeyPress={handleKeyPress}
+              placeholder={t("recaptcha.placeholder")}
+              disabled={disabled}
             className="flex-1"
-            maxLength={6}
-            autoComplete="off"
-          />
+              maxLength={6}
+              autoComplete="off"
+            />
         </div>
       )}
 

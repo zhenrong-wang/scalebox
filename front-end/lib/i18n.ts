@@ -65,6 +65,17 @@ export const translations: Record<Language, Record<string, string>> = {
     "action.terms": "Terms of Service",
     "action.privacy": "Privacy Policy",
 
+    // Dialog
+    "dialog.deleteDescription": "This action cannot be undone. This will permanently delete the {itemType} and remove all associated data.",
+    "dialog.disableDescription": "This will disable the {itemType} and prevent any further access.",
+    "dialog.enableDescription": "This will enable the {itemType} and allow access.",
+    "dialog.confirmDescription": "Are you sure you want to perform this action on the {itemType}?",
+    "dialog.itemToBeActioned": "{itemType} to be {action}:",
+    "dialog.typeToConfirm": "Type {name} to confirm:",
+    "dialog.typeNameHere": "Type \"{name}\" here",
+    "dialog.pleaseTypeToConfirm": "Please type \"{name}\" exactly to confirm",
+    "dialog.processing": "{action}ing...",
+
     // Auth & Landing
     "landing.title": "Build, Test, and Deploy",
     "landing.subtitle": "Faster Than Ever",
@@ -681,6 +692,17 @@ export const translations: Record<Language, Record<string, string>> = {
     "action.applyFilters": "应用筛选",
     "action.deleteUser": "删除用户",
 
+    // Dialog
+    "dialog.deleteDescription": "此操作无法撤销。这将永久删除{itemType}并移除所有相关数据。",
+    "dialog.disableDescription": "这将禁用{itemType}并阻止任何进一步的访问。",
+    "dialog.enableDescription": "这将启用{itemType}并允许访问。",
+    "dialog.confirmDescription": "您确定要对此{itemType}执行此操作吗？",
+    "dialog.itemToBeActioned": "要{action}的{itemType}：",
+    "dialog.typeToConfirm": "输入{name}以确认：",
+    "dialog.typeNameHere": "在此输入\"{name}\"",
+    "dialog.pleaseTypeToConfirm": "请准确输入\"{name}\"以确认",
+    "dialog.processing": "{action}中...",
+
     // Auth & Landing
     "landing.title": "构建、测试和部署",
     "landing.subtitle": "比以往更快",
@@ -1283,6 +1305,17 @@ export const translations: Record<Language, Record<string, string>> = {
     "action.clearAll": "清除全部",
     "action.applyFilters": "套用篩選",
     "action.deleteUser": "刪除使用者",
+
+    // Dialog
+    "dialog.deleteDescription": "此操作無法復原。這將永久刪除{itemType}並移除所有相關資料。",
+    "dialog.disableDescription": "這將停用{itemType}並阻止任何進一步的存取。",
+    "dialog.enableDescription": "這將啟用{itemType}並允許存取。",
+    "dialog.confirmDescription": "您確定要對此{itemType}執行此操作嗎？",
+    "dialog.itemToBeActioned": "要{action}的{itemType}：",
+    "dialog.typeToConfirm": "輸入{name}以確認：",
+    "dialog.typeNameHere": "在此輸入\"{name}\"",
+    "dialog.pleaseTypeToConfirm": "請準確輸入\"{name}\"以確認",
+    "dialog.processing": "{action}中...",
 
     // Auth & Landing
     "landing.title": "建構、測試和部署",

@@ -62,7 +62,7 @@ function DashboardContent() {
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (localStorage.getItem("auth-token")) {
         setAuthState("authenticated");
-      }
+    }
     }
   }, []);
 
@@ -400,9 +400,9 @@ function DashboardContent() {
               </Button>
             </div>
           </div>
-        )
+      )
 
-      case "authenticated":
+    case "authenticated":
       return (
         <div className="flex h-screen bg-background">
           {/* Sidebar */}

@@ -166,7 +166,7 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
   const handleVerifyCode = async () => {
     setIsLoading(true);
     setVerificationError("");
-    try {
+      try {
       const verifyResult = await UserService.verifyEmail(inputCode, formData.email);
       if (verifyResult && verifyResult.msg && verifyResult.msg.includes("successfully")) {
         setShowVerification(false);
@@ -174,10 +174,10 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
         onSwitchToSignIn();
       } else {
         setVerificationError(t("signup.verification.incorrectCode"));
-      }
-    } catch (err) {
+        }
+      } catch (err) {
       setVerificationError(t("signup.unexpectedError"));
-    } finally {
+      } finally {
       setIsLoading(false);
     }
   };
