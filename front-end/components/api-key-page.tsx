@@ -448,7 +448,7 @@ export function ApiKeyPage() {
                       size="icon" 
                       variant="outline" 
                       onClick={() => handleToggleKeyStatus(key.key_id)} 
-                      title={key.is_active ? (t("apiKey.disable") || "Disable") : (t("apiKey.enable") || "Enable")}
+                      title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
                     >
                       {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                     </Button>
