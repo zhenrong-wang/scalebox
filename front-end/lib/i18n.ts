@@ -288,7 +288,7 @@ export const translations: Record<Language, Record<string, string>> = {
     
     "apiKey.search": "Search API keys...",
     "apiKey.deleteWarning": "Deleting this API key will immediately disable any applications or services using it. This action cannot be undone.",
-    "apiKey.description": "Description",
+    "apiKey.description": "Manage your API keys for accessing ScaleBox services",
     "apiKey.expiration": "Expiration",
     "apiKey.view": "View",
     "apiKey.hide": "Hide",
@@ -1495,7 +1495,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "project.search": "搜尋專案...",
     "apiKey.search": "搜尋API金鑰...",
     "apiKey.deleteWarning": "刪除此API金鑰將立即停用使用它的任何應用程式或服務。此操作無法復原。",
-    "apiKey.description": "描述",
+    "apiKey.description": "管理您的API密钥以访问ScaleBox服务",
     "apiKey.expiration": "到期時間",
     "apiKey.view": "檢視",
     "apiKey.hide": "隱藏",
