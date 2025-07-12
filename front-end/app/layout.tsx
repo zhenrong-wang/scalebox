@@ -3,9 +3,9 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.dev',
+  title: 'ScaleBox',
+  description: 'Build, Test, and Deploy Faster Than Ever',
+  generator: 'ScaleBox',
 }
 
 export default function RootLayout({
