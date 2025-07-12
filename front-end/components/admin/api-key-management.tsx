@@ -1,21 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Eye, EyeOff, Trash2, Search, Filter, AlertTriangle, Shield, CheckCircle, Power, PowerOff, Calendar, X } from "lucide-react"
+import { Trash2, Search, AlertTriangle, Shield, Power, PowerOff, X } from "lucide-react"
+import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { DeleteConfirmationDialog } from "../delete-confirmation-dialog"
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
+import { CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useLanguage } from "../../contexts/language-context"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ApiKeyService } from "../../services/api-key-service"
 import type { ApiKey } from "../../services/api-key-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { format } from "date-fns"
 
 export function AdminApiKeyManagement() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
@@ -62,8 +63,9 @@ export function AdminApiKeyManagement() {
     try {
       const keys = await ApiKeyService.getAllApiKeys()
       setApiKeys(keys)
-    } catch (e: any) {
-      setError(e.message || "Failed to load API keys")
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to load API keys")
     } finally {
       setLoading(false)
     }
@@ -73,7 +75,7 @@ export function AdminApiKeyManagement() {
     try {
       const statsData = await ApiKeyService.getApiKeyStats()
       setStats(statsData)
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Failed to load stats:", e)
     }
   }
@@ -124,8 +126,9 @@ export function AdminApiKeyManagement() {
       const actionText = actionDialog.action === "enable" ? "enabled" : actionDialog.action === "disable" ? "disabled" : "deleted"
       setSuccess(`API key "${actionDialog.keyName}" has been ${actionText}. A notification email has been sent to ${actionDialog.userEmail}.`)
       closeActionDialog()
-    } catch (e: any) {
-      setError(e.message || `Failed to ${actionDialog.action} API key`)
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || `Failed to ${actionDialog.action} API key`)
     }
   }
 
@@ -427,77 +430,142 @@ export function AdminApiKeyManagement() {
             )}
           </CardDescription>
         </CardHeader>
-        <div className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => { setSortBy("name"); setSortOrder(sortBy === "name" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("apiKey.keyName")} {sortBy === "name" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
-                <TableHead>{t("apiKey.description")}</TableHead>
-                <TableHead onClick={() => { setSortBy("is_active"); setSortOrder(sortBy === "is_active" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("table.status")} {sortBy === "is_active" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
-                <TableHead>{t("apiKey.expiration")}</TableHead>
-                <TableHead>{t("table.permissions") || "Permissions"}</TableHead>
-                <TableHead>{t("apiKey.keyValue")}</TableHead>
-                <TableHead onClick={() => { setSortBy("user_email"); setSortOrder(sortBy === "user_email" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("table.owner")} {sortBy === "user_email" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
-                <TableHead onClick={() => { setSortBy("created_at"); setSortOrder(sortBy === "created_at" && sortOrder === "asc" ? "desc" : "asc") }} className="cursor-pointer">{t("table.created")} {sortBy === "created_at" ? (sortOrder === "asc" ? "▲" : "▼") : ""}</TableHead>
-                <TableHead>{t("table.actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredApiKeys.map((key) => (
-                <TableRow key={key.key_id}>
-                  <TableCell>{key.name}</TableCell>
-                  <TableCell>{key.description || "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant={key.is_active ? "default" : "destructive"}>
-                      {key.is_active ? "Active" : "Disabled"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {key.expires_in_days ? ApiKeyService.getExpirationText(key.expires_in_days, key.created_at, t) : (t("apiKey.permanent") || "Permanent")}
-                  </TableCell>
-                  <TableCell>{ApiKeyService.getPermissionsText(key.permissions, t)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                        {key.prefix}...
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {t("apiKey.adminViewNote") || "Full key not available in admin view"}
-                    </div>
-                  </TableCell>
-                  <TableCell>{key.user_email || "-"}</TableCell>
-                  <TableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</TableCell>
-                  <TableCell className="flex gap-2">
-                    <Button 
-                      size="icon" 
-                      variant="outline" 
-                      onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", key.is_active ? "disable" : "enable")} 
-                      title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
-                    >
-                      {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      variant="outline" 
-                      onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", "delete")} 
-                      title={t("apiKey.deleteKey") || "Delete API Key"}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredApiKeys.length === 0 && (
+        <CardContent>
+          {filteredApiKeys.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {loading ? "Loading..." : t("table.noKeys") || "No API keys found."}
+            </div>
+          ) : (
+            <ResizableTable
+              defaultColumnWidths={{
+                name: 150,
+                description: 200,
+                status: 100,
+                expiration: 120,
+                permissions: 120,
+                keyValue: 150,
+                owner: 150,
+                created: 120,
+                actions: 100
+              }}
+            >
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground">
-                    {loading ? "Loading..." : t("table.noKeys") || "No API keys found."}
-                  </TableCell>
+                  <ResizableTableHead 
+                    columnId="name" 
+                    defaultWidth={150}
+                    className="cursor-pointer group"
+                    onClick={() => { setSortBy("name"); setSortOrder(sortBy === "name" && sortOrder === "asc" ? "desc" : "asc") }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("apiKey.keyName")}
+                      <SortIndicator
+                        isSorted={sortBy === "name"}
+                        sortDirection={sortBy === "name" ? sortOrder : undefined}
+                      />
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="description" defaultWidth={200}>{t("apiKey.description")}</ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="status" 
+                    defaultWidth={100}
+                    className="cursor-pointer group"
+                    onClick={() => { setSortBy("is_active"); setSortOrder(sortBy === "is_active" && sortOrder === "asc" ? "desc" : "asc") }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.status")}
+                      <SortIndicator
+                        isSorted={sortBy === "is_active"}
+                        sortDirection={sortBy === "is_active" ? sortOrder : undefined}
+                      />
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="expiration" defaultWidth={120}>{t("apiKey.expiration")}</ResizableTableHead>
+                  <ResizableTableHead columnId="permissions" defaultWidth={120}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
+                  <ResizableTableHead columnId="keyValue" defaultWidth={150}>{t("apiKey.keyValue")}</ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="owner" 
+                    defaultWidth={150}
+                    className="cursor-pointer group"
+                    onClick={() => { setSortBy("user_email"); setSortOrder(sortBy === "user_email" && sortOrder === "asc" ? "desc" : "asc") }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.owner")}
+                      <SortIndicator
+                        isSorted={sortBy === "user_email"}
+                        sortDirection={sortBy === "user_email" ? sortOrder : undefined}
+                      />
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="created" 
+                    defaultWidth={120}
+                    className="cursor-pointer group"
+                    onClick={() => { setSortBy("created_at"); setSortOrder(sortBy === "created_at" && sortOrder === "asc" ? "desc" : "asc") }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.created")}
+                      <SortIndicator
+                        isSorted={sortBy === "created_at"}
+                        sortDirection={sortBy === "created_at" ? sortOrder : undefined}
+                      />
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={100}>{t("table.actions")}</ResizableTableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filteredApiKeys.map((key) => (
+                  <TableRow key={key.key_id}>
+                    <ResizableTableCell>{key.name}</ResizableTableCell>
+                    <ResizableTableCell className="break-words">{key.description || "-"}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <Badge variant={key.is_active ? "default" : "destructive"}>
+                        {key.is_active ? "Active" : "Disabled"}
+                      </Badge>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      {key.expires_in_days ? ApiKeyService.getExpirationText(key.expires_in_days, key.created_at, t) : (t("apiKey.permanent") || "Permanent")}
+                    </ResizableTableCell>
+                    <ResizableTableCell className="break-words">{ApiKeyService.getPermissionsText(key.permissions, t)}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                          {key.prefix}...
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {t("apiKey.adminViewNote") || "Full key not available in admin view"}
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell>{key.user_email || "-"}</ResizableTableCell>
+                    <ResizableTableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", key.is_active ? "disable" : "enable")} 
+                          title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
+                        >
+                          {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", "delete")} 
+                          title={t("apiKey.deleteKey") || "Delete API Key"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </ResizableTableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </ResizableTable>
+          )}
+        </CardContent>
       </Card>
 
       {/* Admin Action Confirmation Dialog */}

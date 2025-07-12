@@ -1,21 +1,40 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Download, MoreHorizontal, RefreshCw, Eye, Edit, Trash2 } from "lucide-react"
+import { Search, Download, MoreHorizontal, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
+import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { UserService } from "@/services/user-service"
+
 import { UserDetailsModal } from "./user-details-modal"
 import { useLanguage } from "../../contexts/language-context"
 
+interface User {
+  id: string;
+  name?: string;
+  email?: string;
+  username?: string;
+  status: string;
+  role: string;
+  account_id?: string;
+  currentUsage?: {
+    projects: number;
+    sandboxes: number;
+    apiKeys: number;
+  };
+  totalSpent?: number;
+  createdAt?: string;
+  lastLoginAt?: string;
+}
+
 export function UserManagement() {
-  const [users, setUsers] = useState<any[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
@@ -312,19 +331,32 @@ export function UserManagement() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
+            <ResizableTable
+              defaultColumnWidths={{
+                name: 200,
+                accountId: 120,
+                email: 200,
+                role: 100,
+                status: 100,
+                usage: 120,
+                totalSpent: 120,
+                created: 120,
+                lastLogin: 120,
+                actions: 120
+              }}
+            >
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("table.name")}</TableHead>
-                  <TableHead>Account ID</TableHead>
-                  <TableHead>{t("table.email")}</TableHead>
-                  <TableHead>{t("table.role")}</TableHead>
-                  <TableHead>{t("table.status")}</TableHead>
-                  <TableHead>{t("table.usage")}</TableHead>
-                  <TableHead>{t("table.totalSpent")}</TableHead>
-                  <TableHead>{t("table.created")}</TableHead>
-                  <TableHead>{t("table.lastLogin")}</TableHead>
-                  <TableHead>{t("table.actions")}</TableHead>
+                  <ResizableTableHead columnId="name" defaultWidth={200}>{t("table.name")}</ResizableTableHead>
+                  <ResizableTableHead columnId="accountId" defaultWidth={120}>Account ID</ResizableTableHead>
+                  <ResizableTableHead columnId="email" defaultWidth={200}>{t("table.email")}</ResizableTableHead>
+                  <ResizableTableHead columnId="role" defaultWidth={100}>{t("table.role")}</ResizableTableHead>
+                  <ResizableTableHead columnId="status" defaultWidth={100}>{t("table.status")}</ResizableTableHead>
+                  <ResizableTableHead columnId="usage" defaultWidth={120}>{t("table.usage")}</ResizableTableHead>
+                  <ResizableTableHead columnId="totalSpent" defaultWidth={120}>{t("table.totalSpent")}</ResizableTableHead>
+                  <ResizableTableHead columnId="created" defaultWidth={120}>{t("table.created")}</ResizableTableHead>
+                  <ResizableTableHead columnId="lastLogin" defaultWidth={120}>{t("table.lastLogin")}</ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={120}>{t("table.actions")}</ResizableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -334,41 +366,41 @@ export function UserManagement() {
                     if (!user || typeof user !== "object") return null;
                     return (
                       <TableRow key={user.account_id}>
-                    <TableCell>
+                    <ResizableTableCell>
                       <div>
                         <div className="font-medium">{user.name}</div>
                         <div className="text-sm text-muted-foreground">{user.email}</div>
                       </div>
-                    </TableCell>
-                        <TableCell>
+                    </ResizableTableCell>
+                        <ResizableTableCell>
                           <div className="text-sm font-mono text-muted-foreground">
                             {user.account_id ? user.account_id.substring(0, 8) + '...' : '-'}
                           </div>
-                        </TableCell>
-                    <TableCell>
+                        </ResizableTableCell>
+                    <ResizableTableCell>
                       <Badge className={getRoleColor(user.role)}>{user.role}</Badge>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                       <Badge className={getStatusColor(user.status)}>{user.status}</Badge>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                       <div className="text-sm">
                             <div>{user.currentUsage?.projects ?? 0} {t("admin.projects")}</div>
                             <div className="text-muted-foreground">{user.currentUsage?.sandboxes ?? 0} {t("admin.sandboxes")}</div>
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                           <div className="font-medium">
                             ${user && !isNaN(Number(user.totalSpent)) ? Number(user.totalSpent).toFixed(2) : "0.00"}
                           </div>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                           <div className="text-sm">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "-"}</div>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                           <div className="text-sm">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "-"}</div>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -376,27 +408,27 @@ export function UserManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setSelectedUser(user.account_id)}>{t("action.viewDetails")}</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setSelectedUser(user.account_id || user.id)}>{t("action.viewDetails")}</DropdownMenuItem>
                           {user.status === "active" && (
                             <>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(user.account_id, "disabled")}>{t("admin.disableUser")}</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(user.account_id, "suspended")}>{t("admin.suspendUser")}</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(user.account_id || user.id, "disabled")}>{t("admin.disableUser")}</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(user.account_id || user.id, "suspended")}>{t("admin.suspendUser")}</DropdownMenuItem>
                             </>
                           )}
                           {user.status !== "active" && (
-                                <DropdownMenuItem onClick={() => handleStatusChange(user.account_id, "active")}>{t("admin.activateUser")}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(user.account_id || user.id, "active")}>{t("admin.activateUser")}</DropdownMenuItem>
                           )}
-                              <DropdownMenuItem onClick={() => handleDeleteUser(user.account_id)} className="text-red-600">{t("action.deleteUser")}</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteUser(user.account_id || user.id)} className="text-red-600">{t("action.deleteUser")}</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
+                    </ResizableTableCell>
                   </TableRow>
                     );
                   })
                   .filter(Boolean)
                 }
               </TableBody>
-            </Table>
+            </ResizableTable>
           </div>
         </CardContent>
       </Card>

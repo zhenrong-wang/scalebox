@@ -15,7 +15,7 @@ interface User {
 }
 
 export class UserService {
-  static API_BASE = "http://localhost:8000";
+  static API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   static async signup({ name, email, password }: { name: string; email: string; password: string }) {
     const res = await fetch(`${this.API_BASE}/users/signup`, {

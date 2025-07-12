@@ -10,13 +10,7 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { X } from "lucide-react"
 import type { SandboxFilters } from "../../types/sandbox"
 import { useLanguage } from "../../contexts/language-context"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 
 interface SandboxFiltersPanelProps {
   filters: SandboxFilters

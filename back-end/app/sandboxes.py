@@ -19,7 +19,10 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from config import settings
-from app.users import Base, User, get_db, verify_admin_token
+from .database import get_db
+from .models import Base, User, Sandbox, SandboxUsage, SandboxMetrics
+from .users import verify_admin_token
+from datetime import datetime
 
 
 router = APIRouter(prefix="/sandboxes", tags=["sandboxes"])
@@ -71,10 +74,12 @@ class SandboxResponse(BaseModel):
     project_name: Optional[str]
     resources: Dict[str, Any]
     cost: Dict[str, float]
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-    last_accessed_at: Optional[datetime.datetime]
+    created_at: datetime
+    updated_at: datetime
+    last_accessed_at: Optional[datetime]
     uptime: int  # minutes
+    cpu_spec: Optional[Dict[str, Any]] = None
+    memory_spec: Optional[Dict[str, Any]] = None
 
 
 class SandboxFilters(BaseModel):
@@ -84,8 +89,8 @@ class SandboxFilters(BaseModel):
     visibility: Optional[List[SandboxVisibility]] = None
     user_id: Optional[str] = None
     project_id: Optional[str] = None
-    date_from: Optional[datetime.datetime] = None
-    date_to: Optional[datetime.datetime] = None
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
     search: Optional[str] = None
 
 
@@ -101,78 +106,9 @@ class SandboxStats(BaseModel):
     total_uptime_hours: float
 
 
-# Database models
-class Sandbox(Base):
-    __tablename__ = "sandboxes"
-
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String(100), nullable=False, index=True)
-    description = Column(Text, nullable=True)
-    framework = Column(String(50), nullable=False, index=True)
-    status = Column(String(20), nullable=False, default=SandboxStatus.STOPPED, index=True)
-    user_id = Column(String(36), ForeignKey("users.account_id"), nullable=False, index=True)
-    region = Column(String(20), nullable=False, index=True)
-    visibility = Column(String(20), nullable=False, default=SandboxVisibility.PRIVATE, index=True)
-    project_id = Column(String(36), nullable=True, index=True)
-
-    # Resource usage (stored as JSON strings for simplicity)
-    cpu_usage = Column(Float, default=0.0)
-    memory_usage = Column(Float, default=0.0)
-    storage_usage = Column(Float, default=0.0)  # GB
-    bandwidth_usage = Column(Float, default=0.0)  # GB
-
-    # Cost tracking
-    hourly_rate = Column(Float, default=0.0)
-    total_cost = Column(Float, default=0.0)
-
-    # Timestamps
-    created_at = Column(DateTime, default=func.now(), nullable=False, index=True)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
-    last_accessed_at = Column(DateTime, nullable=True)
-    started_at = Column(DateTime, nullable=True)
-
-    # Relationships
-    user = relationship("User", back_populates="sandboxes")
-
-    # Indexes for better query performance
-    __table_args__ = (
-        Index('idx_sandboxes_user_status', 'user_id', 'status'),
-        Index('idx_sandboxes_created_at', 'created_at'),
-        Index('idx_sandboxes_framework_status', 'framework', 'status'),
-    )
 
 
-class SandboxUsage(Base):
-    __tablename__ = "sandbox_usage"
 
-    id = Column(Integer, primary_key=True, index=True)
-    sandbox_id = Column(String(36), ForeignKey("sandboxes.id"), nullable=False, index=True)
-    timestamp = Column(DateTime, default=func.now(), nullable=False, index=True)
-    cpu_usage = Column(Float, nullable=False)
-    memory_usage = Column(Float, nullable=False)
-    storage_usage = Column(Float, nullable=False)
-    bandwidth_usage = Column(Float, nullable=False)
-    cost_increment = Column(Float, nullable=False, default=0.0)
-
-
-# Add relationship to User model
-User.sandboxes = relationship("Sandbox", back_populates="user")
-
-# Database connection
-DATABASE_URL = (
-    f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
-    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
-)
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_recycle=settings.DB_POOL_RECYCLE,
-    pool_timeout=settings.DB_POOL_TIMEOUT,
-    echo=settings.ENVIRONMENT == 'development'
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 # Helper functions
@@ -193,10 +129,10 @@ def get_current_user(
     return user
 
 
-def calculate_uptime(started_at: Optional[datetime.datetime]) -> int:
+def calculate_uptime(started_at: Optional[datetime]) -> int:
     if not started_at:
         return 0
-    now = datetime.datetime.utcnow()
+    now = datetime.utcnow()
     delta = now - started_at
     return int(delta.total_seconds() / 60)  # Return minutes
 
@@ -243,7 +179,7 @@ def safe_datetime(val, default=None):
     """Safely extract datetime value from SQLAlchemy attribute"""
     if isinstance(val, InstrumentedAttribute):
         return default
-    if isinstance(val, datetime.datetime):
+    if isinstance(val, datetime):
         return val
     return default
 
@@ -317,10 +253,10 @@ def list_sandboxes(
         uptime = calculate_uptime(started_at_val)
 
         created_at_val = safe_datetime(
-            getattr(sandbox, 'created_at', None), datetime.datetime.utcnow()
+            getattr(sandbox, 'created_at', None), datetime.utcnow()
         )
         updated_at_val = safe_datetime(
-            getattr(sandbox, 'updated_at', None), datetime.datetime.utcnow()
+            getattr(sandbox, 'updated_at', None), datetime.utcnow()
         )
         last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
@@ -353,7 +289,9 @@ def list_sandboxes(
             created_at=created_at_val,
             updated_at=updated_at_val,
             last_accessed_at=last_accessed_at_val,
-            uptime=uptime
+            uptime=uptime,
+            cpu_spec=getattr(sandbox, 'cpu_requirements', None),
+            memory_spec=getattr(sandbox, 'memory_requirements', None)
         ))
 
     return result
@@ -442,10 +380,10 @@ def create_sandbox(
     uptime = calculate_uptime(started_at_val)
 
     created_at_val = safe_datetime(
-        getattr(new_sandbox, 'created_at', None), datetime.datetime.utcnow()
+        getattr(new_sandbox, 'created_at', None), datetime.utcnow()
     )
     updated_at_val = safe_datetime(
-        getattr(new_sandbox, 'updated_at', None), datetime.datetime.utcnow()
+        getattr(new_sandbox, 'updated_at', None), datetime.utcnow()
     )
     last_accessed_at_val = safe_datetime(getattr(new_sandbox, 'last_accessed_at', None))
 
@@ -497,10 +435,10 @@ def get_sandbox(
     uptime = calculate_uptime(started_at_val)
 
     created_at_val = safe_datetime(
-        getattr(sandbox, 'created_at', None), datetime.datetime.utcnow()
+        getattr(sandbox, 'created_at', None), datetime.utcnow()
     )
     updated_at_val = safe_datetime(
-        getattr(sandbox, 'updated_at', None), datetime.datetime.utcnow()
+        getattr(sandbox, 'updated_at', None), datetime.utcnow()
     )
     last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
@@ -512,24 +450,30 @@ def get_sandbox(
     )
 
     return SandboxResponse(
-        id=str(sandbox.id),
-        name=str(sandbox.name),
-        description=str(sandbox.description) if sandbox.description is not None else None,
-        framework=str(sandbox.framework),
-        status=SandboxStatus(sandbox.status),
-        user_id=str(sandbox.user_id),
+        id=str(getattr(sandbox, 'id', '')),
+        name=str(getattr(sandbox, 'name', '')),
+        description=str(getattr(sandbox, 'description', ''))
+        if getattr(sandbox, 'description', None) is not None else None,
+        framework=str(getattr(sandbox, 'framework', '')),
+        status=SandboxStatus(str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value))),
+        user_id=str(getattr(sandbox, 'user_id', '')),
         user_name=user_name,
         user_email=str(current_user.email),
-        region=str(sandbox.region),
-        visibility=SandboxVisibility(sandbox.visibility),
-        project_id=str(sandbox.project_id) if sandbox.project_id is not None else None,
-        project_name=None,
+        region=str(getattr(sandbox, 'region', '')),
+        visibility=SandboxVisibility(
+            str(getattr(sandbox, 'visibility', SandboxVisibility.PRIVATE.value))
+        ),
+        project_id=str(getattr(sandbox, 'project_id', ''))
+        if getattr(sandbox, 'project_id', None) is not None else None,
+        project_name=None,  # TODO: Add project name lookup
         resources=get_sandbox_resources(sandbox),
         cost=get_sandbox_cost(sandbox),
         created_at=created_at_val,
         updated_at=updated_at_val,
         last_accessed_at=last_accessed_at_val,
-        uptime=uptime
+        uptime=uptime,
+        cpu_spec=getattr(sandbox, 'cpu_requirements', None),
+        memory_spec=getattr(sandbox, 'memory_requirements', None)
     )
 
 
@@ -568,10 +512,10 @@ def update_sandbox(
     uptime = calculate_uptime(started_at_val)
 
     created_at_val = safe_datetime(
-        getattr(sandbox, 'created_at', None), datetime.datetime.utcnow()
+        getattr(sandbox, 'created_at', None), datetime.utcnow()
     )
     updated_at_val = safe_datetime(
-        getattr(sandbox, 'updated_at', None), datetime.datetime.utcnow()
+        getattr(sandbox, 'updated_at', None), datetime.utcnow()
     )
     last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
@@ -649,8 +593,8 @@ def start_sandbox(
 
     # Update status and timestamps
     setattr(sandbox, 'status', SandboxStatus.RUNNING.value)
-    setattr(sandbox, 'last_accessed_at', datetime.datetime.utcnow())
-    setattr(sandbox, 'started_at', datetime.datetime.utcnow())
+    setattr(sandbox, 'last_accessed_at', datetime.utcnow())
+    setattr(sandbox, 'started_at', datetime.utcnow())
     db.commit()
 
     return {"message": "Sandbox started successfully"}
@@ -688,11 +632,40 @@ def stop_sandbox(
 
     # Update status and timestamps
     setattr(sandbox, 'status', SandboxStatus.STOPPED.value)
-    setattr(sandbox, 'last_accessed_at', datetime.datetime.utcnow())
+    setattr(sandbox, 'last_accessed_at', datetime.utcnow())
     setattr(sandbox, 'started_at', None)
     db.commit()
 
     return {"message": "Sandbox stopped successfully"}
+
+
+@router.get("/{sandbox_id}/metrics")
+def get_sandbox_metrics(
+    sandbox_id: str,
+    metric_type: str = Query("cpu", enum=["cpu", "memory", "storage"]),
+    start: Optional[datetime] = Query(None),
+    end: Optional[datetime] = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(SandboxMetrics).filter(SandboxMetrics.sandbox_id == sandbox_id)
+    if start:
+        query = query.filter(SandboxMetrics.timestamp >= start)
+    if end:
+        query = query.filter(SandboxMetrics.timestamp <= end)
+    query = query.order_by(SandboxMetrics.timestamp.asc())
+    data = query.all()
+    result = []
+    for row in data:
+        if metric_type == "cpu":
+            value = row.cpu_usage
+        elif metric_type == "memory":
+            value = row.memory_usage
+        elif metric_type == "storage":
+            value = row.storage_usage
+        else:
+            value = None
+        result.append({"timestamp": row.timestamp, "value": value})
+    return {"metrics": result}
 
 
 # Admin endpoints
@@ -775,10 +748,10 @@ def get_all_sandboxes_admin(
         uptime = calculate_uptime(started_at_val)
 
         created_at_val = safe_datetime(
-            getattr(sandbox, 'created_at', None), datetime.datetime.utcnow()
+            getattr(sandbox, 'created_at', None), datetime.utcnow()
         )
         updated_at_val = safe_datetime(
-            getattr(sandbox, 'updated_at', None), datetime.datetime.utcnow()
+            getattr(sandbox, 'updated_at', None), datetime.utcnow()
         )
         last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
@@ -877,8 +850,8 @@ def admin_sandbox_action(
         if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RUNNING.value:
             raise HTTPException(status_code=400, detail="Sandbox is already running")
         setattr(sandbox, 'status', SandboxStatus.RUNNING.value)
-        setattr(sandbox, 'last_accessed_at', datetime.datetime.utcnow())
-        setattr(sandbox, 'started_at', datetime.datetime.utcnow())
+        setattr(sandbox, 'last_accessed_at', datetime.utcnow())
+        setattr(sandbox, 'started_at', datetime.utcnow())
         message = "Sandbox started by admin"
     elif action == "stop":
         if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.STOPPED.value:
@@ -892,7 +865,7 @@ def admin_sandbox_action(
             current_total_cost = float(getattr(sandbox, 'total_cost', 0.0))
             setattr(sandbox, 'total_cost', current_total_cost + cost_increment)
         setattr(sandbox, 'status', SandboxStatus.STOPPED.value)
-        setattr(sandbox, 'last_accessed_at', datetime.datetime.utcnow())
+        setattr(sandbox, 'last_accessed_at', datetime.utcnow())
         setattr(sandbox, 'started_at', None)
         message = "Sandbox stopped by admin"
     elif action == "delete":

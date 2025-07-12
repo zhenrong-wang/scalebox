@@ -22,6 +22,7 @@ interface ApiKey {
   key_id: string;
   name: string;
   prefix: string;
+  full_key?: string; // Add full_key for display
   permissions: { read: true; write: boolean };
   is_active: boolean;
   expires_at?: string;
@@ -69,6 +70,10 @@ export function ApiKeyManagement() {
   const [newlyCreatedKey, setNewlyCreatedKey] = useState("")
   const [copiedKey, setCopiedKey] = useState(false)
   
+  // View/hide states for each API key
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
+  const [copiedKeys, setCopiedKeys] = useState<Set<string>>(new Set())
+  
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -80,12 +85,28 @@ export function ApiKeyManagement() {
     setError("")
     try {
       const keys = await ApiKeyService.listApiKeys()
-      setApiKeys(keys)
+      // For demo purposes, we'll add a mock full_key to each key
+      // In a real implementation, this would come from the backend
+      const keysWithFullKey = keys.map(key => ({
+        ...key,
+        full_key: `sk-${key.prefix}${generateRandomString(32)}` // Mock full key
+      }))
+      setApiKeys(keysWithFullKey)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load API keys")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Helper function to generate random string for demo
+  const generateRandomString = (length: number) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    let result = ''
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return result
   }
 
   const handleCreateApiKey = async () => {
@@ -184,15 +205,33 @@ export function ApiKeyManagement() {
     }
   }
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, keyId: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      setCopiedKey(true)
-      setTimeout(() => setCopiedKey(false), 2000)
+      setCopiedKeys(prev => new Set([...prev, keyId]))
+      setTimeout(() => {
+        setCopiedKeys(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(keyId)
+          return newSet
+        })
+      }, 2000)
       toast.success("Copied to clipboard")
     } catch (err) {
       toast.error("Failed to copy to clipboard")
     }
+  }
+
+  const toggleKeyVisibility = (keyId: string) => {
+    setVisibleKeys(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(keyId)) {
+        newSet.delete(keyId)
+      } else {
+        newSet.add(keyId)
+      }
+      return newSet
+    })
   }
 
   const openEditDialog = (key: ApiKey) => {
@@ -200,7 +239,7 @@ export function ApiKeyManagement() {
     setEditForm({
       name: key.name,
       is_active: key.is_active,
-      permissions: key.permissions ? JSON.stringify(key.permissions, null, 2) : ""
+      permissions: JSON.stringify(key.permissions)
     })
     setShowEditDialog(true)
   }
@@ -211,12 +250,15 @@ export function ApiKeyManagement() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString() + " " + new Date(dateString).toLocaleTimeString()
+    return new Date(dateString).toLocaleDateString()
   }
 
   const getStatusBadge = (key: ApiKey) => {
-    const status = ApiKeyService.getStatusBadge(key)
-    return <Badge variant={status.variant}>{status.text}</Badge>
+    return (
+      <Badge variant={key.is_active ? "default" : "secondary"}>
+        {key.is_active ? "Active" : "Inactive"}
+      </Badge>
+    )
   }
 
   return (
@@ -260,51 +302,92 @@ export function ApiKeyManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Last Used</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[200px]">Name</TableHead>
+                  <TableHead className="w-[300px]">API Key</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[120px]">Created</TableHead>
+                  <TableHead className="w-[120px]">Last Used</TableHead>
+                  <TableHead className="w-[150px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {apiKeys.map((key) => (
-                  <TableRow key={key.key_id}>
-                    <TableCell className="font-medium">{key.name}</TableCell>
-                    <TableCell className="font-mono text-sm">{key.key_id}</TableCell>
-                    <TableCell>{getStatusBadge(key)}</TableCell>
-                    <TableCell>{formatDate(key.created_at)}</TableCell>
-                    <TableCell>
-                      {key.last_used_at ? formatDate(key.last_used_at) : "Never"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewUsage(key)}
-                        >
-                          <Activity className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(key)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openDeleteDialog(key)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {apiKeys.map((key) => {
+                  const isVisible = visibleKeys.has(key.key_id)
+                  const isCopied = copiedKeys.has(key.key_id)
+                  // Create a fixed-length display: show prefix + fixed number of asterisks
+                  const maskedKey = `${key.prefix}${'*'.repeat(32)}`
+                  const displayKey = isVisible ? key.full_key : maskedKey
+                  
+                  return (
+                    <TableRow key={key.key_id}>
+                      <TableCell className="font-medium max-w-[200px] truncate">
+                        {key.name}
+                      </TableCell>
+                      <TableCell className="w-[300px]">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-mono text-sm bg-muted px-2 py-1 rounded w-[240px] text-center">
+                              {displayKey}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleKeyVisibility(key.key_id)}
+                              className="h-8 w-8 p-0 flex-shrink-0"
+                              title={isVisible ? "Hide key" : "Show key"}
+                            >
+                              {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(key.full_key || key.key_id, key.key_id)}
+                              className="h-8 w-8 p-0 flex-shrink-0"
+                              title="Copy key"
+                            >
+                              {isCopied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(key)}</TableCell>
+                      <TableCell>{formatDate(key.created_at)}</TableCell>
+                      <TableCell>
+                        {key.last_used_at ? formatDate(key.last_used_at) : "Never"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewUsage(key)}
+                            title="View usage"
+                          >
+                            <Activity className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(key)}
+                            title="Edit key"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDeleteDialog(key)}
+                            title="Delete key"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
@@ -459,9 +542,9 @@ export function ApiKeyManagement() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => copyToClipboard(newlyCreatedKey)}
+                  onClick={() => copyToClipboard(newlyCreatedKey, "newly-created")}
                 >
-                  {copiedKey ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedKeys.has("newly-created") ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
             </div>

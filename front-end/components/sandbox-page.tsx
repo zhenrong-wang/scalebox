@@ -1,19 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Play, Square, Trash2, Search, Filter, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check, ChevronUp, ChevronDown } from "lucide-react"
+import { Play, Square, Trash2, Search, Filter, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check } from "lucide-react"
+import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
+import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "../contexts/language-context"
 import { SandboxService } from "../services/sandbox-service"
 import type { Sandbox, SandboxStats } from "../types/sandbox"
 import { Label } from "@/components/ui/label"
+import { PageLayout } from "@/components/ui/page-layout"
 
 type SortField = "name" | "framework" | "status" | "createdAt" | "uptime"
 type SortOrder = "asc" | "desc"
@@ -45,6 +49,12 @@ export function SandboxPage() {
     sandboxId: null,
     isBatch: false
   })
+
+  const [metricsDialog, setMetricsDialog] = useState<{ open: boolean, sandbox: Sandbox | null }>({ open: false, sandbox: null })
+  const [metricsType, setMetricsType] = useState<'cpu' | 'memory' | 'storage'>('cpu')
+  const [metricsData, setMetricsData] = useState<Array<{ timestamp: string, value: number }>>([])
+  const [metricsLoading, setMetricsLoading] = useState(false)
+  const [metricsRange, setMetricsRange] = useState<{ start: string | null, end: string | null }>({ start: null, end: null })
 
   const { t } = useLanguage()
 
@@ -204,8 +214,12 @@ export function SandboxPage() {
   }
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null
-    return sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+    return (
+      <SortIndicator
+        isSorted={sortField === field}
+        sortDirection={sortField === field ? sortOrder : undefined}
+      />
+    )
   }
 
   const handleSelectAll = () => {
@@ -226,56 +240,52 @@ export function SandboxPage() {
     setSelectedSandboxes(newSelected)
   }
 
-  const filteredSandboxes = sandboxes.filter((sandbox) => {
-    const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (sandbox.description && sandbox.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredSandboxes = sandboxes.filter(sandbox => {
+    const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || sandbox.status === statusFilter
+    const matchesDateRange = (!dateRange.from || new Date(sandbox.createdAt) >= new Date(dateRange.from)) &&
+                            (!dateRange.to || new Date(sandbox.createdAt) <= new Date(dateRange.to))
+    return matchesSearch && matchesStatus && matchesDateRange
+  }).sort((a, b) => {
+    const aValue = a[sortField]
+    const bValue = b[sortField]
     
-    let matchesDate = true
-    if (dateRange.from) {
-      matchesDate = matchesDate && new Date(sandbox.createdAt) >= new Date(dateRange.from)
-    }
-    if (dateRange.to) {
-      matchesDate = matchesDate && new Date(sandbox.createdAt) <= new Date(dateRange.to)
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return sortOrder === "asc" 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue)
     }
     
-    return matchesSearch && matchesStatus && matchesDate
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      return sortOrder === "asc" ? aValue - bValue : bValue - aValue
+    }
+    
+    return 0
   })
 
-  const sortedSandboxes = [...filteredSandboxes].sort((a, b) => {
-    let aVal: any, bVal: any
-    
-    switch (sortField) {
-      case "name":
-        aVal = a.name.toLowerCase()
-        bVal = b.name.toLowerCase()
-        break
-      case "framework":
-        aVal = a.framework.toLowerCase()
-        bVal = b.framework.toLowerCase()
-        break
-      case "status":
-        aVal = a.status.toLowerCase()
-        bVal = b.status.toLowerCase()
-        break
-      case "createdAt":
-        aVal = new Date(a.createdAt).getTime()
-        bVal = new Date(b.createdAt).getTime()
-        break
-      case "uptime":
-        aVal = a.uptime
-        bVal = b.uptime
-        break
-      default:
-        return 0
+  // Prepare summary cards data
+  const summaryCards = stats ? [
+    {
+      title: t("table.totalSandboxes") || "Total Sandboxes",
+      value: stats.total,
+      icon: <Activity className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.avgCpuUsage") || "Avg CPU Usage",
+      value: `${stats.avgCpuUsage.toFixed(1)}%`,
+      icon: <Cpu className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.avgMemoryUsage") || "Avg Memory Usage",
+      value: `${stats.avgMemoryUsage.toFixed(1)}%`,
+      icon: <HardDrive className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.totalCost") || "Total Cost",
+      value: `$${stats.totalCost.toFixed(2)}`,
+      icon: <DollarSign className="h-4 w-4 text-muted-foreground" />
     }
-    
-    if (sortOrder === "asc") {
-      return aVal > bVal ? 1 : -1
-    } else {
-      return aVal < bVal ? 1 : -1
-    }
-  })
+  ] : []
 
   const openDatePicker = (type: 'from' | 'to', event: React.MouseEvent<HTMLButtonElement>) => {
     // Get the button element that was clicked
@@ -348,46 +358,40 @@ export function SandboxPage() {
     document.addEventListener('keyup', handleEscape)
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      {stats && (
-        <div className="grid gap-4 md:grid-cols-5">
-          <div className="bg-card p-4 rounded-lg border border-border">
-            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">
-              {t("table.totalSandboxes") || "Total Sandboxes"}
-            </div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border border-border">
-            <div className="text-2xl font-bold text-blue-600">{stats.avgCpuUsage.toFixed(1)}%</div>
-            <div className="text-sm text-muted-foreground">
-              {t("table.avgCpuUsage") || "Avg CPU Usage"}
-            </div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border border-border">
-            <div className="text-2xl font-bold text-foreground">{stats.avgMemoryUsage.toFixed(1)}%</div>
-            <div className="text-sm text-muted-foreground">
-              {t("table.avgMemoryUsage") || "Avg Memory Usage"}
-            </div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border border-border">
-            <div className="text-2xl font-bold text-foreground">${stats.totalCost.toFixed(2)}</div>
-            <div className="text-sm text-muted-foreground">
-              {t("table.totalCost") || "Total Cost"}
-            </div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border border-border">
-            <Button asChild className="w-full">
-              <a href="https://docs.scalebox.dev/sandboxes" target="_blank" rel="noopener noreferrer">
-                <Plus className="h-4 w-4 mr-2" />
-                {t("action.createSandbox") || "Create Sandbox"}
-              </a>
-            </Button>
-          </div>
-        </div>
-      )}
+  const openMetricsDialog = async (sandbox: Sandbox) => {
+    setMetricsDialog({ open: true, sandbox })
+    setMetricsType('cpu')
+    setMetricsRange({ start: null, end: null })
+    await fetchMetrics(sandbox.id, 'cpu', null, null)
+  }
 
+  const fetchMetrics = async (sandboxId: string, type: 'cpu' | 'memory' | 'storage', start: string | null, end: string | null) => {
+    setMetricsLoading(true)
+    try {
+      const data = await SandboxService.getSandboxMetrics(sandboxId, type, start || undefined, end || undefined)
+      setMetricsData(data)
+    } catch (e) {
+      setMetricsData([])
+    } finally {
+      setMetricsLoading(false)
+    }
+  }
+
+  return (
+    <PageLayout
+      header={{
+        description: t("sandbox.description") || "Manage your development sandboxes",
+        children: (
+          <Button asChild>
+            <a href="https://docs.scalebox.dev/sandboxes" target="_blank" rel="noopener noreferrer">
+              <Plus className="h-4 w-4 mr-2" />
+              {t("action.createSandbox") || "Create Sandbox"}
+            </a>
+          </Button>
+        )
+      }}
+      summaryCards={summaryCards}
+    >
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -520,128 +524,170 @@ export function SandboxPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <ResizableTable
+              defaultColumnWidths={{
+                checkbox: 48,
+                name: 200,
+                framework: 120,
+                status: 100,
+                cpu: 100,
+                memory: 100,
+                uptime: 100,
+                created: 120,
+                actions: 150
+              }}
+            >
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <ResizableTableHead columnId="checkbox" defaultWidth={48}>
                     <Checkbox
                       checked={selectedSandboxes.size === filteredSandboxes.length && filteredSandboxes.length > 0}
                       onCheckedChange={handleSelectAll}
                     />
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="name"
+                    defaultWidth={200}
+                    className="cursor-pointer group"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-1">
                       {t("table.name") || "Name"}
                       {getSortIcon("name")}
                     </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="framework"
+                    defaultWidth={120}
+                    className="cursor-pointer group"
                     onClick={() => handleSort("framework")}
                   >
                     <div className="flex items-center gap-1">
                       {t("table.framework") || "Framework"}
                       {getSortIcon("framework")}
                     </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="status"
+                    defaultWidth={100}
+                    className="cursor-pointer group"
                     onClick={() => handleSort("status")}
                   >
                     <div className="flex items-center gap-1">
                       {t("table.status") || "Status"}
                       {getSortIcon("status")}
                     </div>
-                  </TableHead>
-                  <TableHead>{t("table.cpu") || "CPU"}</TableHead>
-                  <TableHead>{t("table.memory") || "Memory"}</TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="cpu" defaultWidth={100}>
+                    <div className="flex items-center gap-1">
+                      <Cpu className="h-4 w-4" />
+                      {t("table.cpu") || "CPU"}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="memory" defaultWidth={100}>
+                    <div className="flex items-center gap-1">
+                      <HardDrive className="h-4 w-4" />
+                      {t("table.memory") || "Memory"}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="uptime"
+                    defaultWidth={100}
+                    className="cursor-pointer group"
                     onClick={() => handleSort("uptime")}
                   >
                     <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
                       {t("table.uptime") || "Uptime"}
                       {getSortIcon("uptime")}
                     </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="created"
+                    defaultWidth={120}
+                    className="cursor-pointer group"
                     onClick={() => handleSort("createdAt")}
                   >
                     <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
                       {t("table.created") || "Created"}
                       {getSortIcon("createdAt")}
                     </div>
-                  </TableHead>
-                  <TableHead>{t("table.actions") || "Actions"}</TableHead>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={150}>
+                    {t("table.actions") || "Actions"}
+                  </ResizableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedSandboxes.map((sandbox) => (
+                {filteredSandboxes.map((sandbox) => (
                   <TableRow key={sandbox.id}>
-                    <TableCell>
+                    <ResizableTableCell>
                       <Checkbox
                         checked={selectedSandboxes.has(sandbox.id)}
                         onCheckedChange={(checked) => handleSelectSandbox(sandbox.id, checked as boolean)}
                       />
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                       <div>
                         <div className="font-medium">{sandbox.name}</div>
-                        <div className="text-sm text-muted-foreground max-w-xs truncate">
-                          {sandbox.description || t("sandbox.noDescription") || "No description"}
-                        </div>
+                        <div className="text-sm text-muted-foreground">{sandbox.id}</div>
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                       <Badge variant="outline">{sandbox.framework}</Badge>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(sandbox.status)}</TableCell>
-                    <TableCell>{sandbox.resources.cpu.toFixed(1)}%</TableCell>
-                    <TableCell>{sandbox.resources.memory.toFixed(1)}%</TableCell>
-                    <TableCell>{formatUptime(sandbox.uptime)}</TableCell>
-                    <TableCell>{formatDate(sandbox.createdAt)}</TableCell>
-                    <TableCell>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      {getStatusBadge(sandbox.status)}
+                    </ResizableTableCell>
+                    <ResizableTableCell>{sandbox.cpu_spec || 0} vCPU</ResizableTableCell>
+                    <ResizableTableCell>{sandbox.memory_spec || 0} GB</ResizableTableCell>
+                    <ResizableTableCell>{formatUptime(sandbox.uptime)}</ResizableTableCell>
+                    <ResizableTableCell>{formatDate(sandbox.createdAt)}</ResizableTableCell>
+                    <ResizableTableCell>
                       <div className="flex items-center gap-2">
                         {sandbox.status === "stopped" && (
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                            title={t("action.start") || "Start"}
+                            title={t("table.start") || "Start"}
                           >
                             <Play className="h-4 w-4" />
                           </Button>
                         )}
                         {sandbox.status === "running" && (
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                            title={t("action.stop") || "Stop"}
+                            title={t("table.stop") || "Stop"}
                           >
                             <Square className="h-4 w-4" />
                           </Button>
                         )}
-                        {sandbox.status !== "deleted" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                            title={t("action.delete") || "Delete"}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openMetricsDialog(sandbox)}
+                          title={t("table.metrics") || "Metrics"}
+                        >
+                          <Activity className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                          title={t("table.delete") || "Delete"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </TableCell>
+                    </ResizableTableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </ResizableTable>
           )}
         </CardContent>
       </Card>
@@ -740,6 +786,50 @@ export function SandboxPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <Dialog open={metricsDialog.open} onOpenChange={open => setMetricsDialog({ open, sandbox: open ? metricsDialog.sandbox : null })}>
+        <DialogContent className="max-w-3xl backdrop-blur">
+          <DialogHeader>
+            <DialogTitle>Sandbox Metrics</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-4 items-center mb-4">
+            <select value={metricsType} onChange={e => {
+              setMetricsType(e.target.value as any)
+              if (metricsDialog.sandbox) fetchMetrics(metricsDialog.sandbox.id, e.target.value as any, metricsRange.start, metricsRange.end)
+            }} className="border rounded px-2 py-1">
+              <option value="cpu">CPU</option>
+              <option value="memory">Memory</option>
+              <option value="storage">Storage</option>
+            </select>
+            {/* Date range selectors (simple for now) */}
+            <input type="date" value={metricsRange.start || ''} onChange={e => {
+              const newStart = e.target.value || null
+              setMetricsRange(r => ({ ...r, start: newStart }))
+              if (metricsDialog.sandbox) fetchMetrics(metricsDialog.sandbox.id, metricsType, newStart, metricsRange.end)
+            }} className="border rounded px-2 py-1" />
+            <span>to</span>
+            <input type="date" value={metricsRange.end || ''} onChange={e => {
+              const newEnd = e.target.value || null
+              setMetricsRange(r => ({ ...r, end: newEnd }))
+              if (metricsDialog.sandbox) fetchMetrics(metricsDialog.sandbox.id, metricsType, metricsRange.start, newEnd)
+            }} className="border rounded px-2 py-1" />
+          </div>
+          <div className="w-full h-96 bg-white dark:bg-gray-900 rounded shadow relative">
+            {metricsLoading ? (
+              <div className="flex items-center justify-center h-full">Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="timestamp" tickFormatter={v => new Date(v).toLocaleString()} minTickGap={40} />
+                  <YAxis />
+                  <Tooltip labelFormatter={v => new Date(v).toLocaleString()} />
+                  <Line type="monotone" dataKey="value" stroke="#8884d8" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </PageLayout>
   )
 }

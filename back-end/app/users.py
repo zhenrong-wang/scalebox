@@ -3,9 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from config import settings
 import uuid
@@ -18,6 +16,9 @@ import jwt
 from datetime import timedelta
 import random
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from .database import get_db
+from .models import User, PendingSignup
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -47,55 +48,7 @@ class PasswordResetConfirmRequest(BaseModel):
     token: str
     new_password: str
 
-DATABASE_URL = f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
-engine = create_engine(
-    DATABASE_URL, 
-    pool_pre_ping=True,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_recycle=settings.DB_POOL_RECYCLE,
-    pool_timeout=settings.DB_POOL_TIMEOUT,
-    echo=settings.ENVIRONMENT == 'development'  # Only log SQL in development
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class PendingSignup(Base):
-    __tablename__ = "pending_signups"
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(100), nullable=True)
-    verification_code = Column(String(10), nullable=False)
-    created_at = Column(DateTime, default=func.now())
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(String(36), unique=True, index=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    username = Column(String(50), unique=True, index=True, nullable=True)
-    password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(100), nullable=True)
-    role = Column(String(20), default="user")
-    is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)
-    verification_token = Column(String(255), nullable=True)
-    reset_token = Column(String(255), nullable=True)
-    reset_token_expiry = Column(DateTime, nullable=True)
-    last_login = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    last_password_reset_request = Column(DateTime, nullable=True)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Filter, Play, Square, Trash2, Eye, Download, Server, DollarSign, Cpu, MemoryStick } from "lucide-react"
 import { SandboxService } from "../../services/sandbox-service"
@@ -52,9 +53,8 @@ export function SandboxManagement() {
 
   // Apply filters and search
   useEffect(() => {
-    const searchFilters = { ...filters, search: searchTerm }
     // Local filtering logic
-    let filtered = sandboxes.filter((sb) => {
+    const filtered = sandboxes.filter((sb) => {
       // Status filter
       if (filters.status.length && !filters.status.includes(sb.status)) return false
       // Framework filter
@@ -79,7 +79,7 @@ export function SandboxManagement() {
 
     // Apply sorting
     const sorted = [...filtered].sort((a, b) => {
-      let aValue: any, bValue: any
+      let aValue: string | Date | number, bValue: string | Date | number
       switch (sortBy) {
         case "name":
           aValue = a.name.toLowerCase()
@@ -128,19 +128,12 @@ export function SandboxManagement() {
     // Refresh sandboxes
       const updatedSandboxes = await SandboxService.getAllSandboxes()
     setSandboxes(updatedSandboxes)
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to perform sandbox action:', error)
     }
   }
 
   const getStatusBadge = (status: Sandbox["status"]) => {
-    const variants = {
-      running: "default",
-      stopped: "secondary",
-      deleted: "destructive",
-      error: "destructive",
-    } as const
-
     const colors = {
       running: "bg-green-100 text-green-800 border-green-200",
       stopped: "bg-gray-100 text-gray-800 border-gray-200",
@@ -287,7 +280,7 @@ export function SandboxManagement() {
                 <Filter className="h-4 w-4 mr-2" />
                 {t("admin.filters")}
               </Button>
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <Select value={sortBy} onValueChange={(value: "name" | "created" | "cost" | "status") => setSortBy(value)}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -315,102 +308,109 @@ export function SandboxManagement() {
             </div>
           )}
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("admin.name")}</TableHead>
-                  <TableHead>{t("admin.framework")}</TableHead>
-                  <TableHead>{t("admin.status")}</TableHead>
-                  <TableHead>{t("admin.user")}</TableHead>
-                  <TableHead>{t("admin.resources")}</TableHead>
-                  <TableHead>{t("admin.cost")}</TableHead>
-                  <TableHead>{t("admin.created")}</TableHead>
-                  <TableHead className="text-right">
-                    {t("admin.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSandboxes.map((sandbox) => (
-                  <TableRow key={sandbox.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{sandbox.name}</div>
-                        <div className="text-sm text-muted-foreground truncate max-w-[200px]">
-                          {sandbox.description}
-                        </div>
+          <ResizableTable
+            defaultColumnWidths={{
+              name: 200,
+              framework: 120,
+              status: 100,
+              user: 150,
+              resources: 150,
+              cost: 120,
+              created: 120,
+              actions: 120
+            }}
+          >
+            <TableHeader>
+              <TableRow>
+                <ResizableTableHead columnId="name" defaultWidth={200}>{t("admin.name")}</ResizableTableHead>
+                <ResizableTableHead columnId="framework" defaultWidth={120}>{t("admin.framework")}</ResizableTableHead>
+                <ResizableTableHead columnId="status" defaultWidth={100}>{t("admin.status")}</ResizableTableHead>
+                <ResizableTableHead columnId="user" defaultWidth={150}>{t("admin.user")}</ResizableTableHead>
+                <ResizableTableHead columnId="resources" defaultWidth={150}>{t("admin.resources")}</ResizableTableHead>
+                <ResizableTableHead columnId="cost" defaultWidth={120}>{t("admin.cost")}</ResizableTableHead>
+                <ResizableTableHead columnId="created" defaultWidth={120}>{t("admin.created")}</ResizableTableHead>
+                <ResizableTableHead columnId="actions" defaultWidth={120}>{t("admin.actions")}</ResizableTableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSandboxes.map((sandbox) => (
+                <TableRow key={sandbox.id}>
+                  <ResizableTableCell>
+                    <div>
+                      <div className="font-medium">{sandbox.name}</div>
+                      <div className="text-sm text-muted-foreground break-words">
+                        {sandbox.description}
                       </div>
-                    </TableCell>
-                    <TableCell>{getFrameworkBadge(sandbox.framework)}</TableCell>
-                    <TableCell>{getStatusBadge(sandbox.status)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{sandbox.userName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {sandbox.userEmail}
-                        </div>
+                    </div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>{getFrameworkBadge(sandbox.framework)}</ResizableTableCell>
+                  <ResizableTableCell>{getStatusBadge(sandbox.status)}</ResizableTableCell>
+                  <ResizableTableCell>
+                    <div>
+                      <div className="font-medium">{sandbox.userName}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {sandbox.userEmail}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span>{t("admin.cpu")}:</span>
-                          <Progress value={sandbox.resources.cpu} className="w-16 h-2" />
-                          <span className="text-xs">{sandbox.resources.cpu}%</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <span>{t("admin.ram")}:</span>
-                          <Progress value={sandbox.resources.memory} className="w-16 h-2" />
-                          <span className="text-xs">{sandbox.resources.memory}%</span>
-                        </div>
+                    </div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span>{t("admin.cpu")}:</span>
+                        <Progress value={sandbox.resources.cpu} className="w-16 h-2" />
+                        <span className="text-xs">{sandbox.resources.cpu}%</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{formatCurrency(sandbox.cost.totalCost)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatCurrency(sandbox.cost.hourlyRate)}/{t("admin.hr")}
-                        </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span>{t("admin.ram")}:</span>
+                        <Progress value={sandbox.resources.memory} className="w-16 h-2" />
+                        <span className="text-xs">{sandbox.resources.memory}%</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{formatDate(sandbox.createdAt)}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedSandbox(sandbox)
-                            setIsDetailsModalOpen(true)
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
+                    </div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div>
+                      <div className="font-medium">{formatCurrency(sandbox.cost.totalCost)}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatCurrency(sandbox.cost.hourlyRate)}/{t("admin.hr")}
+                      </div>
+                    </div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="text-sm">{formatDate(sandbox.createdAt)}</div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedSandbox(sandbox)
+                          setIsDetailsModalOpen(true)
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {sandbox.status === "stopped" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "start")}>
+                          <Play className="h-4 w-4" />
                         </Button>
-                        {sandbox.status === "stopped" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "start")}>
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {sandbox.status === "running" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "stop")}>
-                            <Square className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {sandbox.status !== "deleted" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "delete")}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      )}
+                      {sandbox.status === "running" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "stop")}>
+                          <Square className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {sandbox.status !== "deleted" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "delete")}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </ResizableTableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </ResizableTable>
 
           {filteredSandboxes.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">

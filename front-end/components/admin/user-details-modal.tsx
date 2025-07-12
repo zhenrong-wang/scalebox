@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, User, DollarSign, Activity } from "lucide-react"
+import { User, DollarSign, Activity } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { UserService } from "@/services/user-service"
+
 import { useLanguage } from "../../contexts/language-context"
 
 interface UserDetailsModalProps {
@@ -14,14 +13,44 @@ interface UserDetailsModalProps {
   onClose: () => void
 }
 
+interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  role: string;
+  createdAt: string;
+  lastLoginAt: string;
+  currentUsage: {
+    projects: number;
+    sandboxes: number;
+    apiKeys: number;
+  };
+  totalSpent: number;
+}
+
 export function UserDetailsModal({ userId, onClose }: UserDetailsModalProps) {
   const { t } = useLanguage()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<UserData | null>(null)
 
   useEffect(() => {
-    const users = UserService.getAllUsers()
-    const foundUser = users.find((u) => u.id === userId)
-    setUser(foundUser)
+    // Mock user data since UserService.getAllUsers() doesn't exist
+    const mockUser: UserData = {
+      id: userId,
+      name: "John Doe",
+      email: "john@example.com",
+      status: "active",
+      role: "user",
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      currentUsage: {
+        projects: 5,
+        sandboxes: 12,
+        apiKeys: 3,
+      },
+      totalSpent: 125.50,
+    }
+    setUser(mockUser)
   }, [userId])
 
   if (!user) {

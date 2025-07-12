@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Search, Filter, FolderOpen, Settings, Trash2, Edit, Box, DollarSign, Eye, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react"
+import { Plus, Search, Filter, FolderOpen, Settings, Trash2, Edit, Box, DollarSign, Eye } from "lucide-react"
+import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +13,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
+import { PageLayout } from "@/components/ui/page-layout"
 import { useLanguage } from "../../contexts/language-context"
 
 interface Project {
@@ -100,8 +103,12 @@ export function ProjectManagement() {
   }
 
   const getSortIcon = (field: string) => {
-    if (sortField !== field) return <ArrowUpDown className="h-4 w-4" />
-    return sortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+    return (
+      <SortIndicator
+        isSorted={sortField === field}
+        sortDirection={sortField === field ? sortDirection : undefined}
+      />
+    )
   }
 
   const filteredAndSortedProjects = projects
@@ -194,281 +201,274 @@ export function ProjectManagement() {
   const totalSandboxes = projects.reduce((sum, p) => sum + p.sandboxCount, 0)
   const totalSpent = projects.reduce((sum, p) => sum + p.totalSpent, 0)
 
+  // Prepare summary cards data
+  const summaryCards = [
+    {
+      title: t("table.totalProjects") || "Total Projects",
+      value: totalProjects,
+      icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.activeProjects") || "Active Projects",
+      value: activeProjects,
+      icon: <Box className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.totalSandboxes") || "Total Sandboxes",
+      value: totalSandboxes,
+      icon: <Settings className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.totalSpent") || "Total Spent",
+      value: `$${totalSpent.toFixed(2)}`,
+      icon: <DollarSign className="h-4 w-4 text-muted-foreground" />
+    }
+  ]
+
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("table.totalProjects") || "Total Projects"}</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalProjects}</div>
-            <p className="text-xs text-muted-foreground">{activeProjects} {t("table.active")}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("table.totalSandboxes") || "Total Sandboxes"}</CardTitle>
-            <Box className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalSandboxes}</div>
-            <p className="text-xs text-muted-foreground">{t("table.acrossAllProjects") || "Across all projects"}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("table.totalSpent")}</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalSpent.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">{t("table.allProjects") || "All projects"}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-center h-full">
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t("action.createProject")}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{t("action.createProject")}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="projectName">{t("table.name")}</Label>
-                    <Input
-                      id="projectName"
-                      value={newProject.name}
-                      onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                      placeholder={t("table.name")}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="projectDescription">{t("table.description") || "Description"}</Label>
-                    <Textarea
-                      id="projectDescription"
-                      value={newProject.description}
-                      onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                      placeholder={t("table.description") || "Describe your project"}
-                      rows={3}
-                    />
-                  </div>
-                  <Button onClick={handleCreateProject} className="w-full">
-                    {t("action.createProject")}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
-      </div>
-
+    <PageLayout
+      header={{
+        description: t("project.description") || "Manage your development projects",
+        children: (
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t("action.createProject") || "Create Project"}
+          </Button>
+        )
+      }}
+      summaryCards={summaryCards}
+    >
       {/* Filters */}
-      <div className="bg-card p-4 rounded-lg border border-border">
-        <div className="flex gap-4 items-center">
-          <div className="relative" style={{ maxWidth: 320, flex: '0 1 auto' }}>
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder={t("project.search") || "Search projects..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 max-w-xs"
-              style={{ minWidth: 0 }}
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder={t("table.allStatus") || "All Status"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-              <SelectItem value="active">{t("table.active")}</SelectItem>
-              <SelectItem value="archived">{t("table.archived")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Projects Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>{t("table.projects") || "Projects"}</CardTitle>
-            <CardDescription>
-              {filteredAndSortedProjects.length} {t("table.projects") || "projects"} found
-            </CardDescription>
+        <CardContent className="p-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder={t("project.search") || "Search projects..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                  <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
+                  <SelectItem value="archived">{t("table.archived") || "Archived"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          {/* Placeholder for future batch actions */}
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("name")}
-                    className="h-auto p-0 font-medium"
-                  >
-                    {t("table.name")}
-                    {getSortIcon("name")}
-                  </Button>
-                </TableHead>
-                <TableHead>{t("table.description") || "Description"}</TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("sandboxCount")}
-                    className="h-auto p-0 font-medium"
-                  >
-                    {t("table.sandboxes") || "Sandboxes"}
-                    {getSortIcon("sandboxCount")}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("apiKeyCount")}
-                    className="h-auto p-0 font-medium"
-                  >
-                    {t("table.apiKeys") || "API Keys"}
-                    {getSortIcon("apiKeyCount")}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("totalSpent")}
-                    className="h-auto p-0 font-medium"
-                  >
-                    {t("table.totalSpent")}
-                    {getSortIcon("totalSpent")}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("status")}
-                    className="h-auto p-0 font-medium"
-                  >
-                    {t("table.status")}
-                    {getSortIcon("status")}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("updatedAt")}
-                    className="h-auto p-0 font-medium"
-                  >
-                    {t("table.updated") || "Updated"}
-                    {getSortIcon("updatedAt")}
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right">{t("table.actions") || "Actions"}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedProjects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{project.name}</div>
-                      <div className="text-sm text-muted-foreground max-w-xs truncate">{project.description}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{project.sandboxCount}</TableCell>
-                  <TableCell>{project.apiKeyCount}</TableCell>
-                  <TableCell>${project.totalSpent.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge variant={project.status === "active" ? "default" : "secondary"}>
-                      {t(`table.${project.status}`) || project.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{project.updatedAt}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openViewSandboxes(project)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Sandboxes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEditDialog(project)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          {t("action.edit")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleArchiveProject(project.id)}>
-                          <FolderOpen className="h-4 w-4 mr-2" />
-                          {t("action.archive")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteProject(project.id)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t("action.delete")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
 
-      {/* View Sandboxes Dialog */}
-      <Dialog open={viewSandboxesDialog.open} onOpenChange={(open) => setViewSandboxesDialog({ open, project: null })}>
-        <DialogContent className="max-w-4xl">
+      {/* Projects Table */}
+      <Card>
+        <CardContent>
+          {filteredAndSortedProjects.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>{t("project.noProjects") || "No projects found."}</p>
+              <p className="text-sm mt-2">
+                {t("project.createFirst") || "Create your first project to get started."}
+              </p>
+            </div>
+          ) : (
+            <ResizableTable
+              defaultColumnWidths={{
+                name: 200,
+                description: 250,
+                sandboxes: 120,
+                apiKeys: 100,
+                totalSpent: 120,
+                status: 100,
+                created: 120,
+                actions: 120
+              }}
+            >
+              <TableHeader>
+                <TableRow>
+                  <ResizableTableHead 
+                    columnId="name"
+                    defaultWidth={200}
+                    className="cursor-pointer group"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.name") || "Name"}
+                      {getSortIcon("name")}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="description" defaultWidth={250}>
+                    {t("table.description") || "Description"}
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="sandboxes"
+                    defaultWidth={120}
+                    className="cursor-pointer group"
+                    onClick={() => handleSort("sandboxCount")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.sandboxes") || "Sandboxes"}
+                      {getSortIcon("sandboxCount")}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="apiKeys"
+                    defaultWidth={100}
+                    className="cursor-pointer group"
+                    onClick={() => handleSort("apiKeyCount")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.apiKeys") || "API Keys"}
+                      {getSortIcon("apiKeyCount")}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="totalSpent"
+                    defaultWidth={120}
+                    className="cursor-pointer group"
+                    onClick={() => handleSort("totalSpent")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.totalSpent") || "Total Spent"}
+                      {getSortIcon("totalSpent")}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="status"
+                    defaultWidth={100}
+                    className="cursor-pointer group"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.status") || "Status"}
+                      {getSortIcon("status")}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead 
+                    columnId="created"
+                    defaultWidth={120}
+                    className="cursor-pointer group"
+                    onClick={() => handleSort("createdAt")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("table.created") || "Created"}
+                      {getSortIcon("createdAt")}
+                    </div>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={120}>
+                    {t("table.actions") || "Actions"}
+                  </ResizableTableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAndSortedProjects.map((project) => (
+                  <TableRow key={project.id}>
+                    <ResizableTableCell>
+                      <div>
+                        <div className="font-medium">{project.name}</div>
+                        <div className="text-sm text-muted-foreground">{project.id}</div>
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell className="break-words">{project.description}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openViewSandboxes(project)}
+                        className="h-auto p-0"
+                      >
+                        {project.sandboxCount} {t("table.sandboxes") || "sandboxes"}
+                      </Button>
+                    </ResizableTableCell>
+                    <ResizableTableCell>{project.apiKeyCount}</ResizableTableCell>
+                    <ResizableTableCell>${project.totalSpent.toFixed(2)}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <Badge variant={project.status === "active" ? "default" : "secondary"}>
+                        {project.status === "active" ? t("table.active") || "Active" : t("table.archived") || "Archived"}
+                      </Badge>
+                    </ResizableTableCell>
+                    <ResizableTableCell>{new Date(project.createdAt).toLocaleDateString()}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(project)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            {t("action.edit") || "Edit"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openViewSandboxes(project)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            {t("action.viewSandboxes") || "View Sandboxes"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleArchiveProject(project.id)}
+                            className={project.status === "active" ? "" : "hidden"}
+                          >
+                            <FolderOpen className="h-4 w-4 mr-2" />
+                            {t("action.archive") || "Archive"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {t("action.delete") || "Delete"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </ResizableTableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </ResizableTable>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create Project Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              Sandboxes in "{viewSandboxesDialog.project?.name}"
-            </DialogTitle>
+            <DialogTitle>{t("project.createProject") || "Create New Project"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {viewSandboxesDialog.project && (
-              <div>
-                <div className="text-sm text-muted-foreground mb-4">
-                  {getProjectSandboxes(viewSandboxesDialog.project.id).length} sandboxes in this project
-                </div>
-                <div className="space-y-2">
-                  {getProjectSandboxes(viewSandboxesDialog.project.id).map((sandbox) => (
-                    <div key={sandbox.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <span className="font-medium">{sandbox.name}</span>
-                        <Badge variant={sandbox.status === "running" ? "default" : "secondary"}>
-                          {sandbox.status}
-                        </Badge>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  {getProjectSandboxes(viewSandboxesDialog.project.id).length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No sandboxes in this project yet
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            <div>
+              <Label htmlFor="project-name">{t("table.name") || "Name"}</Label>
+              <Input
+                id="project-name"
+                value={newProject.name}
+                onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                placeholder={t("project.namePlaceholder") || "Enter project name"}
+              />
+            </div>
+            <div>
+              <Label htmlFor="project-description">{t("table.description") || "Description"}</Label>
+              <Textarea
+                id="project-description"
+                value={newProject.description}
+                onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                placeholder={t("project.descriptionPlaceholder") || "Enter project description"}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button onClick={handleCreateProject}>
+              {t("action.create") || "Create"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -477,39 +477,72 @@ export function ProjectManagement() {
       <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, project: null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("action.edit")} {t("table.project") || "Project"}</DialogTitle>
+            <DialogTitle>{t("project.editProject") || "Edit Project"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="editProjectName">{t("table.name")}</Label>
+              <Label htmlFor="edit-project-name">{t("table.name") || "Name"}</Label>
               <Input
-                id="editProjectName"
+                id="edit-project-name"
                 value={editProject.name}
                 onChange={(e) => setEditProject({ ...editProject, name: e.target.value })}
-                placeholder={t("table.name")}
+                placeholder={t("project.namePlaceholder") || "Enter project name"}
               />
             </div>
             <div>
-              <Label htmlFor="editProjectDescription">{t("table.description") || "Description"}</Label>
+              <Label htmlFor="edit-project-description">{t("table.description") || "Description"}</Label>
               <Textarea
-                id="editProjectDescription"
+                id="edit-project-description"
                 value={editProject.description}
                 onChange={(e) => setEditProject({ ...editProject, description: e.target.value })}
-                placeholder={t("table.description") || "Describe your project"}
-                rows={3}
+                placeholder={t("project.descriptionPlaceholder") || "Enter project description"}
               />
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setEditDialog({ open: false, project: null })}>
-                {t("action.cancel")}
-              </Button>
-              <Button onClick={handleEditProject}>
-                {t("action.update")}
-              </Button>
-            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditDialog({ open: false, project: null })}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button onClick={handleEditProject}>
+              {t("action.save") || "Save"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* View Sandboxes Dialog */}
+      <Dialog open={viewSandboxesDialog.open} onOpenChange={(open) => setViewSandboxesDialog({ open, project: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {viewSandboxesDialog.project?.name} - {t("table.sandboxes") || "Sandboxes"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {getProjectSandboxes(viewSandboxesDialog.project?.id || "").length} sandboxes in this project
+            </p>
+            <div className="space-y-2">
+              {getProjectSandboxes(viewSandboxesDialog.project?.id || "").map((sandbox) => (
+                <div key={sandbox.id} className="flex items-center justify-between p-2 border rounded">
+                  <div>
+                    <div className="font-medium">{sandbox.name}</div>
+                    <div className="text-sm text-muted-foreground">{sandbox.id}</div>
+                  </div>
+                  <Badge variant={sandbox.status === "running" ? "default" : "secondary"}>
+                    {sandbox.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+            {getProjectSandboxes(viewSandboxesDialog.project?.id || "").length === 0 && (
+              <p className="text-center text-muted-foreground py-4">
+                {t("project.noSandboxes") || "No sandboxes in this project"}
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </PageLayout>
   )
 }

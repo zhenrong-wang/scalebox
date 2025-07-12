@@ -224,6 +224,20 @@ export class SandboxService {
     return handleResponse(response)
   }
 
+  // Fetch metrics for a sandbox
+  static async getSandboxMetrics(sandboxId: string, metricType: 'cpu' | 'memory' | 'storage', start?: string, end?: string): Promise<Array<{ timestamp: string, value: number }>> {
+    const params = new URLSearchParams()
+    params.append('type', metricType)
+    if (start) params.append('start', start)
+    if (end) params.append('end', end)
+    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}/metrics?${params.toString()}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    })
+    const data = await handleResponse(response)
+    return data.metrics
+  }
+
   // Helper function to map API response to Sandbox interface
   private static mapApiResponseToSandbox(apiData: any): Sandbox {
     return {
@@ -243,6 +257,8 @@ export class SandboxService {
         storage: apiData.resources.storage || 0,
         bandwidth: apiData.resources.bandwidth || 0,
       },
+      cpu_spec: apiData.cpu_spec,
+      memory_spec: apiData.memory_spec,
       cost: {
         hourlyRate: apiData.cost.hourlyRate || 0,
         totalCost: apiData.cost.totalCost || 0,

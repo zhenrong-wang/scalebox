@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 load_dotenv(os.path.join(os.path.dirname(__file__), 'app', '.env'))
-from app.users import Base, User
+from app.models import Base, User
 from app.api_keys import ApiKey, ApiKeyUsage, ApiRateLimit
 from app.sandboxes import Sandbox, SandboxUsage
 

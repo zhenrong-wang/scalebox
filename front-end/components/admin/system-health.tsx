@@ -3,7 +3,7 @@
 import { Activity, Server, Database, Zap, AlertTriangle, CheckCircle, Info } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
+
 import { useLanguage } from "../../contexts/language-context"
 
 // Mock system health data
@@ -26,32 +26,6 @@ const systemAlerts = [
 
 export function SystemHealth() {
   const { t } = useLanguage()
-
-  const getAlertIcon = (type: string) => {
-    switch (type) {
-      case "warning":
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />
-      case "error":
-        return <AlertTriangle className="h-4 w-4 text-red-600" />
-      case "success":
-        return <CheckCircle className="h-4 w-4 text-green-600" />
-      default:
-        return <Activity className="h-4 w-4 text-blue-600" />
-    }
-  }
-
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case "warning":
-        return "bg-yellow-100 text-yellow-800"
-      case "error":
-        return "bg-red-100 text-red-800"
-      case "success":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-blue-100 text-blue-800"
-    }
-  }
 
   return (
     <div className="space-y-6">

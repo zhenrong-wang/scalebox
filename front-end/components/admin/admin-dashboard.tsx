@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Users, DollarSign, Activity, TrendingUp } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserManagement } from "./user-management"
 import { UsageAnalytics } from "./usage-analytics"

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useLanguage } from "../contexts/language-context"
@@ -25,6 +24,9 @@ import {
   Legend, 
   ResponsiveContainer
 } from 'recharts'
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
+import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
+import { PageLayout } from "@/components/ui/page-layout"
 
 interface UsageRecord {
   id: string
@@ -46,6 +48,10 @@ interface UsageDataPoint {
   sandboxStorage: number
   projectId?: string
   projectName?: string
+}
+
+interface AggregatedDataPoint extends UsageDataPoint {
+  [key: string]: string | number | undefined
 }
 
 // Mock data for historical usage - 30 days of data for better chart visualization
@@ -193,7 +199,7 @@ export function BillingsPage() {
       acc[date].sandboxRAM += item.sandboxRAM
       acc[date].sandboxStorage += item.sandboxStorage
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, AggregatedDataPoint>)
 
     return Object.values(aggregated).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [filteredHistoricalData])
@@ -244,66 +250,39 @@ export function BillingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Billings & Usage</h1>
-          <p className="text-muted-foreground">{t("billings.monitorUsage")}</p>
-        </div>
-        <Button onClick={exportToCSV}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
-      </div>
-
-      {/* Current Usage Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.thisMonth") || "This Month"}</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${currentMonthEstimate}</div>
-            <p className="text-xs text-muted-foreground">{t("billings.estimatedBill") || "Estimated bill"}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.totalSpent") || "Total Spent"}</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalSpent.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">{t("billings.allTime") || "All time"}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.averageMonthly") || "Average Monthly"}</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${averageMonthly.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">{t("billings.last5Months") || "Last 5 months"}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.activeSandboxes")}</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">4</div>
-            <p className="text-xs text-muted-foreground">{t("billings.currentlyRunning")}</p>
-          </CardContent>
-        </Card>
-      </div>
-
+    <PageLayout
+      header={{
+        description: t("billings.monitorUsage"),
+        children: (
+          <Button onClick={exportToCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        )
+      }}
+      summaryCards={[
+        {
+          title: t("billings.thisMonth") || "This Month",
+          value: `$${currentMonthEstimate}`,
+          icon: <DollarSign className="h-4 w-4 text-muted-foreground" />
+        },
+        {
+          title: t("billings.totalSpent") || "Total Spent",
+          value: `$${totalSpent.toFixed(2)}`,
+          icon: <DollarSign className="h-4 w-4 text-muted-foreground" />
+        },
+        {
+          title: t("billings.averageMonthly") || "Average Monthly",
+          value: `$${averageMonthly.toFixed(2)}`,
+          icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        },
+        {
+          title: t("billings.activeSandboxes") || "Active Sandboxes",
+          value: "4",
+          icon: <Activity className="h-4 w-4 text-muted-foreground" />
+        }
+      ]}
+    >
       {/* Current Usage Details */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -459,67 +438,78 @@ export function BillingsPage() {
 
       {/* Billing History */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t("billings.billingHistory")}</CardTitle>
-          <CardDescription>{t("billings.detailedRecords")}</CardDescription>
-        </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="flex gap-4 items-center mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder={t("billings.search") || "Search billing records..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-                <SelectItem value="paid">{t("table.paid")}</SelectItem>
-                <SelectItem value="pending">{t("table.pending")}</SelectItem>
-                <SelectItem value="overdue">{t("table.overdue")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder={t("billings.search") || "Search billing records..."}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                      <SelectItem value="paid">{t("table.paid") || "Paid"}</SelectItem>
+                      <SelectItem value="pending">{t("table.pending") || "Pending"}</SelectItem>
+                      <SelectItem value="overdue">{t("table.overdue") || "Overdue"}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Billing Table */}
-          <Table>
+          <ResizableTable
+            defaultColumnWidths={{
+              period: 150,
+              sandboxHours: 120,
+              apiCalls: 120,
+              storage: 120,
+              amount: 120,
+              status: 100
+            }}
+          >
             <TableHeader>
               <TableRow>
-                <TableHead>{t("billings.period") || "Period"}</TableHead>
-                <TableHead>{t("billings.sandboxHours") || "Sandbox Hours"}</TableHead>
-                <TableHead>{t("billings.apiCalls") || "API Calls"}</TableHead>
-                <TableHead>{t("billings.storage") || "Storage (GB)"}</TableHead>
-                <TableHead>{t("billings.amount") || "Amount"}</TableHead>
-                <TableHead>{t("billings.status") || "Status"}</TableHead>
+                <ResizableTableHead columnId="period" defaultWidth={150}>{t("billings.period") || "Period"}</ResizableTableHead>
+                <ResizableTableHead columnId="sandboxHours" defaultWidth={120}>{t("billings.sandboxHours") || "Sandbox Hours"}</ResizableTableHead>
+                <ResizableTableHead columnId="apiCalls" defaultWidth={120}>{t("billings.apiCalls") || "API Calls"}</ResizableTableHead>
+                <ResizableTableHead columnId="storage" defaultWidth={120}>{t("billings.storage") || "Storage (GB)"}</ResizableTableHead>
+                <ResizableTableHead columnId="amount" defaultWidth={120}>{t("billings.amount") || "Amount"}</ResizableTableHead>
+                <ResizableTableHead columnId="status" defaultWidth={100}>{t("billings.status") || "Status"}</ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUsageData.map((record) => (
                 <TableRow key={record.id}>
-                  <TableCell className="font-medium">{record.month}</TableCell>
-                  <TableCell>{record.sandboxHours}h</TableCell>
-                  <TableCell>{record.apiCalls.toLocaleString()}</TableCell>
-                  <TableCell>{record.storage}GB</TableCell>
-                  <TableCell>${record.amount.toFixed(2)}</TableCell>
-                  <TableCell>
+                  <ResizableTableCell className="font-medium">{record.month}</ResizableTableCell>
+                  <ResizableTableCell>{record.sandboxHours}h</ResizableTableCell>
+                  <ResizableTableCell>{record.apiCalls.toLocaleString()}</ResizableTableCell>
+                  <ResizableTableCell>{record.storage}GB</ResizableTableCell>
+                  <ResizableTableCell>${record.amount.toFixed(2)}</ResizableTableCell>
+                  <ResizableTableCell>
                     <Badge className={getStatusColor(record.status)}>
                       {t(`table.${record.status}`) || record.status}
                     </Badge>
-                  </TableCell>
+                  </ResizableTableCell>
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </ResizableTable>
         </CardContent>
       </Card>
-    </div>
+    </PageLayout>
   )
 }

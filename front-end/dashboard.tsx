@@ -30,6 +30,7 @@ import { UserService } from "./services/user-service"
 import { useLanguage } from "./contexts/language-context"
 import { LanguageToggle } from "./components/language-toggle"
 import { AdminApiKeyManagement } from "./components/admin/api-key-management"
+import { NotificationButton } from "./components/notification-button"
 
 export type PageType =
   | "sandboxes"
@@ -443,6 +444,7 @@ function DashboardContent() {
                 <div className="flex items-center gap-3">
                   <LanguageToggle />
                   <ThemeToggle />
+                  <NotificationButton />
                   <Button
                     variant="outline"
                     size="icon"

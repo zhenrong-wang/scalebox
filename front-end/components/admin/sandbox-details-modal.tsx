@@ -1,22 +1,10 @@
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import {
   Server,
-  User,
-  Calendar,
   Clock,
-  DollarSign,
-  Cpu,
-  MemoryStick,
-  HardDrive,
-  Network,
-  Globe,
-  Lock,
-  Users,
   Activity,
   AlertTriangle,
 } from "lucide-react"
@@ -30,22 +18,6 @@ interface SandboxDetailsModalProps {
 }
 
 export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetailsModalProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
 
   const formatUptime = (minutes: number) => {
     if (minutes === 0) return "Not running"
@@ -62,32 +34,7 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
     }
   }
 
-  const getStatusColor = (status: Sandbox["status"]) => {
-    switch (status) {
-      case "running":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "stopped":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      case "deleted":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "error":
-        return "bg-red-100 text-red-800 border-red-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
 
-  const getFrameworkColor = (framework: string) => {
-    const colors = {
-      React: "bg-blue-100 text-blue-800 border-blue-200",
-      Vue: "bg-green-100 text-green-800 border-green-200",
-      Angular: "bg-red-100 text-red-800 border-red-200",
-      "Node.js": "bg-yellow-100 text-yellow-800 border-yellow-200",
-      Python: "bg-purple-100 text-purple-800 border-purple-200",
-      "Next.js": "bg-gray-100 text-gray-800 border-gray-200",
-    }
-    return colors[framework as keyof typeof colors] || "bg-gray-100 text-gray-800 border-gray-200"
-  }
 
   const { t } = useLanguage()
 

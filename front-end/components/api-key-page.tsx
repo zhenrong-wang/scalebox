@@ -7,14 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ActionConfirmationDialog } from "./action-confirmation-dialog"
 import { useLanguage } from "../contexts/language-context"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { ApiKeyService } from "../services/api-key-service"
 import type { ApiKey } from "../services/api-key-service"
 import { format, parseISO } from "date-fns"
+import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
+import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
+import { PageLayout } from "@/components/ui/page-layout"
 
 // Extended interface to include the full API key for display
 interface ApiKeyWithFullKey extends ApiKey {
@@ -74,8 +76,9 @@ export function ApiKeyPage() {
     try {
       const keys = await ApiKeyService.listApiKeys()
       setApiKeys(keys)
-    } catch (e: any) {
-      setError(e.message || "Failed to load API keys")
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to load API keys")
     } finally {
       setLoading(false)
     }
@@ -120,8 +123,9 @@ export function ApiKeyPage() {
       await ApiKeyService.toggleApiKeyStatus(keyId);
       toggleKeyStatus(keyId);
       setSuccess(t("apiKey.statusUpdated") || "API key status updated successfully!");
-    } catch (e: any) {
-      setError(e.message || "Failed to update API key status");
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to update API key status");
     }
   }
 
@@ -171,8 +175,9 @@ export function ApiKeyPage() {
       toggleKeyStatus(disableDialog.keyId);
       setSuccess(t("apiKey.statusUpdated") || "API key status updated successfully!");
       closeDisableDialog();
-    } catch (e: any) {
-      setError(e.message || "Failed to update API key status");
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to update API key status");
     }
   }
 
@@ -183,8 +188,9 @@ export function ApiKeyPage() {
       await ApiKeyService.deleteApiKey(deleteDialog.keyId)
       setApiKeys((prev) => prev.filter((key) => key.key_id !== deleteDialog.keyId))
       setSuccess(t("action.deleted") || "Deleted!")
-    } catch (e: any) {
-      setError(e.message || "Failed to delete API key")
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to delete API key")
     } finally {
     closeDeleteDialog()
   }
@@ -225,12 +231,13 @@ export function ApiKeyPage() {
       setNewKeyWrite(true);
       setNewKeyDescription("");
       setNewKeyExpiresIn("30");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const error = e as Error;
       // Check if it's a duplicate name error and use the translated message
-      if (e.message && e.message.includes("must be unique")) {
+      if (error.message && error.message.includes("must be unique")) {
         setDialogError(t("apiKey.duplicateName") || "An API key with this name already exists. Please choose a different name.");
       } else {
-        setDialogError(e.message || "Failed to create API key");
+        setDialogError(error.message || "Failed to create API key");
       }
     } finally {
       setLoading(false);
@@ -246,25 +253,30 @@ export function ApiKeyPage() {
   const activeKeys = apiKeys.filter((key) => key.is_active).length
   const totalKeys = apiKeys.length
 
+  // Prepare summary cards data
+  const summaryCards = [
+    {
+      title: t("table.totalKeys") || "Total Keys",
+      value: totalKeys,
+      icon: <Power className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.activeKeys") || "Active Keys",
+      value: activeKeys,
+      icon: <Power className="h-4 w-4 text-muted-foreground" />
+    },
+    {
+      title: t("table.disabledKeys") || "Disabled Keys",
+      value: totalKeys - activeKeys,
+      icon: <PowerOff className="h-4 w-4 text-muted-foreground" />
+    }
+  ]
+
   return (
-    <div className="space-y-6">
-      {error && <div className="text-red-600 font-medium">{error}</div>}
-      {success && <div className="text-green-600 font-medium">{success}</div>}
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="text-2xl font-bold text-foreground">{totalKeys}</div>
-          <div className="text-sm text-muted-foreground">{t("table.totalKeys") || "Total Keys"}</div>
-        </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="text-2xl font-bold text-green-600">{activeKeys}</div>
-          <div className="text-sm text-muted-foreground">{t("table.activeKeys") || "Active Keys"}</div>
-        </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="text-2xl font-bold text-foreground">{totalKeys - activeKeys}</div>
-          <div className="text-sm text-muted-foreground">{t("table.disabledKeys") || "Disabled Keys"}</div>
-        </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
+    <PageLayout
+      header={{
+        description: t("apiKey.description") || "Manage your API keys for accessing ScaleBox services",
+        children: (
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
             if (!open) {
@@ -276,7 +288,7 @@ export function ApiKeyPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button className="w-full" disabled={apiKeys.length >= 5}>
+              <Button disabled={apiKeys.length >= 5}>
                 <Plus className="h-4 w-4 mr-2" />
                 {t("apiKey.createKey") || "Create Key"}
               </Button>
@@ -338,168 +350,170 @@ export function ApiKeyPage() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+        )
+      }}
+      summaryCards={summaryCards}
+    >
+      {error && <div className="text-red-600 font-medium">{error}</div>}
+      {success && <div className="text-green-600 font-medium">{success}</div>}
 
       {/* Filters */}
-      <div className="bg-card p-4 rounded-lg border border-border">
-        <div className="flex gap-4 items-center">
-          <div className="relative" style={{ maxWidth: 320, flex: '0 1 auto' }}>
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder={t("apiKey.search") || "Search API keys..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 max-w-xs"
-              style={{ minWidth: 0 }}
-            />
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-4 items-center">
+            <div className="relative" style={{ maxWidth: 320, flex: '0 1 auto' }}>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder={t("apiKey.search") || "Search API keys..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 max-w-xs"
+                style={{ minWidth: 0 }}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
+                <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-              <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
-              <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Table */}
       <Card>
-        <CardHeader>
-            <CardTitle>{t("table.apiKeys") || "API Keys"}</CardTitle>
-          <CardDescription>{t("table.apiKeysDesc") || "Manage your API keys. You can have up to 5 active keys."}</CardDescription>
-        </CardHeader>
-        <div className="p-4">
-          <Table>
+        <CardContent>
+          <ResizableTable
+            defaultColumnWidths={{
+              name: 100,
+              description: 150,
+              status: 80,
+              expiration: 100,
+              permissions: 140,
+              keyValue: 450,
+              created: 100,
+              actions: 100
+            }}
+          >
             <TableHeader>
               <TableRow>
-                <TableHead>{t("table.name") || "Name"}</TableHead>
-                <TableHead>{t("apiKey.description") || "Description"}</TableHead>
-                <TableHead>{t("table.status") || "Status"}</TableHead>
-                <TableHead>{t("apiKey.expiration") || "Expiration"}</TableHead>
-                <TableHead>{t("table.permissions") || "Permissions"}</TableHead>
-                <TableHead>{t("apiKey.keyValue") || "Key Value"}</TableHead>
-                <TableHead>{t("table.created") || "Created"}</TableHead>
-                <TableHead>{t("table.actions") || "Actions"}</TableHead>
+                <ResizableTableHead columnId="name" defaultWidth={100}>{t("table.name") || "Name"}</ResizableTableHead>
+                <ResizableTableHead columnId="description" defaultWidth={150}>{t("apiKey.description") || "Description"}</ResizableTableHead>
+                <ResizableTableHead columnId="status" defaultWidth={80}>{t("table.status") || "Status"}</ResizableTableHead>
+                <ResizableTableHead columnId="expiration" defaultWidth={100}>{t("apiKey.expiration") || "Expiration"}</ResizableTableHead>
+                <ResizableTableHead columnId="permissions" defaultWidth={140}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
+                <ResizableTableHead columnId="keyValue" defaultWidth={450}>{t("apiKey.keyValue") || "Key Value"}</ResizableTableHead>
+                <ResizableTableHead columnId="created" defaultWidth={100}>{t("table.created") || "Created"}</ResizableTableHead>
+                <ResizableTableHead columnId="actions" defaultWidth={100}>{t("table.actions") || "Actions"}</ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredApiKeys.map((key) => (
-                <TableRow key={key.key_id}>
-                  <TableCell>{key.name}</TableCell>
-                  <TableCell>{key.description || "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant={key.is_active ? "default" : "destructive"}>
-                      {key.is_active ? "Active" : "Disabled"}
+              {filteredApiKeys.map((apiKey) => (
+                <TableRow key={apiKey.key_id}>
+                  <ResizableTableCell>
+                    <div className="font-medium break-words">{apiKey.name}</div>
+                  </ResizableTableCell>
+                  <ResizableTableCell className="break-words">{apiKey.description || "-"}</ResizableTableCell>
+                  <ResizableTableCell>
+                    <Badge variant={apiKey.is_active ? "default" : "secondary"}>
+                      {apiKey.is_active ? (t("table.active") || "Active") : (t("table.disabled") || "Disabled")}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {key.expires_in_days ? ApiKeyService.getExpirationText(key.expires_in_days, key.created_at, (k, vars) => t(k, vars)) : (t("apiKey.permanent") || "Permanent")}
-                  </TableCell>
-                  <TableCell>{ApiKeyService.getPermissionsText(key.permissions, t)}</TableCell>
-                  <TableCell>
-                    {key.full_key ? (
-                      <div className="flex items-center gap-2">
-                        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                          {showKeys[key.key_id] ? key.full_key : "••••••••••••••••••••••••••••••••••••••••••••••••"}
-                        </div>
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
-                          onClick={() => toggleKeyVisibility(key.key_id)}
-                          title={showKeys[key.key_id] ? (t("apiKey.hide") || "Hide") : (t("apiKey.view") || "View")}
-                          disabled={!key.full_key}
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    {apiKey.expires_in_days ? `${apiKey.expires_in_days} ${t("apiKey.days") || "days"}` : (t("apiKey.permanent") || "Permanent")}
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="break-words">
+                      <Badge variant="outline">
+                        {apiKey.permissions.write ? (t("apiKey.readWrite") || "Read & Write") : (t("apiKey.readOnly") || "Read Only")}
+                      </Badge>
+                    </div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="font-mono text-xs bg-muted px-2 py-1 rounded overflow-x-auto whitespace-nowrap flex-1" style={{ minWidth: '320px', maxWidth: '400px' }}>
+                        {showKeys[apiKey.key_id] ? (apiKey.full_key || `${apiKey.prefix}...`) : '*'.repeat(40)}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleKeyVisibility(apiKey.key_id)}
+                          title={showKeys[apiKey.key_id] ? (t("apiKey.hideKey") || "Hide key") : (t("apiKey.showKey") || "Show key")}
+                          className="h-8 w-8 p-0 flex-shrink-0"
                         >
-                          {showKeys[key.key_id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showKeys[apiKey.key_id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
-                          onClick={() => copyToClipboard(key.full_key!)}
-                          title={t("apiKey.copy") || "Copy"}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(apiKey.full_key || `${apiKey.prefix}...`)}
+                          title={t("apiKey.copyKey") || "Copy key"}
+                          className="h-8 w-8 p-0 flex-shrink-0"
                         >
                           <Copy className="h-4 w-4" />
-                      </Button>
+                        </Button>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                          {key.prefix}...
-                        </div>
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
-                          onClick={() => copyToClipboard(key.prefix + "...")}
-                          title={t("apiKey.copy") || "Copy"}
-                        >
-                        <Copy className="h-4 w-4" />
-                      </Button>
                     </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</TableCell>
-                  <TableCell className="flex gap-2">
-                    <Button 
-                      size="icon" 
-                      variant="outline" 
-                      onClick={() => handleToggleKeyStatus(key.key_id)} 
-                      title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
-                    >
-                      {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    {format(parseISO(apiKey.created_at), "MMM dd, yyyy")}
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleKeyStatus(apiKey.key_id)}
+                        title={apiKey.is_active ? (t("apiKey.disableKey") || "Disable key") : (t("apiKey.enableKey") || "Enable key")}
+                      >
+                        {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                       </Button>
                       <Button
-                      size="icon" 
-                        variant="outline"
-                      onClick={() => openDeleteDialog(key.key_id, key.name)} 
-                      title={key.is_active ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") : (t("apiKey.deleteKey") || "Delete API Key")}
-                      disabled={key.is_active}
-                      className={key.is_active ? "opacity-50 cursor-not-allowed" : ""}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
+                        title={t("apiKey.deleteKey") || "Delete key"}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                  </TableCell>
+                    </div>
+                  </ResizableTableCell>
                 </TableRow>
               ))}
-              {filteredApiKeys.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    {loading ? "Loading..." : (t("table.noKeys") || "No API keys found.")}
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
-          </Table>
-        </div>
+          </ResizableTable>
+        </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Confirmation Dialogs */}
       <ActionConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={closeDeleteDialog}
         onConfirm={confirmDeleteKey}
-        isLoading={deleteDialog.isLoading}
         itemName={deleteDialog.keyName}
-        itemType={t("table.apiKey") || "API Key"}
+        itemType="API Key"
         action="delete"
-        warningMessage={t("apiKey.deleteWarning") || `Are you sure you want to delete the API key "${deleteDialog.keyName}"? This action cannot be undone.`}
+        isLoading={deleteDialog.isLoading}
+        warningMessage={t("apiKey.deleteWarning") || "Deleting this API key will immediately disable any applications or services using it. This action cannot be undone."}
       />
 
-      {/* Disable Confirmation Dialog */}
       <ActionConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={closeDisableDialog}
         onConfirm={confirmDisableKey}
-        isLoading={disableDialog.isLoading}
         itemName={disableDialog.keyName}
-        itemType={t("table.apiKey") || "API Key"}
+        itemType="API Key"
         action="disable"
-        warningMessage={t("apiKey.disableWarning") || `Disabling this API key will immediately stop all applications and services using it. This may cause service interruptions. Are you sure you want to disable this key?`}
+        isLoading={disableDialog.isLoading}
+        warningMessage={t("apiKey.disableWarning") || "Disabling this API key will immediately stop all applications and services using it. This may cause service interruptions."}
       />
-    </div>
+    </PageLayout>
   )
 }

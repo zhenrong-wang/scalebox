@@ -62,11 +62,13 @@ export function ActionConfirmationDialog({
   const isConfirmDisabled = (requireConfirmation && confirmationText !== itemName) || isLoading
 
   const getActionConfig = () => {
+    const itemTypeLower = itemType?.toLowerCase() || "item"
+    
     switch (action) {
       case "delete":
         return {
           title: t("action.delete") || "Delete",
-          description: t("dialog.deleteDescription", { itemType: itemType.toLowerCase() }) || `This action cannot be undone. This will permanently delete the ${itemType.toLowerCase()} and remove all associated data.`,
+          description: t("dialog.deleteDescription", { itemType: itemTypeLower }) || `This action cannot be undone. This will permanently delete the ${itemTypeLower} and remove all associated data.`,
           buttonText: t("action.delete") || "Delete",
           buttonVariant: "destructive" as const,
           icon: Trash2,
@@ -75,7 +77,7 @@ export function ActionConfirmationDialog({
       case "disable":
         return {
           title: t("action.disable") || "Disable",
-          description: t("dialog.disableDescription", { itemType: itemType.toLowerCase() }) || `This will disable the ${itemType.toLowerCase()} and prevent any further access.`,
+          description: t("dialog.disableDescription", { itemType: itemTypeLower }) || `This will disable the ${itemTypeLower} and prevent any further access.`,
           buttonText: t("action.disable") || "Disable",
           buttonVariant: "default" as const,
           icon: PowerOff,
@@ -84,7 +86,7 @@ export function ActionConfirmationDialog({
       case "enable":
         return {
           title: t("action.enable") || "Enable",
-          description: t("dialog.enableDescription", { itemType: itemType.toLowerCase() }) || `This will enable the ${itemType.toLowerCase()} and allow access.`,
+          description: t("dialog.enableDescription", { itemType: itemTypeLower }) || `This will enable the ${itemTypeLower} and allow access.`,
           buttonText: t("action.enable") || "Enable",
           buttonVariant: "default" as const,
           icon: Power,
@@ -93,7 +95,7 @@ export function ActionConfirmationDialog({
       default:
         return {
           title: t("action.confirm") || "Confirm",
-          description: t("dialog.confirmDescription", { itemType: itemType.toLowerCase() }) || `Are you sure you want to perform this action on the ${itemType.toLowerCase()}?`,
+          description: t("dialog.confirmDescription", { itemType: itemTypeLower }) || `Are you sure you want to perform this action on the ${itemTypeLower}?`,
           buttonText: t("action.confirm") || "Confirm",
           buttonVariant: "default" as const,
           icon: AlertTriangle,

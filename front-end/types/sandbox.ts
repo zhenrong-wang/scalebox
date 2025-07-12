@@ -15,6 +15,8 @@ export interface Sandbox {
     storage: number // GB
     bandwidth: number // GB
   }
+  cpu_spec?: number // vCPU spec
+  memory_spec?: number // GB spec
   cost: {
     hourlyRate: number
     totalCost: number

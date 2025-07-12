@@ -3,7 +3,8 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.users import User, Base, get_password_hash
+from app.models import User, Base
+from app.users import get_password_hash
 from config import settings
 
 DATABASE_URL = f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"

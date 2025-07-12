@@ -25,7 +25,7 @@ export function LanguageProvider({
 
   // Initialize language after hydration to prevent SSR/client mismatch
   useEffect(() => {
-      const stored = localStorage.getItem(storageKey) as Language | null
+    const stored = localStorage.getItem(storageKey) as Language | null
     if (stored && stored in translations) {
       setLanguage(stored)
     } else {
@@ -34,7 +34,7 @@ export function LanguageProvider({
         setLanguage("zh-CN")
       } else if (nav.startsWith("zh-tw") || nav.startsWith("zh-hk")) {
         setLanguage("zh-TW")
-    }
+      }
       // If none of the above, keep the default language
     }
     setIsHydrated(true)

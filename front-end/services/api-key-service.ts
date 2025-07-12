@@ -45,7 +45,7 @@ interface ApiKeyStats {
 
 export type { ApiKey };
 export class ApiKeyService {
-  static API_BASE = "http://localhost:8000";
+  static API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   private static getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem("auth-token");

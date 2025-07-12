@@ -31,6 +31,20 @@ type UserData = {
   // ...other fields as needed
 };
 
+interface ApiUser {
+  account_id?: string;
+  accountId?: string;
+  id?: string;
+  username?: string;
+  full_name?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  is_active?: boolean;
+  is_verified?: boolean;
+  created_at?: string;
+}
+
 export function AccountSettings({ isOpen, onClose, onLogout }: AccountSettingsProps) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isEditing, setIsEditing] = useState({
@@ -57,7 +71,7 @@ export function AccountSettings({ isOpen, onClose, onLogout }: AccountSettingsPr
 
   useEffect(() => {
     async function fetchUser() {
-      const user: any = await UserService.getCurrentUser();
+      const user = await UserService.getCurrentUser() as ApiUser | null;
       if (user) {
         // Handle both account_id (from backend) and accountId (fallback)
         const accountId = user.account_id || user.accountId || user.id || 'N/A';
