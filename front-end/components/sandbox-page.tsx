@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Play, Square, Trash2, Search, Filter, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check } from "lucide-react"
+import { Play, Square, Trash2, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check } from "lucide-react"
 import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,7 @@ import { SandboxService } from "../services/sandbox-service"
 import type { Sandbox, SandboxStats } from "../types/sandbox"
 import { Label } from "@/components/ui/label"
 import { PageLayout } from "@/components/ui/page-layout"
+import { SearchFilters } from "@/components/ui/search-filters"
 
 type SortField = "name" | "framework" | "status" | "createdAt" | "uptime"
 type SortOrder = "asc" | "desc"
@@ -393,77 +394,73 @@ export function SandboxPage() {
       summaryCards={summaryCards}
     >
       {/* Filters */}
+      <SearchFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder={t("sandbox.search") || "Search sandboxes..."}
+        filters={[
+          {
+            key: "status",
+            label: t("table.selectStatus") || "Filter by status",
+            value: statusFilter,
+            onValueChange: setStatusFilter,
+            options: [
+              { value: "all", label: t("table.allStatus") || "All Status" },
+              { value: "running", label: t("table.running") || "Running" },
+              { value: "stopped", label: t("table.stopped") || "Stopped" },
+              { value: "error", label: t("table.error") || "Error" }
+            ]
+          }
+        ]}
+      />
+
+      {/* Date Range Filter */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder={t("sandbox.search") || "Search sandboxes..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-                  <SelectItem value="running">{t("table.running") || "Running"}</SelectItem>
-                  <SelectItem value="stopped">{t("table.stopped") || "Stopped"}</SelectItem>
-                  <SelectItem value="error">{t("table.error") || "Error"}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
+          <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
+            dateRange.from || dateRange.to 
+              ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
+              : 'bg-muted/50 border-border'
+          }`}>
+            <Label className={`text-sm font-medium whitespace-nowrap ${
               dateRange.from || dateRange.to 
-                ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
-                : 'bg-muted/50 border-border'
-            }`}>
-              <Label className={`text-sm font-medium whitespace-nowrap ${
-                dateRange.from || dateRange.to 
-                  ? 'text-blue-700 dark:text-blue-300' 
-                  : ''
-              }`}>{t("table.created") || "Created"}</Label>
-              <div className="flex items-center gap-1">
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => openDatePicker('from', e)}
-                    className="w-[120px] h-8 text-sm justify-start"
-                  >
-                    {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
-                  </Button>
-                </div>
-                <span className="text-muted-foreground text-sm">to</span>
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => openDatePicker('to', e)}
-                    className="w-[120px] h-8 text-sm justify-start"
-                  >
-                    {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
-                  </Button>
-                </div>
-              </div>
-              {(dateRange.from || dateRange.to) && (
+                ? 'text-blue-700 dark:text-blue-300' 
+                : ''
+            }`}>{t("table.created") || "Created"}</Label>
+            <div className="flex items-center gap-1">
+              <div className="relative">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  onClick={() => setDateRange({ from: null, to: null })}
-                  className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                  title="Clear date range"
+                  onClick={(e) => openDatePicker('from', e)}
+                  className="w-[120px] h-8 text-sm justify-start"
                 >
-                  <X className="h-3 w-3" />
+                  {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
                 </Button>
-              )}
+              </div>
+              <span className="text-muted-foreground text-sm">to</span>
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => openDatePicker('to', e)}
+                  className="w-[120px] h-8 text-sm justify-start"
+                >
+                  {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
+                </Button>
+              </div>
             </div>
+            {(dateRange.from || dateRange.to) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDateRange({ from: null, to: null })}
+                className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                title="Clear date range"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

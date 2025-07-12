@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Edit, Trash2, AlertTriangle, DollarSign, TrendingUp, CheckCircle, XCircle, Search } from "lucide-react"
+import { Plus, Edit, Trash2, AlertTriangle, DollarSign, TrendingUp, CheckCircle, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { useLanguage } from "../contexts/language-context"
 import { tReplace } from "../lib/i18n"
 import { PageLayout } from "@/components/ui/page-layout"
+import { SearchFilters } from "@/components/ui/search-filters"
 
 interface Budget {
   id: string
@@ -282,21 +283,11 @@ export function BudgetPage() {
       ]}
     >
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder={t("budget.search") || "Search budgets..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SearchFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder={t("budget.search") || "Search budgets..."}
+      />
 
       {/* Budgets Table */}
       <Card>

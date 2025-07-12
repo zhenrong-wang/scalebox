@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { DollarSign, Clock, Database, Zap, Search, Filter, Download, Calendar, BarChart3, TrendingUp, Activity } from "lucide-react"
+import { DollarSign, Clock, Database, Zap, Download, Calendar, BarChart3, TrendingUp, Activity } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,6 +27,7 @@ import {
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { PageLayout } from "@/components/ui/page-layout"
+import { SearchFilters } from "@/components/ui/search-filters"
 
 interface UsageRecord {
   id: string
@@ -357,7 +358,7 @@ export function BillingsPage() {
               </Select>
               <Select value={selectedProject} onValueChange={setSelectedProject}>
                 <SelectTrigger className="w-48">
-                  <Filter className="h-4 w-4 mr-2" />
+                  <BarChart3 className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent>
@@ -440,35 +441,25 @@ export function BillingsPage() {
       <Card>
         <CardContent>
           {/* Filters */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder={t("billings.search") || "Search billing records..."}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-                      <SelectItem value="paid">{t("table.paid") || "Paid"}</SelectItem>
-                      <SelectItem value="pending">{t("table.pending") || "Pending"}</SelectItem>
-                      <SelectItem value="overdue">{t("table.overdue") || "Overdue"}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SearchFilters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder={t("billings.search") || "Search billing records..."}
+            filters={[
+              {
+                key: "status",
+                label: t("table.selectStatus") || "Filter by status",
+                value: statusFilter,
+                onValueChange: setStatusFilter,
+                options: [
+                  { value: "all", label: t("table.allStatus") || "All Status" },
+                  { value: "paid", label: t("table.paid") || "Paid" },
+                  { value: "pending", label: t("table.pending") || "Pending" },
+                  { value: "overdue", label: t("table.overdue") || "Overdue" }
+                ]
+              }
+            ]}
+          />
 
           {/* Billing Table */}
           <ResizableTable
