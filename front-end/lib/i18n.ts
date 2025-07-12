@@ -652,6 +652,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "billings.barChart": "Bar Chart",
     "billings.exportCSV": "Export CSV",
     "billings.monitorUsage": "Monitor your usage and billing history",
+    "billings.showAnalytics": "Show Analytics",
+    "billings.hideAnalytics": "Hide Analytics",
     "action.back": "Back",
     "table.total": "Total",
     "table.totalSandboxes": "Total Sandboxes",
@@ -773,6 +775,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "action.viewSandboxes": "View Sandboxes",
     "sandbox.description": "Create, run, and manage isolated development environments. Track usage and costs for each sandbox.",
     "budget.search": "Search budgets...",
+    "billings.showAnalytics": "Show Analytics",
+    "billings.hideAnalytics": "Hide Analytics",
+    "cookie.title": "We use cookies",
+    "cookie.description": "We use cookies to enhance your experience, analyze site traffic, and personalize content. By continuing to use our site, you consent to our use of cookies.",
+    "cookie.accept": "Accept All",
+    "cookie.reject": "Reject",
+    "cookie.settings": "Settings",
   },
   "zh-CN": {
     // Navigation & Sidebar
@@ -1330,6 +1339,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "billings.barChart": "長條圖",
     "billings.exportCSV": "匯出CSV",
     "billings.monitorUsage": "監控您的使用和帳單歷史",
+    "billings.showAnalytics": "顯示分析",
+    "billings.hideAnalytics": "隱藏分析",
 
     // Additional keys
     "table.projects": "專案",
@@ -2055,6 +2066,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "billings.barChart": "長條圖",
     "billings.exportCSV": "匯出CSV",
     "billings.monitorUsage": "監控您的使用和帳單歷史",
+    "billings.showAnalytics": "顯示分析",
+    "billings.hideAnalytics": "隱藏分析",
 
     // Additional keys
     "table.projects": "專案",

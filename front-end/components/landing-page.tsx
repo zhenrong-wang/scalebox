@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useLanguage } from "../contexts/language-context"
 import { LanguageToggle } from "./language-toggle"
+import { CookieConsent } from "./ui/cookie-consent"
 
 interface LandingPageProps {
   onSignIn: () => void
@@ -135,6 +136,13 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
           </div>
         </div>
       </footer>
+
+      {/* Cookie Consent */}
+      <CookieConsent 
+        onAccept={() => console.log("Cookies accepted")}
+        onReject={() => console.log("Cookies rejected")}
+        onSettings={() => console.log("Cookie settings opened")}
+      />
     </div>
   )
 }

@@ -151,6 +151,7 @@ export function BillingsPage() {
   const [selectedMetric, setSelectedMetric] = useState<string>("sandboxQuantity")
   const [timeInterval, setTimeInterval] = useState<string>("7d")
   const [selectedProject, setSelectedProject] = useState<string>("all")
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const { t } = useLanguage()
 
   const filteredUsageData = usageData.filter((record) => {
@@ -255,10 +256,21 @@ export function BillingsPage() {
       header={{
         description: t("billings.monitorUsage"),
         children: (
-          <Button onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant={showAnalytics ? "default" : "outline"}
+              onClick={() => setShowAnalytics(!showAnalytics)}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              {showAnalytics ? t("billings.hideAnalytics") || "Hide Analytics" : t("billings.showAnalytics") || "Show Analytics"}
+            </Button>
+            {showAnalytics && (
+              <Button onClick={exportToCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            )}
+          </div>
         )
       }}
       summaryCards={[
@@ -284,183 +296,187 @@ export function BillingsPage() {
         }
       ]}
     >
-      {/* Current Usage Details */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.sandboxHours") || "Sandbox Hours"}</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{currentUsage.sandboxHours.used}h</div>
-            <div className="text-xs text-muted-foreground mb-2">{`of ${currentUsage.sandboxHours.limit}h limit`}</div>
-            <Progress value={(currentUsage.sandboxHours.used / currentUsage.sandboxHours.limit) * 100} className="h-2" />
-          </CardContent>
-        </Card>
+      {/* Usage Analytics - Only shown when toggled */}
+      {showAnalytics && (
+        <>
+          {/* Current Usage Details */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t("billings.sandboxHours") || "Sandbox Hours"}</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{currentUsage.sandboxHours.used}h</div>
+                <div className="text-xs text-muted-foreground mb-2">{`of ${currentUsage.sandboxHours.limit}h limit`}</div>
+                <Progress value={(currentUsage.sandboxHours.used / currentUsage.sandboxHours.limit) * 100} className="h-2" />
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.apiCalls") || "API Calls"}</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{currentUsage.apiCalls.used.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground mb-2">{`of ${currentUsage.apiCalls.limit.toLocaleString()} limit`}</div>
-            <Progress value={(currentUsage.apiCalls.used / currentUsage.apiCalls.limit) * 100} className="h-2" />
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t("billings.apiCalls") || "API Calls"}</CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{currentUsage.apiCalls.used.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground mb-2">{`of ${currentUsage.apiCalls.limit.toLocaleString()} limit`}</div>
+                <Progress value={(currentUsage.apiCalls.used / currentUsage.apiCalls.limit) * 100} className="h-2" />
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("billings.storage") || "Storage"}</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{currentUsage.storage.used}GB</div>
-            <div className="text-xs text-muted-foreground mb-2">{`of ${currentUsage.storage.limit}GB limit`}</div>
-            <Progress value={(currentUsage.storage.used / currentUsage.storage.limit) * 100} className="h-2" />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Usage Analytics */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>{t("billings.usageAnalytics")}</CardTitle>
-              <CardDescription>{t("billings.historicalPatterns")}</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-                <SelectTrigger className="w-48">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sandboxQuantity">{t("billings.sandboxQuantity")}</SelectItem>
-                  <SelectItem value="sandboxCores">{t("billings.sandboxCores")}</SelectItem>
-                  <SelectItem value="sandboxRAM">{t("billings.sandboxRAM")}</SelectItem>
-                  <SelectItem value="sandboxStorage">{t("billings.sandboxStorage")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={timeInterval} onValueChange={setTimeInterval}>
-                <SelectTrigger className="w-32">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7d">7 days</SelectItem>
-                  <SelectItem value="30d">30 days</SelectItem>
-                  <SelectItem value="90d">90 days</SelectItem>
-                  <SelectItem value="1y">1 year</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger className="w-48">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  <SelectItem value="proj_001">E-commerce Platform</SelectItem>
-                  <SelectItem value="proj_002">Mobile App Backend</SelectItem>
-                  <SelectItem value="proj_003">Analytics Dashboard</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t("billings.storage") || "Storage"}</CardTitle>
+                <Database className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{currentUsage.storage.used}GB</div>
+                <div className="text-xs text-muted-foreground mb-2">{`of ${currentUsage.storage.limit}GB limit`}</div>
+                <Progress value={(currentUsage.storage.used / currentUsage.storage.limit) * 100} className="h-2" />
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="line" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="line">{t("billings.lineChart")}</TabsTrigger>
-              <TabsTrigger value="area">{t("billings.areaChart")}</TabsTrigger>
-              <TabsTrigger value="bar">{t("billings.barChart")}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="line" className="mt-4">
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={aggregatedData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey={selectedMetric} 
-                    stroke="#8884d8" 
-                    strokeWidth={2}
-                    name={getMetricLabel(selectedMetric)}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </TabsContent>
-            <TabsContent value="area" className="mt-4">
-              <ResponsiveContainer width="100%" height={400}>
-                <AreaChart data={aggregatedData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Area 
-                    type="monotone" 
-                    dataKey={selectedMetric} 
-                    stroke="#8884d8" 
-                    fill="#8884d8" 
-                    fillOpacity={0.3}
-                    name={getMetricLabel(selectedMetric)}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </TabsContent>
-            <TabsContent value="bar" className="mt-4">
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={aggregatedData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar 
-                    dataKey={selectedMetric} 
-                    fill="#8884d8" 
-                    name={getMetricLabel(selectedMetric)}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+
+          {/* Usage Analytics Charts */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>{t("billings.usageAnalytics")}</CardTitle>
+                  <CardDescription>{t("billings.historicalPatterns")}</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedMetric} onValueChange={setSelectedMetric}>
+                    <SelectTrigger className="w-48">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sandboxQuantity">{t("billings.sandboxQuantity")}</SelectItem>
+                      <SelectItem value="sandboxCores">{t("billings.sandboxCores")}</SelectItem>
+                      <SelectItem value="sandboxRAM">{t("billings.sandboxRAM")}</SelectItem>
+                      <SelectItem value="sandboxStorage">{t("billings.sandboxStorage")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={timeInterval} onValueChange={setTimeInterval}>
+                    <SelectTrigger className="w-32">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7d">7 days</SelectItem>
+                      <SelectItem value="30d">30 days</SelectItem>
+                      <SelectItem value="90d">90 days</SelectItem>
+                      <SelectItem value="1y">1 year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger className="w-48">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      <SelectItem value="proj_001">E-commerce Platform</SelectItem>
+                      <SelectItem value="proj_002">Mobile App Backend</SelectItem>
+                      <SelectItem value="proj_003">Analytics Dashboard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="line" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="line">{t("billings.lineChart")}</TabsTrigger>
+                  <TabsTrigger value="area">{t("billings.areaChart")}</TabsTrigger>
+                  <TabsTrigger value="bar">{t("billings.barChart")}</TabsTrigger>
+                </TabsList>
+                <TabsContent value="line" className="mt-4">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={aggregatedData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey={selectedMetric} 
+                        stroke="#8884d8" 
+                        strokeWidth={2}
+                        name={getMetricLabel(selectedMetric)}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+                <TabsContent value="area" className="mt-4">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={aggregatedData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Area 
+                        type="monotone" 
+                        dataKey={selectedMetric} 
+                        stroke="#8884d8" 
+                        fill="#8884d8" 
+                        fillOpacity={0.3}
+                        name={getMetricLabel(selectedMetric)}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+                <TabsContent value="bar" className="mt-4">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={aggregatedData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar 
+                        dataKey={selectedMetric} 
+                        fill="#8884d8" 
+                        name={getMetricLabel(selectedMetric)}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
 
 
       {/* Billing History */}
+      <SearchFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder={t("billings.search") || "Search billing records..."}
+        filters={[
+          {
+            key: "status",
+            label: t("table.selectStatus") || "Filter by status",
+            value: statusFilter,
+            onValueChange: setStatusFilter,
+            options: [
+              { value: "all", label: t("table.allStatus") || "All Status" },
+              { value: "paid", label: t("table.paid") || "Paid" },
+              { value: "pending", label: t("table.pending") || "Pending" },
+              { value: "overdue", label: t("table.overdue") || "Overdue" }
+            ]
+          }
+        ]}
+      />
+
       <Card>
         <CardContent>
-          {/* Filters */}
-          <SearchFilters
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            searchPlaceholder={t("billings.search") || "Search billing records..."}
-            filters={[
-              {
-                key: "status",
-                label: t("table.selectStatus") || "Filter by status",
-                value: statusFilter,
-                onValueChange: setStatusFilter,
-                options: [
-                  { value: "all", label: t("table.allStatus") || "All Status" },
-                  { value: "paid", label: t("table.paid") || "Paid" },
-                  { value: "pending", label: t("table.pending") || "Pending" },
-                  { value: "overdue", label: t("table.overdue") || "Overdue" }
-                ]
-              }
-            ]}
-          />
-
           {/* Billing Table */}
           <ResizableTable
             defaultColumnWidths={{
