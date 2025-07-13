@@ -17,7 +17,6 @@ import { format, parseISO } from "date-fns"
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { PageLayout } from "@/components/ui/page-layout"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Extended interface to include the full API key for display
 interface ApiKeyWithFullKey extends ApiKey {
@@ -40,6 +39,8 @@ export function ApiKeyPage() {
   const [dialogError, setDialogError] = useState<string>("")
   const [newKeyExpiresIn, setNewKeyExpiresIn] = useState<string>("30"); // default 30 days
   const [newKeyDescription, setNewKeyDescription] = useState("");
+  
+
 
   // Delete confirmation state
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -558,65 +559,71 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
-                            disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Clock className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {apiKey.expires_in_days === null || apiKey.expires_in_days === undefined
+                      <div className="relative group">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
+                          disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
+                          className="h-8 w-8 p-0"
+                          title={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined
                             ? (t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys")
                             : (t("apiKey.extendKey") || "Extend expiration")
                           }
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleKeyStatus(apiKey.key_id)}
-                            disabled={apiKey.is_expired}
-                            className="h-8 w-8 p-0"
-                          >
-                            {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {apiKey.is_expired
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                        {apiKey.expires_in_days === null || apiKey.expires_in_days === undefined && (
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                            {t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys"}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative group">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleKeyStatus(apiKey.key_id)}
+                          disabled={apiKey.is_expired}
+                          className="h-8 w-8 p-0"
+                          title={apiKey.is_expired
                             ? (t("apiKey.cannotEnableExpired") || "Cannot enable expired keys")
                             : apiKey.is_active 
                               ? (t("apiKey.disableKey") || "Disable key") 
                               : (t("apiKey.enableKey") || "Enable key")
                           }
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
-                            disabled={apiKey.is_active}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {apiKey.is_active 
+                        >
+                          {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                        </Button>
+                        {apiKey.is_expired && (
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                            {t("apiKey.cannotEnableExpired") || "Cannot enable expired keys"}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative group">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
+                          disabled={apiKey.is_active}
+                          className="h-8 w-8 p-0"
+                          title={apiKey.is_active 
                             ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") 
                             : (t("apiKey.deleteKey") || "Delete key")
                           }
-                        </TooltipContent>
-                      </Tooltip>
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        {apiKey.is_active && (
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                            {t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first."}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </ResizableTableCell>
                 </TableRow>
@@ -685,6 +692,8 @@ export function ApiKeyPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+
     </PageLayout>
   )
 }
