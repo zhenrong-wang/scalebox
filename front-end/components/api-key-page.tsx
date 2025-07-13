@@ -147,16 +147,6 @@ export function ApiKeyPage() {
   }
 
   const openDeleteDialog = (keyId: string, keyName: string) => {
-    // Find the key to check if it's active
-    const key = apiKeys.find(k => k.key_id === keyId);
-    if (!key) return;
-
-    // Prevent deletion of active keys
-    if (key.is_active) {
-      setError(t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.");
-      return;
-    }
-
     setDeleteDialog({
       isOpen: true,
       keyId,
@@ -591,7 +581,8 @@ export function ApiKeyPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
-                        title={t("apiKey.deleteKey") || "Delete key"}
+                        title={apiKey.is_active ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") : (t("apiKey.deleteKey") || "Delete key")}
+                        disabled={apiKey.is_active}
                         className="h-8 w-8 p-0"
                       >
                         <Trash2 className="h-4 w-4" />
