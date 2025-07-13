@@ -464,26 +464,26 @@ export function ApiKeyPage() {
         <CardContent>
           <ResizableTable
             defaultColumnWidths={{
-              name: 120,
-              description: 200,
-              status: 80,
-              expiration: 100,
-              permissions: 120,
-              keyValue: 300,
-              created: 100,
-              actions: 100
+              name: 140,
+              description: 180,
+              status: 90,
+              expiration: 120,
+              permissions: 110,
+              keyValue: 280,
+              created: 110,
+              actions: 160
             }}
           >
             <TableHeader>
               <TableRow>
-                <ResizableTableHead columnId="name" defaultWidth={120}>{t("table.name") || "Name"}</ResizableTableHead>
-                <ResizableTableHead columnId="description" defaultWidth={200}>{t("table.description") || "Description"}</ResizableTableHead>
-                <ResizableTableHead columnId="status" defaultWidth={80}>{t("table.status") || "Status"}</ResizableTableHead>
-                <ResizableTableHead columnId="expiration" defaultWidth={100}>{t("apiKey.expiration") || "Expiration"}</ResizableTableHead>
-                <ResizableTableHead columnId="permissions" defaultWidth={120}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
-                <ResizableTableHead columnId="keyValue" defaultWidth={300}>{t("apiKey.keyValue") || "Key Value"}</ResizableTableHead>
-                <ResizableTableHead columnId="created" defaultWidth={100}>{t("table.created") || "Created"}</ResizableTableHead>
-                <ResizableTableHead columnId="actions" defaultWidth={100}>{t("table.actions") || "Actions"}</ResizableTableHead>
+                <ResizableTableHead columnId="name" defaultWidth={140}>{t("table.name") || "Name"}</ResizableTableHead>
+                <ResizableTableHead columnId="description" defaultWidth={180}>{t("table.description") || "Description"}</ResizableTableHead>
+                <ResizableTableHead columnId="status" defaultWidth={90}>{t("table.status") || "Status"}</ResizableTableHead>
+                <ResizableTableHead columnId="expiration" defaultWidth={120}>{t("apiKey.expiration") || "Expiration"}</ResizableTableHead>
+                <ResizableTableHead columnId="permissions" defaultWidth={110}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
+                <ResizableTableHead columnId="keyValue" defaultWidth={280}>{t("apiKey.keyValue") || "Key Value"}</ResizableTableHead>
+                <ResizableTableHead columnId="created" defaultWidth={110}>{t("table.created") || "Created"}</ResizableTableHead>
+                <ResizableTableHead columnId="actions" defaultWidth={160}>{t("table.actions") || "Actions"}</ResizableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -538,7 +538,7 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-2">
-                      <div className="font-mono text-xs bg-muted px-2 py-1 rounded overflow-x-auto whitespace-nowrap flex-1" style={{ minWidth: '200px', maxWidth: '280px' }}>
+                      <div className="font-mono text-xs bg-muted px-2 py-1 rounded overflow-x-auto whitespace-nowrap flex-1" style={{ minWidth: '180px', maxWidth: '240px' }}>
                         {showKeys[apiKey.key_id] ? (apiKey.full_key || `${apiKey.prefix}...`) : '*'.repeat(40)}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -567,13 +567,14 @@ export function ApiKeyPage() {
                     {format(parseISO(apiKey.created_at), "MMM dd, yyyy")}
                   </ResizableTableCell>
                   <ResizableTableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
                         title={t("apiKey.extendKey") || "Extend expiration"}
                         disabled={apiKey.is_expired}
+                        className="h-8 w-8 p-0"
                       >
                         <Clock className="h-4 w-4" />
                       </Button>
@@ -582,6 +583,7 @@ export function ApiKeyPage() {
                         size="sm"
                         onClick={() => handleToggleKeyStatus(apiKey.key_id)}
                         title={apiKey.is_active ? (t("apiKey.disableKey") || "Disable key") : (t("apiKey.enableKey") || "Enable key")}
+                        className="h-8 w-8 p-0"
                       >
                         {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                       </Button>
@@ -590,6 +592,7 @@ export function ApiKeyPage() {
                         size="sm"
                         onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
                         title={t("apiKey.deleteKey") || "Delete key"}
+                        className="h-8 w-8 p-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

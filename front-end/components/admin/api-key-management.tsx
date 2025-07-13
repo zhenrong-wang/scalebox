@@ -439,14 +439,14 @@ export function AdminApiKeyManagement() {
             <ResizableTable
               defaultColumnWidths={{
                 name: 150,
-                description: 200,
+                description: 180,
                 status: 100,
                 expiration: 120,
-                permissions: 120,
+                permissions: 110,
                 keyValue: 150,
                 owner: 150,
                 created: 120,
-                actions: 100
+                actions: 140
               }}
             >
               <TableHeader>
@@ -465,7 +465,7 @@ export function AdminApiKeyManagement() {
                       />
                     </div>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="description" defaultWidth={200}>{t("table.description")}</ResizableTableHead>
+                  <ResizableTableHead columnId="description" defaultWidth={180}>{t("table.description")}</ResizableTableHead>
                   <ResizableTableHead 
                     columnId="status" 
                     defaultWidth={100}
@@ -481,7 +481,7 @@ export function AdminApiKeyManagement() {
                     </div>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="expiration" defaultWidth={120}>{t("apiKey.expiration")}</ResizableTableHead>
-                  <ResizableTableHead columnId="permissions" defaultWidth={120}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
+                  <ResizableTableHead columnId="permissions" defaultWidth={110}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
                   <ResizableTableHead columnId="keyValue" defaultWidth={150}>{t("apiKey.keyValue")}</ResizableTableHead>
                   <ResizableTableHead 
                     columnId="owner" 
@@ -511,7 +511,7 @@ export function AdminApiKeyManagement() {
                       />
                     </div>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="actions" defaultWidth={100}>{t("table.actions")}</ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={140}>{t("table.actions")}</ResizableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -541,20 +541,22 @@ export function AdminApiKeyManagement() {
                     <ResizableTableCell>{key.user_email || "-"}</ResizableTableCell>
                     <ResizableTableCell>{key.created_at ? new Date(key.created_at).toLocaleDateString() : "-"}</ResizableTableCell>
                     <ResizableTableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1">
                         <Button 
-                          size="icon" 
+                          size="sm"
                           variant="outline" 
                           onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", key.is_active ? "disable" : "enable")} 
                           title={key.is_active ? (t("action.disable") || "Disable") : (t("action.enable") || "Enable")}
+                          className="h-8 w-8 p-0"
                         >
                           {key.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                         </Button>
                         <Button 
-                          size="icon" 
+                          size="sm"
                           variant="outline" 
                           onClick={() => openActionDialog(key.key_id, key.name, key.user_email || "", "delete")} 
                           title={t("apiKey.deleteKey") || "Delete API Key"}
+                          className="h-8 w-8 p-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
