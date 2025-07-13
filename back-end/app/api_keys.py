@@ -509,6 +509,14 @@ def toggle_api_key_status(
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
     
+    # Check if the key is expired
+    expires_in_days = getattr(api_key, 'expires_in_days', None)
+    if expires_in_days is not None:
+        created_at = getattr(api_key, 'created_at', datetime.datetime.utcnow())
+        expiration_date = created_at + datetime.timedelta(days=expires_in_days)
+        if datetime.datetime.utcnow() > expiration_date:
+            raise HTTPException(status_code=400, detail="Cannot enable an expired API key. Please extend the expiration first.")
+    
     # Toggle the status
     setattr(api_key, 'is_active', not getattr(api_key, 'is_active'))
     db.commit()
@@ -664,6 +672,14 @@ async def admin_api_key_action(
         raise HTTPException(status_code=404, detail="Key owner not found")
     
     if action_request.action == "enable":
+        # Check if the key is expired
+        expires_in_days = getattr(api_key, 'expires_in_days', None)
+        if expires_in_days is not None:
+            created_at = getattr(api_key, 'created_at', datetime.datetime.utcnow())
+            expiration_date = created_at + datetime.timedelta(days=expires_in_days)
+            if datetime.datetime.utcnow() > expiration_date:
+                raise HTTPException(status_code=400, detail="Cannot enable an expired API key. Please extend the expiration first.")
+        
         setattr(api_key, 'is_active', True)
         db.commit()
         message = "API key enabled successfully"
