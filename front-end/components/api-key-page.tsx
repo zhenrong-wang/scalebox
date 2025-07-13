@@ -40,6 +40,19 @@ export function ApiKeyPage() {
   const [newKeyExpiresIn, setNewKeyExpiresIn] = useState<string>("30"); // default 30 days
   const [newKeyDescription, setNewKeyDescription] = useState("");
   
+  // Tooltip state
+  const [tooltip, setTooltip] = useState<{
+    show: boolean;
+    text: string;
+    x: number;
+    y: number;
+  }>({
+    show: false,
+    text: "",
+    x: 0,
+    y: 0,
+  });
+  
 
 
   // Delete confirmation state
@@ -559,7 +572,7 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-1">
-                      <div className="relative group">
+                      <div className="relative">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -570,17 +583,28 @@ export function ApiKeyPage() {
                             ? (t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys")
                             : (t("apiKey.extendKey") || "Extend expiration")
                           }
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const isPermanent = apiKey.expires_in_days === null || apiKey.expires_in_days === undefined;
+                            const tooltipText = isPermanent 
+                              ? (t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys")
+                              : (t("apiKey.extendKey") || "Extend expiration");
+                            
+                            console.log("Extend button hover:", { isPermanent, tooltipText, rect });
+                            
+                            setTooltip({
+                              show: true,
+                              text: tooltipText,
+                              x: rect.left + rect.width / 2,
+                              y: rect.top - 10,
+                            });
+                          }}
+                          onMouseLeave={() => setTooltip({ show: false, text: "", x: 0, y: 0 })}
                         >
                           <Clock className="h-4 w-4" />
                         </Button>
-                        {apiKey.expires_in_days === null || apiKey.expires_in_days === undefined && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                            {t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys"}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        )}
                       </div>
-                      <div className="relative group">
+                      <div className="relative">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -593,17 +617,32 @@ export function ApiKeyPage() {
                               ? (t("apiKey.disableKey") || "Disable key") 
                               : (t("apiKey.enableKey") || "Enable key")
                           }
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            if (apiKey.is_expired) {
+                              setTooltip({
+                                show: true,
+                                text: t("apiKey.cannotEnableExpired") || "Cannot enable expired keys",
+                                x: rect.left + rect.width / 2,
+                                y: rect.top - 10,
+                              });
+                            } else {
+                              setTooltip({
+                                show: true,
+                                text: apiKey.is_active 
+                                  ? (t("apiKey.disableKey") || "Disable key") 
+                                  : (t("apiKey.enableKey") || "Enable key"),
+                                x: rect.left + rect.width / 2,
+                                y: rect.top - 10,
+                              });
+                            }
+                          }}
+                          onMouseLeave={() => setTooltip({ show: false, text: "", x: 0, y: 0 })}
                         >
                           {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                         </Button>
-                        {apiKey.is_expired && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                            {t("apiKey.cannotEnableExpired") || "Cannot enable expired keys"}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        )}
                       </div>
-                      <div className="relative group">
+                      <div className="relative">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -614,15 +653,28 @@ export function ApiKeyPage() {
                             ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") 
                             : (t("apiKey.deleteKey") || "Delete key")
                           }
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            if (apiKey.is_active) {
+                              setTooltip({
+                                show: true,
+                                text: t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.",
+                                x: rect.left + rect.width / 2,
+                                y: rect.top - 10,
+                              });
+                            } else {
+                              setTooltip({
+                                show: true,
+                                text: t("apiKey.deleteKey") || "Delete key",
+                                x: rect.left + rect.width / 2,
+                                y: rect.top - 10,
+                              });
+                            }
+                          }}
+                          onMouseLeave={() => setTooltip({ show: false, text: "", x: 0, y: 0 })}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        {apiKey.is_active && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                            {t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first."}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </ResizableTableCell>
@@ -693,7 +745,19 @@ export function ApiKeyPage() {
         </DialogContent>
       </Dialog>
       
-
+      {/* Global Tooltip */}
+      {tooltip.show && (
+        <div
+          className="fixed z-[9999] px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg pointer-events-none whitespace-nowrap"
+          style={{
+            left: tooltip.x - 100, // Center the tooltip
+            top: tooltip.y - 40,
+          }}
+        >
+          {tooltip.text}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
     </PageLayout>
   )
 }
