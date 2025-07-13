@@ -17,6 +17,7 @@ import { format, parseISO } from "date-fns"
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { PageLayout } from "@/components/ui/page-layout"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Extended interface to include the full API key for display
 interface ApiKeyWithFullKey extends ApiKey {
@@ -557,36 +558,65 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
-                        title={t("apiKey.extendKey") || "Extend expiration"}
-                        disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Clock className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleKeyStatus(apiKey.key_id)}
-                        title={apiKey.is_active ? (t("apiKey.disableKey") || "Disable key") : (t("apiKey.enableKey") || "Enable key")}
-                        disabled={apiKey.is_expired}
-                        className="h-8 w-8 p-0"
-                      >
-                        {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
-                        title={apiKey.is_active ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") : (t("apiKey.deleteKey") || "Delete key")}
-                        disabled={apiKey.is_active}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
+                            disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Clock className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {apiKey.expires_in_days === null || apiKey.expires_in_days === undefined
+                            ? (t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys")
+                            : (t("apiKey.extendKey") || "Extend expiration")
+                          }
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleToggleKeyStatus(apiKey.key_id)}
+                            disabled={apiKey.is_expired}
+                            className="h-8 w-8 p-0"
+                          >
+                            {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {apiKey.is_expired
+                            ? (t("apiKey.cannotEnableExpired") || "Cannot enable expired keys")
+                            : apiKey.is_active 
+                              ? (t("apiKey.disableKey") || "Disable key") 
+                              : (t("apiKey.enableKey") || "Enable key")
+                          }
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
+                            disabled={apiKey.is_active}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {apiKey.is_active 
+                            ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") 
+                            : (t("apiKey.deleteKey") || "Delete key")
+                          }
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </ResizableTableCell>
                 </TableRow>

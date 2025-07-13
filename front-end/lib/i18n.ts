@@ -333,6 +333,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "apiKey.extend": "Extend",
     "apiKey.expirationExtended": "API key expiration extended successfully!",
     "apiKey.expiresSoon": "Expires soon!",
+    "apiKey.cannotExtendPermanent": "Cannot extend permanent keys",
+    "apiKey.cannotEnableExpired": "Cannot enable expired keys",
 
     // Templates
     "templates.title": "Templates",
@@ -1540,6 +1542,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "apiKey.copyKey": "複製密钥",
     "apiKey.disableKey": "停用密钥",
     "apiKey.enableKey": "啟用密钥",
+    "apiKey.extendKey": "延長到期時間",
+    "apiKey.extendExpiration": "延長API密钥到期時間",
+    "apiKey.extendByDays": "延長天數",
+    "apiKey.extendByMonths": "延長月數",
+    "apiKey.makePermanent": "設為永久",
+    "apiKey.extend": "延長",
+    "apiKey.expirationExtended": "API密钥到期時間延長成功！",
+    "apiKey.expiresSoon": "即將到期！",
+    "apiKey.cannotExtendPermanent": "無法延長永久密钥",
+    "apiKey.cannotEnableExpired": "無法啟用已過期的密钥",
 
     // reCAPTCHA
     "recaptcha.title": "安全性驗證",
@@ -2414,6 +2426,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "apiKey.copyKey": "複製金鑰",
     "apiKey.disableKey": "停用金鑰",
     "apiKey.enableKey": "啟用金鑰",
+    "apiKey.extendKey": "延長到期時間",
+    "apiKey.extendExpiration": "延長API金鑰到期時間",
+    "apiKey.extendByDays": "延長天數",
+    "apiKey.extendByMonths": "延長月數",
+    "apiKey.makePermanent": "設為永久",
+    "apiKey.extend": "延長",
+    "apiKey.expirationExtended": "API金鑰到期時間延長成功！",
+    "apiKey.expiresSoon": "即將到期！",
+    "apiKey.cannotExtendPermanent": "無法延長永久金鑰",
+    "apiKey.cannotEnableExpired": "無法啟用已過期的金鑰",
 
     // reCAPTCHA
     "recaptcha.title": "安全性驗證",
