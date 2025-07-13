@@ -73,16 +73,12 @@ export function ApiKeyPage() {
     keyName: string
     isLoading: boolean
     extendByDays: string
-    extendByMonths: string
-    makePermanent: boolean
   }>({
     isOpen: false,
     keyId: "",
     keyName: "",
     isLoading: false,
-    extendByDays: "",
-    extendByMonths: "",
-    makePermanent: false,
+    extendByDays: "30",
   })
 
   const { t } = useLanguage()
@@ -193,9 +189,7 @@ export function ApiKeyPage() {
       keyId,
       keyName,
       isLoading: false,
-      extendByDays: "",
-      extendByMonths: "",
-      makePermanent: false,
+      extendByDays: "30",
     })
   }
 
@@ -205,9 +199,7 @@ export function ApiKeyPage() {
       keyId: "",
       keyName: "",
       isLoading: false,
-      extendByDays: "",
-      extendByMonths: "",
-      makePermanent: false,
+      extendByDays: "30",
     })
   }
 
@@ -215,27 +207,26 @@ export function ApiKeyPage() {
     setExtendDialog((prev) => ({ ...prev, isLoading: true }))
     setError("")
     setSuccess("")
+    
     try {
       const request: any = {}
       
-      if (extendDialog.makePermanent) {
+      if (extendDialog.extendByDays && extendDialog.extendByDays !== "permanent") {
+        request.extend_by_days = parseInt(extendDialog.extendByDays)
+      } else if (extendDialog.extendByDays === "permanent") {
         request.make_permanent = true
-      } else {
-        if (extendDialog.extendByDays) {
-          request.extend_by_days = parseInt(extendDialog.extendByDays)
-        }
-        if (extendDialog.extendByMonths) {
-          request.extend_by_months = parseInt(extendDialog.extendByMonths)
-        }
       }
       
       await ApiKeyService.extendApiKeyExpiration(extendDialog.keyId, request)
+      
       setSuccess(t("apiKey.expirationExtended") || "API key expiration extended successfully!")
-      fetchApiKeys() // Refresh the list
       closeExtendDialog()
+      fetchApiKeys() // Refresh the list to show updated expiration
     } catch (e: unknown) {
-      const error = e as Error
+      const error = e as Error;
       setError(error.message || "Failed to extend API key expiration")
+    } finally {
+      setExtendDialog((prev) => ({ ...prev, isLoading: false }))
     }
   }
 
@@ -577,7 +568,7 @@ export function ApiKeyPage() {
                         size="sm"
                         onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
                         title={t("apiKey.extendKey") || "Extend expiration"}
-                        disabled={apiKey.is_expired}
+                        disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
                         className="h-8 w-8 p-0"
                       >
                         <Clock className="h-4 w-4" />
@@ -641,38 +632,18 @@ export function ApiKeyPage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="extend-days">{t("apiKey.extendByDays") || "Extend by days"}</Label>
-              <Input
-                id="extend-days"
-                type="number"
-                min="1"
-                max="365"
-                placeholder="30"
-                value={extendDialog.extendByDays}
-                onChange={(e) => setExtendDialog(prev => ({ ...prev, extendByDays: e.target.value }))}
-                disabled={extendDialog.makePermanent}
-              />
-            </div>
-            <div>
-              <Label htmlFor="extend-months">{t("apiKey.extendByMonths") || "Extend by months"}</Label>
-              <Input
-                id="extend-months"
-                type="number"
-                min="1"
-                max="12"
-                placeholder="3"
-                value={extendDialog.extendByMonths}
-                onChange={(e) => setExtendDialog(prev => ({ ...prev, extendByMonths: e.target.value }))}
-                disabled={extendDialog.makePermanent}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="make-permanent"
-                checked={extendDialog.makePermanent}
-                onChange={(e) => setExtendDialog(prev => ({ ...prev, makePermanent: e.target.checked }))}
-              />
-              <Label htmlFor="make-permanent">{t("apiKey.makePermanent") || "Make permanent"}</Label>
+              <Select value={extendDialog.extendByDays} onValueChange={(value) => setExtendDialog(prev => ({ ...prev, extendByDays: value }))}>
+                <SelectTrigger id="extend-days">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 {t("apiKey.days") || "days"}</SelectItem>
+                  <SelectItem value="60">60 {t("apiKey.days") || "days"}</SelectItem>
+                  <SelectItem value="90">90 {t("apiKey.days") || "days"}</SelectItem>
+                  <SelectItem value="180">180 {t("apiKey.days") || "days"}</SelectItem>
+                  <SelectItem value="permanent">{t("apiKey.permanent") || "Permanent"}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={closeExtendDialog}>
@@ -680,7 +651,7 @@ export function ApiKeyPage() {
               </Button>
               <Button 
                 onClick={confirmExtendKey} 
-                disabled={extendDialog.isLoading || (!extendDialog.extendByDays && !extendDialog.extendByMonths && !extendDialog.makePermanent)}
+                disabled={extendDialog.isLoading || !extendDialog.extendByDays}
               >
                 {extendDialog.isLoading ? (t("action.loading") || "Loading...") : (t("apiKey.extend") || "Extend")}
               </Button>
