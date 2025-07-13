@@ -504,6 +504,10 @@ export function ApiKeyPage() {
                         <Badge variant="destructive" className="w-fit">
                           {t("apiKey.expired") || "Expired"}
                         </Badge>
+                      ) : apiKey.expires_in_days === null || apiKey.expires_in_days === undefined ? (
+                        <Badge variant="outline" className="w-fit">
+                          {t("apiKey.permanent") || "Permanent"}
+                        </Badge>
                       ) : apiKey.remaining_days !== undefined ? (
                         <div className="flex items-center gap-2">
                           <Badge 
