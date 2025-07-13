@@ -465,7 +465,7 @@ export function AdminApiKeyManagement() {
                       />
                     </div>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="description" defaultWidth={200}>{t("apiKey.description")}</ResizableTableHead>
+                  <ResizableTableHead columnId="description" defaultWidth={200}>{t("table.description")}</ResizableTableHead>
                   <ResizableTableHead 
                     columnId="status" 
                     defaultWidth={100}

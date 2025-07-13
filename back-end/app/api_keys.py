@@ -59,6 +59,11 @@ class UpdateApiKeyRequest(BaseModel):
     can_write: Optional[bool] = None
     expires_in_days: Optional[int] = None  # Allow updating expiration
 
+class ExtendApiKeyRequest(BaseModel):
+    extend_by_days: Optional[int] = None  # Extend by specific days
+    extend_by_months: Optional[int] = None  # Extend by specific months
+    make_permanent: Optional[bool] = False  # Make the key permanent
+
 class ApiKeyResponse(BaseModel):
     id: str  # Changed from int to str
     key_id: str
@@ -69,6 +74,8 @@ class ApiKeyResponse(BaseModel):
     permissions: Dict[str, bool]
     is_active: bool
     expires_in_days: Optional[int]  # Changed from expires_at to expires_in_days
+    remaining_days: Optional[int] = None  # Calculated remaining days
+    is_expired: bool = False  # Whether the key is expired
     last_used_at: Optional[datetime.datetime]
     created_at: datetime.datetime
     user_email: Optional[str] = None  # For admin view
@@ -279,8 +286,26 @@ def list_api_keys(
 ):
     """List API keys for the current user"""
     api_keys = db.query(ApiKey).filter(ApiKey.user_id == current_user.id).all()
-    return [
-        ApiKeyResponse(
+    
+    response_keys = []
+    for key in api_keys:
+        # Calculate remaining days and expiration status
+        remaining_days = None
+        is_expired = False
+        expires_in_days = getattr(key, 'expires_in_days', None)
+        
+        if expires_in_days is not None:
+            created_at = getattr(key, 'created_at', datetime.datetime.utcnow())
+            expiration_date = created_at + datetime.timedelta(days=expires_in_days)
+            now = datetime.datetime.utcnow()
+            
+            if expiration_date > now:
+                remaining_days = (expiration_date - now).days
+            else:
+                is_expired = True
+                remaining_days = 0
+        
+        response_keys.append(ApiKeyResponse(
             id=getattr(key, 'id'),
             key_id=getattr(key, 'key_id'),
             name=getattr(key, 'name'),
@@ -289,12 +314,14 @@ def list_api_keys(
             full_key=getattr(key, 'full_key'),  # Include the full key
             permissions=getattr(key, 'permissions') or {"read": True, "write": True},
             is_active=getattr(key, 'is_active'),
-            expires_in_days=getattr(key, 'expires_in_days'),
+            expires_in_days=expires_in_days,
+            remaining_days=remaining_days,
+            is_expired=is_expired,
             last_used_at=getattr(key, 'last_used_at'),
             created_at=getattr(key, 'created_at')
-        )
-        for key in api_keys
-    ]
+        ))
+    
+    return response_keys
 
 @router.get("/{key_id}", response_model=ApiKeyResponse)
 def get_api_key(
@@ -311,6 +338,22 @@ def get_api_key(
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
     
+    # Calculate remaining days and expiration status
+    remaining_days = None
+    is_expired = False
+    expires_in_days = getattr(api_key, 'expires_in_days', None)
+    
+    if expires_in_days is not None:
+        created_at = getattr(api_key, 'created_at', datetime.datetime.utcnow())
+        expiration_date = created_at + datetime.timedelta(days=expires_in_days)
+        now = datetime.datetime.utcnow()
+        
+        if expiration_date > now:
+            remaining_days = (expiration_date - now).days
+        else:
+            is_expired = True
+            remaining_days = 0
+    
     return ApiKeyResponse(
         id=getattr(api_key, 'id'),
         key_id=getattr(api_key, 'key_id'),
@@ -320,7 +363,9 @@ def get_api_key(
         full_key=getattr(api_key, 'full_key'),  # Include the full key
         permissions=getattr(api_key, 'permissions') or {"read": True, "write": True},
         is_active=getattr(api_key, 'is_active'),
-        expires_in_days=getattr(api_key, 'expires_in_days'),
+        expires_in_days=expires_in_days,
+        remaining_days=remaining_days,
+        is_expired=is_expired,
         last_used_at=getattr(api_key, 'last_used_at'),
         created_at=getattr(api_key, 'created_at')
     )
@@ -395,6 +440,59 @@ def delete_api_key(
     db.commit()
     
     return {"message": "API key deleted successfully"}
+
+@router.post("/{key_id}/extend")
+def extend_api_key_expiration(
+    key_id: str,
+    request: ExtendApiKeyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Extend API key expiration or make it permanent"""
+    # Find the API key
+    api_key = db.query(ApiKey).filter(
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    if not getattr(api_key, 'is_active', False):
+        raise HTTPException(status_code=400, detail="Cannot extend inactive API key")
+    
+    # Calculate new expiration
+    if request.make_permanent:
+        setattr(api_key, 'expires_in_days', None)
+    else:
+        # Calculate current expiration date
+        current_expiration = None
+        expires_in_days = getattr(api_key, 'expires_in_days', None)
+        if expires_in_days is not None:
+            current_expiration = getattr(api_key, 'created_at', datetime.datetime.utcnow()) + datetime.timedelta(days=expires_in_days)
+        else:
+            # If already permanent, use current date as base
+            current_expiration = datetime.datetime.utcnow()
+        
+        # Calculate extension
+        extension_days = 0
+        if request.extend_by_days:
+            extension_days += request.extend_by_days
+        if request.extend_by_months:
+            extension_days += request.extend_by_months * 30  # Approximate
+        
+        if extension_days > 0:
+            # Calculate new expiration date
+            new_expiration = current_expiration + datetime.timedelta(days=extension_days)
+            # Calculate days from creation to new expiration
+            created_at = getattr(api_key, 'created_at', datetime.datetime.utcnow())
+            total_days = (new_expiration - created_at).days
+            setattr(api_key, 'expires_in_days', total_days)
+    
+    setattr(api_key, 'updated_at', datetime.datetime.utcnow())
+    db.commit()
+    
+    return {"message": "API key expiration updated successfully"}
 
 @router.post("/{key_id}/toggle")
 def toggle_api_key_status(

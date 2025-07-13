@@ -66,7 +66,7 @@ const ResizableTable = React.forwardRef<HTMLTableElement, ResizableTableProps>(
 
     return (
       <ResizableTableContext.Provider value={contextValue}>
-        <div className="relative w-full overflow-auto">
+        <div className="relative w-full overflow-x-auto">
           <table
             ref={ref}
             className={cn("w-full caption-bottom text-sm", className)}

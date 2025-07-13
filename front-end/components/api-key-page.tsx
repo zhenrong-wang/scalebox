@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Copy, Eye, EyeOff, Trash2, Search, Filter, Power, PowerOff } from "lucide-react"
+import { Plus, Copy, Eye, EyeOff, Trash2, Search, Filter, Power, PowerOff, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,8 @@ import { PageLayout } from "@/components/ui/page-layout"
 // Extended interface to include the full API key for display
 interface ApiKeyWithFullKey extends ApiKey {
   full_key?: string; // The full API key for display
+  remaining_days?: number; // Calculated remaining days
+  is_expired?: boolean; // Whether the key is expired
 }
 
 export function ApiKeyPage() {
@@ -62,6 +64,25 @@ export function ApiKeyPage() {
     keyId: "",
     keyName: "",
     isLoading: false,
+  })
+
+  // Extend expiration state
+  const [extendDialog, setExtendDialog] = useState<{
+    isOpen: boolean
+    keyId: string
+    keyName: string
+    isLoading: boolean
+    extendByDays: string
+    extendByMonths: string
+    makePermanent: boolean
+  }>({
+    isOpen: false,
+    keyId: "",
+    keyName: "",
+    isLoading: false,
+    extendByDays: "",
+    extendByMonths: "",
+    makePermanent: false,
   })
 
   const { t } = useLanguage()
@@ -164,6 +185,58 @@ export function ApiKeyPage() {
       keyName: "",
       isLoading: false,
     })
+  }
+
+  const openExtendDialog = (keyId: string, keyName: string) => {
+    setExtendDialog({
+      isOpen: true,
+      keyId,
+      keyName,
+      isLoading: false,
+      extendByDays: "",
+      extendByMonths: "",
+      makePermanent: false,
+    })
+  }
+
+  const closeExtendDialog = () => {
+    setExtendDialog({
+      isOpen: false,
+      keyId: "",
+      keyName: "",
+      isLoading: false,
+      extendByDays: "",
+      extendByMonths: "",
+      makePermanent: false,
+    })
+  }
+
+  const confirmExtendKey = async () => {
+    setExtendDialog((prev) => ({ ...prev, isLoading: true }))
+    setError("")
+    setSuccess("")
+    try {
+      const request: any = {}
+      
+      if (extendDialog.makePermanent) {
+        request.make_permanent = true
+      } else {
+        if (extendDialog.extendByDays) {
+          request.extend_by_days = parseInt(extendDialog.extendByDays)
+        }
+        if (extendDialog.extendByMonths) {
+          request.extend_by_months = parseInt(extendDialog.extendByMonths)
+        }
+      }
+      
+      await ApiKeyService.extendApiKeyExpiration(extendDialog.keyId, request)
+      setSuccess(t("apiKey.expirationExtended") || "API key expiration extended successfully!")
+      fetchApiKeys() // Refresh the list
+      closeExtendDialog()
+    } catch (e: unknown) {
+      const error = e as Error
+      setError(error.message || "Failed to extend API key expiration")
+    }
   }
 
   const confirmDisableKey = async () => {
@@ -391,24 +464,24 @@ export function ApiKeyPage() {
         <CardContent>
           <ResizableTable
             defaultColumnWidths={{
-              name: 100,
-              description: 150,
+              name: 120,
+              description: 200,
               status: 80,
               expiration: 100,
-              permissions: 140,
-              keyValue: 450,
+              permissions: 120,
+              keyValue: 300,
               created: 100,
               actions: 100
             }}
           >
             <TableHeader>
               <TableRow>
-                <ResizableTableHead columnId="name" defaultWidth={100}>{t("table.name") || "Name"}</ResizableTableHead>
-                <ResizableTableHead columnId="description" defaultWidth={150}>{t("apiKey.description") || "Description"}</ResizableTableHead>
+                <ResizableTableHead columnId="name" defaultWidth={120}>{t("table.name") || "Name"}</ResizableTableHead>
+                <ResizableTableHead columnId="description" defaultWidth={200}>{t("table.description") || "Description"}</ResizableTableHead>
                 <ResizableTableHead columnId="status" defaultWidth={80}>{t("table.status") || "Status"}</ResizableTableHead>
                 <ResizableTableHead columnId="expiration" defaultWidth={100}>{t("apiKey.expiration") || "Expiration"}</ResizableTableHead>
-                <ResizableTableHead columnId="permissions" defaultWidth={140}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
-                <ResizableTableHead columnId="keyValue" defaultWidth={450}>{t("apiKey.keyValue") || "Key Value"}</ResizableTableHead>
+                <ResizableTableHead columnId="permissions" defaultWidth={120}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
+                <ResizableTableHead columnId="keyValue" defaultWidth={300}>{t("apiKey.keyValue") || "Key Value"}</ResizableTableHead>
                 <ResizableTableHead columnId="created" defaultWidth={100}>{t("table.created") || "Created"}</ResizableTableHead>
                 <ResizableTableHead columnId="actions" defaultWidth={100}>{t("table.actions") || "Actions"}</ResizableTableHead>
               </TableRow>
@@ -426,7 +499,35 @@ export function ApiKeyPage() {
                     </Badge>
                   </ResizableTableCell>
                   <ResizableTableCell>
-                    {apiKey.expires_in_days ? `${apiKey.expires_in_days} ${t("apiKey.days") || "days"}` : (t("apiKey.permanent") || "Permanent")}
+                    <div className="flex flex-col gap-1">
+                      {apiKey.is_expired ? (
+                        <Badge variant="destructive" className="w-fit">
+                          {t("apiKey.expired") || "Expired"}
+                        </Badge>
+                      ) : apiKey.remaining_days !== undefined ? (
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={
+                              apiKey.remaining_days <= 7 ? "destructive" : 
+                              apiKey.remaining_days <= 30 ? "secondary" : 
+                              "outline"
+                            }
+                            className="w-fit"
+                          >
+                            {apiKey.remaining_days} {t("apiKey.days") || "days"}
+                          </Badge>
+                          {apiKey.remaining_days <= 7 && (
+                            <span className="text-xs text-red-600">
+                              {t("apiKey.expiresSoon") || "Expires soon!"}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="w-fit">
+                          {t("apiKey.permanent") || "Permanent"}
+                        </Badge>
+                      )}
+                    </div>
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="break-words">
@@ -437,7 +538,7 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-2">
-                      <div className="font-mono text-xs bg-muted px-2 py-1 rounded overflow-x-auto whitespace-nowrap flex-1" style={{ minWidth: '320px', maxWidth: '400px' }}>
+                      <div className="font-mono text-xs bg-muted px-2 py-1 rounded overflow-x-auto whitespace-nowrap flex-1" style={{ minWidth: '200px', maxWidth: '280px' }}>
                         {showKeys[apiKey.key_id] ? (apiKey.full_key || `${apiKey.prefix}...`) : '*'.repeat(40)}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -467,6 +568,15 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
+                        title={t("apiKey.extendKey") || "Extend expiration"}
+                        disabled={apiKey.is_expired}
+                      >
+                        <Clock className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -514,6 +624,63 @@ export function ApiKeyPage() {
         isLoading={disableDialog.isLoading}
         warningMessage={t("apiKey.disableWarning") || "Disabling this API key will immediately stop all applications and services using it. This may cause service interruptions."}
       />
+
+      {/* Extend Expiration Dialog */}
+      <Dialog open={extendDialog.isOpen} onOpenChange={closeExtendDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("apiKey.extendExpiration") || "Extend API Key Expiration"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="extend-days">{t("apiKey.extendByDays") || "Extend by days"}</Label>
+              <Input
+                id="extend-days"
+                type="number"
+                min="1"
+                max="365"
+                placeholder="30"
+                value={extendDialog.extendByDays}
+                onChange={(e) => setExtendDialog(prev => ({ ...prev, extendByDays: e.target.value }))}
+                disabled={extendDialog.makePermanent}
+              />
+            </div>
+            <div>
+              <Label htmlFor="extend-months">{t("apiKey.extendByMonths") || "Extend by months"}</Label>
+              <Input
+                id="extend-months"
+                type="number"
+                min="1"
+                max="12"
+                placeholder="3"
+                value={extendDialog.extendByMonths}
+                onChange={(e) => setExtendDialog(prev => ({ ...prev, extendByMonths: e.target.value }))}
+                disabled={extendDialog.makePermanent}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="make-permanent"
+                checked={extendDialog.makePermanent}
+                onChange={(e) => setExtendDialog(prev => ({ ...prev, makePermanent: e.target.checked }))}
+              />
+              <Label htmlFor="make-permanent">{t("apiKey.makePermanent") || "Make permanent"}</Label>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={closeExtendDialog}>
+                {t("action.cancel") || "Cancel"}
+              </Button>
+              <Button 
+                onClick={confirmExtendKey} 
+                disabled={extendDialog.isLoading || (!extendDialog.extendByDays && !extendDialog.extendByMonths && !extendDialog.makePermanent)}
+              >
+                {extendDialog.isLoading ? (t("action.loading") || "Loading...") : (t("apiKey.extend") || "Extend")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   )
 }

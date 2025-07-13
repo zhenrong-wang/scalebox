@@ -7,6 +7,8 @@ interface ApiKey {
   permissions: { read: true; write: boolean };
   is_active: boolean;
   expires_in_days?: number; // Changed from expires_at to expires_in_days
+  remaining_days?: number; // Calculated remaining days
+  is_expired?: boolean; // Whether the key is expired
   last_used_at?: string;
   created_at: string;
   user_email?: string; // for admin
@@ -24,6 +26,12 @@ interface UpdateApiKeyRequest {
   description?: string; // New description field
   can_write?: boolean;
   expires_in_days?: number; // Allow updating expiration
+}
+
+interface ExtendApiKeyRequest {
+  extend_by_days?: number; // Extend by specific days
+  extend_by_months?: number; // Extend by specific months
+  make_permanent?: boolean; // Make the key permanent
 }
 
 interface ApiKeyUsage {
@@ -134,6 +142,21 @@ export class ApiKeyService {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || "Failed to toggle API key status");
+    }
+
+    return await response.json();
+  }
+
+  static async extendApiKeyExpiration(keyId: string, request: ExtendApiKeyRequest): Promise<{ message: string }> {
+    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}/extend`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to extend API key expiration");
     }
 
     return await response.json();
