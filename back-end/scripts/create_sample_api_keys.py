@@ -21,10 +21,10 @@ def create_sample_api_keys():
     db = next(get_db())
     
     try:
-        # Find a test user (assuming there's at least one user)
-        user = db.query(User).first()
+        # Find the specific user by email
+        user = db.query(User).filter(User.email == "495458966@qq.com").first()
         if not user:
-            print("No users found. Please create a user first.")
+            print("User with email '495458966@qq.com' not found. Please create this user first.")
             return
         
         print(f"Creating sample API keys for user: {user.email}")
