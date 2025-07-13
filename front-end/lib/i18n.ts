@@ -332,7 +332,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "apiKey.makePermanent": "Make permanent",
     "apiKey.extend": "Extend",
     "apiKey.expirationExtended": "API key expiration extended successfully!",
-    "apiKey.expired": "Expired",
     "apiKey.expiresSoon": "Expires soon!",
 
     // Templates
@@ -2685,5 +2684,5 @@ export const translations: Record<Language, Record<string, string>> = {
 
 // Helper for variable interpolation in translations
 export function tReplace(str: string, vars: Record<string, string | number>) {
-  return Object.entries(vars).reduce((acc, [key, value]) => acc.replaceAll(`{${key}}`, String(value)), str);
+  return Object.entries(vars).reduce((acc, [key, value]) => acc.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value)), str);
 }
