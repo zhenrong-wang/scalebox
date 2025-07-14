@@ -95,7 +95,7 @@ export function Sidebar({
               <Code className="h-4 w-4 text-primary-foreground" />
             </div>
             <div>
-              <div className="font-semibold text-sm">ScaleBox</div>
+                              <div className="font-semibold text-sm">ScaleBox</div>
             </div>
           </div>
         )}

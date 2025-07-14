@@ -374,18 +374,25 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
               <div className="flex items-center space-x-2">
                 <Checkbox id="terms" checked={acceptTerms} onCheckedChange={(checked: any) => setAcceptTerms(checked === true)} disabled={isLoading} />
                 <Label htmlFor="terms" className="text-sm">
-                  I agree to the{" "}
-                  <Button variant="link" className="px-0 text-sm h-auto p-0" asChild>
-                    <a href="/terms" target="_blank" rel="noopener noreferrer">
-                      {t("action.terms")}
-                    </a>
-                  </Button>{" "}
-                  and{" "}
-                  <Button variant="link" className="px-0 text-sm h-auto p-0" asChild>
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer">
-                      {t("action.privacy")}
-                    </a>
-                  </Button>
+                  {t("signup.terms").split("{terms}").map((part, index) => (
+                    <React.Fragment key={index}>
+                      {part}
+                      {index === 0 && (
+                        <Button variant="link" className="px-0 text-sm h-auto p-0" asChild>
+                          <a href="/terms" target="_blank" rel="noopener noreferrer">
+                            {t("action.terms")}
+                          </a>
+                        </Button>
+                      )}
+                      {index === 1 && (
+                        <Button variant="link" className="px-0 text-sm h-auto p-0" asChild>
+                          <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                            {t("action.privacy")}
+                          </a>
+                        </Button>
+                      )}
+                    </React.Fragment>
+                  ))}
                 </Label>
               </div>
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useLanguage } from "../contexts/language-context"
 import { LanguageToggle } from "./language-toggle"
+import { ThemeToggle } from "./theme-toggle"
 import { CookieConsent } from "./ui/cookie-consent"
 import { CookieSettings } from "./ui/cookie-settings"
 import { PrivacyModal } from "./ui/privacy-modal"
@@ -44,6 +45,7 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
             </div>
             <div className="flex items-center gap-3">
               <LanguageToggle />
+              <ThemeToggle />
               <Button variant="outline" onClick={onSignIn}>
                 {t("action.signIn")}
               </Button>
@@ -128,7 +130,7 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
         {/* Footer */}
         <footer className="container mx-auto px-4 py-8 border-t">
           <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; 2024 ScaleBox. {t("footer.allRightsReserved")}</p>
+            <p>&copy; 2024 Cloudsway.AI. {t("footer.allRightsReserved")}</p>
             <div className="flex justify-center gap-6 mt-4">
               <button 
                 onClick={() => setIsPrivacyModalOpen(true)}
