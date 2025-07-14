@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RecaptchaMock } from "@/components/ui/recaptcha-mock"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { PrivacyModal } from "@/components/ui/privacy-modal"
+import { TermsModal } from "@/components/ui/terms-modal"
 // import type { CheckedState } from "@/components/ui/checkbox"
 import { useLanguage } from "../contexts/language-context"
 import { LanguageToggle } from "./language-toggle"
@@ -48,6 +50,8 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
   const [showVerification, setShowVerification] = useState(false)
   const [inputCode, setInputCode] = useState("")
   const [verificationError, setVerificationError] = useState("")
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false)
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false)
   const captchaRef = useRef<{ validate: () => void; regenerate: () => void }>(null)
 
   const { t } = useLanguage()
@@ -374,25 +378,22 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
               <div className="flex items-center space-x-2">
                 <Checkbox id="terms" checked={acceptTerms} onCheckedChange={(checked: any) => setAcceptTerms(checked === true)} disabled={isLoading} />
                 <Label htmlFor="terms" className="text-sm">
-                  {t("signup.terms").split("{terms}").map((part, index) => (
-                    <React.Fragment key={index}>
-                      {part}
-                      {index === 0 && (
-                        <Button variant="link" className="px-0 text-sm h-auto p-0" asChild>
-                          <a href="/terms" target="_blank" rel="noopener noreferrer">
-                            {t("action.terms")}
-                          </a>
-                        </Button>
-                      )}
-                      {index === 1 && (
-                        <Button variant="link" className="px-0 text-sm h-auto p-0" asChild>
-                          <a href="/privacy" target="_blank" rel="noopener noreferrer">
-                            {t("action.privacy")}
-                          </a>
-                        </Button>
-                      )}
-                    </React.Fragment>
-                  ))}
+                  {t("signup.terms").replace("{terms}", "").replace("{privacy}", "")}
+                  <Button 
+                    variant="link" 
+                    className="px-0 text-sm h-auto p-0" 
+                    onClick={() => setIsTermsModalOpen(true)}
+                  >
+                    {t("action.terms")}
+                  </Button>
+                  {t("signup.terms.and")}
+                  <Button 
+                    variant="link" 
+                    className="px-0 text-sm h-auto p-0" 
+                    onClick={() => setIsPrivacyModalOpen(true)}
+                  >
+                    {t("action.privacy")}
+                  </Button>
                 </Label>
               </div>
 
@@ -452,6 +453,18 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Privacy Modal */}
+            <PrivacyModal 
+              isOpen={isPrivacyModalOpen}
+              onClose={() => setIsPrivacyModalOpen(false)}
+            />
+
+            {/* Terms of Service Modal */}
+            <TermsModal 
+              isOpen={isTermsModalOpen}
+              onClose={() => setIsTermsModalOpen(false)}
+            />
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
