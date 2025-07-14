@@ -18,6 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLanguage } from "../contexts/language-context"
 import { tReplace } from "../lib/i18n"
 import { templateService, type Template, type TemplateCreateRequest, type TemplateUpdateRequest } from "../services/template-service"
+import { UserService } from "../services/user-service"
 import { useToast } from "@/hooks/use-toast"
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
@@ -59,17 +60,29 @@ export function TemplatesPage() {
     tags: [] as string[],
     is_public: false,
   });
-  const [currentUser, setCurrentUser] = useState<{ id?: number; isAdmin?: boolean }>({})
+  const [currentUser, setCurrentUser] = useState<{ id?: number; role?: string }>({})
   const { t } = useLanguage()
   const { toast } = useToast()
 
   // Fetch templates on component mount
   useEffect(() => {
     fetchTemplates()
-    // Get current user info (you'll need to implement this based on your auth system)
-    const userInfo = JSON.parse(localStorage.getItem('user-info') || '{}')
-    setCurrentUser(userInfo)
+    fetchCurrentUser()
   }, [])
+
+  const fetchCurrentUser = async () => {
+    try {
+      const userData = await UserService.getCurrentUser()
+      if (userData) {
+        setCurrentUser({
+          id: userData.id,
+          role: userData.role
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch current user:', error)
+    }
+  }
 
   const fetchTemplates = async () => {
     try {
@@ -305,7 +318,7 @@ export function TemplatesPage() {
     try {
       for (const templateId of selectedTemplates) {
         const template = templates.find(t => t.id === templateId)
-        if (template && templateService.canDelete(template, currentUser.id, currentUser.isAdmin)) {
+        if (template && templateService.canDelete(template, currentUser.id, currentUser.role === 'admin')) {
           await templateService.deleteTemplate(templateId)
         }
       }
