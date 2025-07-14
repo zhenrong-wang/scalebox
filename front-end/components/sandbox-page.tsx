@@ -11,6 +11,7 @@ import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "../contexts/language-context"
@@ -33,6 +34,7 @@ export function SandboxPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [dateRange, setDateRange] = useState<{ from: string | null, to: string | null }>({ from: null, to: null })
+  const [activeTab, setActiveTab] = useState<"active" | "deleted">("active")
   
   // Confirmation dialogs
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
@@ -242,11 +244,16 @@ export function SandboxPage() {
   }
 
   const filteredSandboxes = sandboxes.filter(sandbox => {
+    // First filter by active/deleted tab
+    const matchesTab = activeTab === "active" ? sandbox.status !== "deleted" : sandbox.status === "deleted"
+    
+    // Then apply other filters
     const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || sandbox.status === statusFilter
     const matchesDateRange = (!dateRange.from || new Date(sandbox.createdAt) >= new Date(dateRange.from)) &&
                             (!dateRange.to || new Date(sandbox.createdAt) <= new Date(dateRange.to))
-    return matchesSearch && matchesStatus && matchesDateRange
+    
+    return matchesTab && matchesSearch && matchesStatus && matchesDateRange
   }).sort((a, b) => {
     const aValue = a[sortField]
     const bValue = b[sortField]
@@ -393,84 +400,102 @@ export function SandboxPage() {
       }}
       summaryCards={summaryCards}
     >
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search and Status Filter */}
-            <div className="flex flex-col sm:flex-row gap-2 flex-1">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder={t("sandbox.search") || "Search sandboxes..."}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+      {/* Filters and Search */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Search and Status Filter */}
+        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder={t("sandbox.search") || "Search sandboxes..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+              {activeTab === "active" ? (
+                <>
                   <SelectItem value="running">{t("table.running") || "Running"}</SelectItem>
                   <SelectItem value="stopped">{t("table.stopped") || "Stopped"}</SelectItem>
                   <SelectItem value="error">{t("table.error") || "Error"}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Date Range Filter */}
-            <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
-              dateRange.from || dateRange.to 
-                ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
-                : 'bg-muted/50 border-border'
-            }`}>
-              <Label className={`text-sm font-medium whitespace-nowrap ${
-                dateRange.from || dateRange.to 
-                  ? 'text-blue-700 dark:text-blue-300' 
-                  : ''
-              }`}>{t("table.created") || "Created"}</Label>
-              <div className="flex items-center gap-1">
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => openDatePicker('from', e)}
-                    className="w-[120px] h-8 text-sm justify-start"
-                  >
-                    {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
-                  </Button>
-                </div>
-                <span className="text-muted-foreground text-sm">to</span>
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => openDatePicker('to', e)}
-                    className="w-[120px] h-8 text-sm justify-start"
-                  >
-                    {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
-                  </Button>
-                </div>
-              </div>
-              {(dateRange.from || dateRange.to) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDateRange({ from: null, to: null })}
-                  className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                  title="Clear date range"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+                </>
+              ) : (
+                <SelectItem value="deleted">{t("table.deleted") || "Deleted"}</SelectItem>
               )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Range Filter */}
+        <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
+          dateRange.from || dateRange.to 
+            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
+            : 'bg-muted/50 border-border'
+        }`}>
+          <Label className={`text-sm font-medium whitespace-nowrap ${
+            dateRange.from || dateRange.to 
+              ? 'text-blue-700 dark:text-blue-300' 
+              : ''
+          }`}>{t("table.created") || "Created"}</Label>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => openDatePicker('from', e)}
+                className="w-[120px] h-8 text-sm justify-start"
+              >
+                {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
+              </Button>
+            </div>
+            <span className="text-muted-foreground text-sm">to</span>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => openDatePicker('to', e)}
+                className="w-[120px] h-8 text-sm justify-start"
+              >
+                {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
+              </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          {(dateRange.from || dateRange.to) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDateRange({ from: null, to: null })}
+              className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+              title="Clear date range"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs for Active/Deleted Sandboxes */}
+      <Tabs value={activeTab} onValueChange={(value) => {
+        setActiveTab(value as "active" | "deleted")
+        setStatusFilter("all") // Reset status filter when switching tabs
+      }}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="active">
+            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "deleted").length})
+          </TabsTrigger>
+          <TabsTrigger value="deleted">
+            {t("table.deleted") || "Deleted"} ({sandboxes.filter(s => s.status === "deleted").length})
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Batch Actions */}
       {selectedSandboxes.size > 0 && (
@@ -483,30 +508,46 @@ export function SandboxPage() {
                 </span>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setStartDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                >
-                  <Play className="h-4 w-4 mr-1" />
-                  {t("table.startSelected") || "Start Selected"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setStopDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                >
-                  <Square className="h-4 w-4 mr-1" />
-                  {t("table.stopSelected") || "Stop Selected"}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  {t("table.deleteSelected") || "Delete Selected"}
-                </Button>
+                {activeTab === "active" ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStartDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                    >
+                      <Play className="h-4 w-4 mr-1" />
+                      {t("table.startSelected") || "Start Selected"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStopDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                    >
+                      <Square className="h-4 w-4 mr-1" />
+                      {t("table.stopSelected") || "Stop Selected"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {t("table.deleteSelected") || "Delete Selected"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // TODO: Implement restore functionality
+                      console.log("Restore selected sandboxes:", Array.from(selectedSandboxes))
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    {t("action.restore") || "Restore Selected"}
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
@@ -650,42 +691,58 @@ export function SandboxPage() {
                     <ResizableTableCell>{formatDate(sandbox.createdAt)}</ResizableTableCell>
                     <ResizableTableCell>
                       <div className="flex items-center gap-2">
-                        {sandbox.status === "stopped" && (
+                        {activeTab === "active" ? (
+                          <>
+                            {sandbox.status === "stopped" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                                title={t("table.start") || "Start"}
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {sandbox.status === "running" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                                title={t("table.stop") || "Stop"}
+                              >
+                                <Square className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openMetricsDialog(sandbox)}
+                              title={t("table.metrics") || "Metrics"}
+                            >
+                              <Activity className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                              title={t("table.delete") || "Delete"}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                            title={t("table.start") || "Start"}
+                            onClick={() => {
+                              // TODO: Implement restore functionality
+                              console.log("Restore sandbox:", sandbox.id)
+                            }}
+                            title={t("action.restore") || "Restore"}
                           >
-                            <Play className="h-4 w-4" />
+                            <Check className="h-4 w-4" />
                           </Button>
                         )}
-                        {sandbox.status === "running" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                            title={t("table.stop") || "Stop"}
-                          >
-                            <Square className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openMetricsDialog(sandbox)}
-                          title={t("table.metrics") || "Metrics"}
-                        >
-                          <Activity className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                          title={t("table.delete") || "Delete"}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </ResizableTableCell>
                   </TableRow>

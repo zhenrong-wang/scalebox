@@ -43,6 +43,8 @@ export function ApiKeyPage() {
 
   
 
+  
+
 
   // Delete confirmation state
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -333,7 +335,7 @@ export function ApiKeyPage() {
   return (
     <PageLayout
       header={{
-        description: t("apiKey.description") || "Manage your API keys for accessing ScaleBox services",
+        description: t("apiKey.description") || "Manage your API keys for accessing ScaleBox services. Each user can have up to 5 API Keys.",
         children: (
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
@@ -415,48 +417,44 @@ export function ApiKeyPage() {
       {error && <div className="text-red-600 font-medium">{error}</div>}
       {success && <div className="text-green-600 font-medium">{success}</div>}
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-4 items-center">
-            <div className="relative" style={{ maxWidth: 320, flex: '0 1 auto' }}>
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder={t("apiKey.search") || "Search API keys..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 max-w-xs"
-                style={{ minWidth: 0 }}
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-                <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
-                <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
-              </SelectContent>
-            </Select>
+      {/* Filters and Search */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder={t("apiKey.search") || "Search API keys..."}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+            <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
+            <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Table */}
       <Card>
         <CardContent>
           <ResizableTable
             defaultColumnWidths={{
-              name: 140,
-              description: 150,
-              status: 90,
-              expiration: 120,
-              permissions: 110,
-              keyValue: 320,
-              created: 110,
-              actions: 140
+              name: 120,
+              description: 120,
+              status: 80,
+              expiration: 100,
+              permissions: 100,
+              keyValue: 200,
+              created: 100,
+              actions: 120
             }}
           >
             <TableHeader>
@@ -561,59 +559,52 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-1">
-                      <div className="relative group">
+                      <div className="relative">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
                           disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
                           className="h-8 w-8 p-0"
+                          title={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined
+                            ? (t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys")
+                            : (t("apiKey.extendKey") || "Extend expiration")
+                          }
                         >
                           <Clock className="h-4 w-4" />
                         </Button>
-                        {/* Only show tooltip for disabled buttons */}
-                        {apiKey.expires_in_days === null || apiKey.expires_in_days === undefined && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[9999]">
-                            {t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys"}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        )}
                       </div>
-                      <div className="relative group">
+                      <div className="relative">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleToggleKeyStatus(apiKey.key_id)}
                           disabled={apiKey.is_expired}
                           className="h-8 w-8 p-0"
+                          title={apiKey.is_expired
+                            ? (t("apiKey.cannotEnableExpired") || "Cannot enable expired keys")
+                            : apiKey.is_active 
+                              ? (t("apiKey.disableKey") || "Disable key") 
+                              : (t("apiKey.enableKey") || "Enable key")
+                          }
                         >
                           {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                         </Button>
-                        {/* Only show tooltip for disabled buttons */}
-                        {apiKey.is_expired && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[9999]">
-                            {t("apiKey.cannotEnableExpired") || "Cannot enable expired keys"}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        )}
                       </div>
-                      <div className="relative group">
+                      <div className="relative">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
                           disabled={apiKey.is_active}
                           className="h-8 w-8 p-0"
+                          title={apiKey.is_active 
+                            ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") 
+                            : (t("apiKey.deleteKey") || "Delete key")
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        {/* Only show tooltip for disabled buttons */}
-                        {apiKey.is_active && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[9999]">
-                            {t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first."}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </ResizableTableCell>

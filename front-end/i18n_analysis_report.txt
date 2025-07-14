@@ -1,0 +1,65 @@
+================================================================================
+I18N TRANSLATION ANALYSIS REPORT
+================================================================================
+
+SUMMARY:
+English keys: 0
+Simplified Chinese keys: 838
+Traditional Chinese keys: 837
+
+TRADITIONAL IN SIMPLIFIED (63):
+  - notifications.mark_as_unread: 標記為未讀
+  - admin.ofTotalUsers: 總使用者數
+  - admin.ofTotalProjects: 總專案數
+  - admin.totalUsers: 總使用者數
+  - admin.totalCost: 總成本
+  - admin.starter: 入門版
+  - admin.fromAllUsers: 來自所有使用者
+  - notifications.bulkMarkedAsRead: 批次標記為已讀
+  - system.errorRateDesc: 最近24小時
+  - billings.period: 期間
+  - admin.visibility.public: 公開
+  - billings.barChart: 長條圖
+  - notifications.markedAsUnreadDesc: 通知已標記為未讀
+  - notifications.markAsReadError: 標記通知為已讀失敗
+  - notifications.markedAsReadDesc: 通知已標記為已讀
+  - admin.uptime: 運作時間
+  - admin.avgMemoryUsage: 平均記憶體使用率
+  - admin.admin: 管理員
+  - admin.deleteApiKeyWarning: 這將永久刪除API金鑰。此操作無法復原。
+  - billings.sandboxRAM: 沙盒記憶體
+  ... and 43 more
+
+SIMPLIFIED IN TRADITIONAL (9):
+  - admin.ofTotalUsers: 总用户数
+  - admin.ofTotalProjects: 总项目数
+  - admin.activeSessions: 活跃会话数
+  - admin.totalUsers: 总用户数
+  - billings.startDate: 开始日期
+  - admin.totalSessions: 总会话数
+  - admin.totalRevenue: 总收入
+  - admin.totalSpent: 总支出
+  - admin.totalSandboxes: 总沙盒数
+
+MIXED CHINESE (1132):
+  - zh-CN dashboard.page.sandboxes: 沙盒
+  - zh-CN admin.reason: 原因
+  - zh-CN dashboard.page.system: 系统健康
+  - zh-CN apiKey.days: 天
+  - zh-CN table.monthly: 每月
+  - zh-CN landing.feature.security: 企业级安全
+  - zh-CN table.weekly: 每週
+  - zh-CN admin.disabled: 已停用
+  - zh-CN recaptcha.placeholder: 输入上面的字符
+  - zh-CN apiKey.keyPrefix: API密钥前缀
+  - zh-CN admin.recentTransactions: 最近交易
+  - zh-CN project.search: 搜尋專案...
+  - zh-CN signup.title: 创建您的账户
+  - zh-CN table.activeBudgets: 活跃预算
+  - zh-CN table.sortAsc: 升序排序
+  - zh-CN sandbox.search: 搜尋沙盒...
+  - zh-CN apiKey.expired: 已到期
+  - zh-CN admin.byUsers: 依使用者
+  - zh-CN admin.basicInformation: 基本信息
+  - zh-CN admin.activeSessions: 作用中工作階段數
+  ... and 1112 more

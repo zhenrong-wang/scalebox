@@ -283,11 +283,17 @@ export function BudgetPage() {
       ]}
     >
       {/* Filters */}
-      <SearchFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder={t("budget.search") || "Search budgets..."}
-      />
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1 max-w-md">
+          <Input
+            placeholder={t("budget.search") || "Search budgets..."}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        </div>
+      </div>
 
       {/* Budgets Table */}
       <Card>

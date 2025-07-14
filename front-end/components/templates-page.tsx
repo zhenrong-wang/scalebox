@@ -481,7 +481,7 @@ export function TemplatesPage() {
                   <ResizableTableHead columnId="memory" defaultWidth={100}>
                     <Button variant="ghost" onClick={() => handleSort("memory_requirements")} className="h-auto p-0 group">
                       <HardDrive className="h-4 w-4 mr-1" />
-                      Memory {getSortIcon("memory_requirements")}
+                      {t("table.memory") || "Memory"} {getSortIcon("memory_requirements")}
                     </Button>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="created" defaultWidth={120}>

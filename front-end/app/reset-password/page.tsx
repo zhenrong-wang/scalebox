@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { ResetPasswordConfirm } from "../../components/reset-password-confirm"
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams()
   const [token, setToken] = useState<string | null>(null)
 
@@ -38,4 +38,18 @@ export default function ResetPasswordPage() {
   }
 
   return <ResetPasswordConfirm token={token} onBackToSignIn={handleBackToSignIn} />
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-lg mb-4">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
+  )
 } 

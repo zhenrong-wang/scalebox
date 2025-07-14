@@ -2,13 +2,16 @@
 
 import { useState, useMemo } from "react"
 import { DollarSign, Clock, Database, Zap, Download, Calendar, BarChart3, TrendingUp, Activity } from "lucide-react"
+import { format, subDays, startOfDay, endOfDay } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useLanguage } from "../contexts/language-context"
 import { 
   LineChart, 
@@ -152,6 +155,8 @@ export function BillingsPage() {
   const [timeInterval, setTimeInterval] = useState<string>("7d")
   const [selectedProject, setSelectedProject] = useState<string>("all")
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30))
+  const [endDate, setEndDate] = useState<Date>(new Date())
   const { t } = useLanguage()
 
   const filteredUsageData = usageData.filter((record) => {
@@ -164,16 +169,18 @@ export function BillingsPage() {
   const currentMonthEstimate = 45.2
   const averageMonthly = totalSpent / usageData.length
 
-  // Filter historical data based on time interval and project
+  // Filter historical data based on date range and project
   const filteredHistoricalData = useMemo(() => {
     let filtered = historicalUsageData
 
-    // Filter by time interval
-    const now = new Date()
-    const daysToSubtract = timeInterval === "7d" ? 7 : timeInterval === "30d" ? 30 : timeInterval === "90d" ? 90 : 365
-    const cutoffDate = new Date(now.getTime() - (daysToSubtract * 24 * 60 * 60 * 1000))
+    // Filter by date range
+    const startOfRange = startOfDay(startDate)
+    const endOfRange = endOfDay(endDate)
     
-    filtered = filtered.filter(item => new Date(item.date) >= cutoffDate)
+    filtered = filtered.filter(item => {
+      const itemDate = new Date(item.date)
+      return itemDate >= startOfRange && itemDate <= endOfRange
+    })
 
     // Filter by project
     if (selectedProject !== "all") {
@@ -181,7 +188,7 @@ export function BillingsPage() {
     }
 
     return filtered
-  }, [timeInterval, selectedProject])
+  }, [startDate, endDate, selectedProject])
 
   // Aggregate data for charts
   const aggregatedData = useMemo(() => {
@@ -256,21 +263,10 @@ export function BillingsPage() {
       header={{
         description: t("billings.monitorUsage"),
         children: (
-          <div className="flex gap-2">
-            <Button
-              variant={showAnalytics ? "default" : "outline"}
-              onClick={() => setShowAnalytics(!showAnalytics)}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              {showAnalytics ? t("billings.hideAnalytics") || "Hide Analytics" : t("billings.showAnalytics") || "Show Analytics"}
-            </Button>
-            {showAnalytics && (
-              <Button onClick={exportToCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-            )}
-          </div>
+          <Button onClick={() => setShowAnalytics(true)}>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            {t("billings.showAnalytics") || "Show Analytics"}
+          </Button>
         )
       }}
       summaryCards={[
@@ -296,9 +292,19 @@ export function BillingsPage() {
         }
       ]}
     >
-      {/* Usage Analytics - Only shown when toggled */}
-      {showAnalytics && (
-        <>
+      {/* Analytics Dialog */}
+      <Dialog open={showAnalytics} onOpenChange={setShowAnalytics}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-4">
+            <DialogTitle>{t("billings.usageAnalytics") || "Usage Analytics"}</DialogTitle>
+            <div className="flex justify-end">
+              <Button onClick={exportToCSV} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
+          </DialogHeader>
+          
           {/* Current Usage Details */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
@@ -343,10 +349,33 @@ export function BillingsPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle>{t("billings.usageAnalytics")}</CardTitle>
-                  <CardDescription>{t("billings.historicalPatterns")}</CardDescription>
+                  <CardTitle>{t("billings.historicalPatterns") || "Historical Patterns"}</CardTitle>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="start-date" className="text-sm font-medium whitespace-nowrap">
+                      {t("billings.startDate") || "Start Date"}
+                    </Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={format(startDate, 'yyyy-MM-dd')}
+                      onChange={(e) => setStartDate(new Date(e.target.value))}
+                      className="w-40"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="end-date" className="text-sm font-medium whitespace-nowrap">
+                      {t("billings.endDate") || "End Date"}
+                    </Label>
+                    <Input
+                      id="end-date"
+                      type="date"
+                      value={format(endDate, 'yyyy-MM-dd')}
+                      onChange={(e) => setEndDate(new Date(e.target.value))}
+                      className="w-40"
+                    />
+                  </div>
                   <Select value={selectedMetric} onValueChange={setSelectedMetric}>
                     <SelectTrigger className="w-48">
                       <BarChart3 className="h-4 w-4 mr-2" />
@@ -357,18 +386,6 @@ export function BillingsPage() {
                       <SelectItem value="sandboxCores">{t("billings.sandboxCores")}</SelectItem>
                       <SelectItem value="sandboxRAM">{t("billings.sandboxRAM")}</SelectItem>
                       <SelectItem value="sandboxStorage">{t("billings.sandboxStorage")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={timeInterval} onValueChange={setTimeInterval}>
-                    <SelectTrigger className="w-32">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7d">7 days</SelectItem>
-                      <SelectItem value="30d">30 days</SelectItem>
-                      <SelectItem value="90d">90 days</SelectItem>
-                      <SelectItem value="1y">1 year</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={selectedProject} onValueChange={setSelectedProject}>
@@ -396,16 +413,34 @@ export function BillingsPage() {
                 <TabsContent value="line" className="mt-4">
                   <ResponsiveContainer width="100%" height={400}>
                     <LineChart data={aggregatedData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
+                      />
                       <Legend />
                       <Line 
                         type="monotone" 
                         dataKey={selectedMetric} 
-                        stroke="#8884d8" 
-                        strokeWidth={2}
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
                         name={getMetricLabel(selectedMetric)}
                       />
                     </LineChart>
@@ -414,17 +449,33 @@ export function BillingsPage() {
                 <TabsContent value="area" className="mt-4">
                   <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={aggregatedData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
+                      />
                       <Legend />
                       <Area 
                         type="monotone" 
                         dataKey={selectedMetric} 
-                        stroke="#8884d8" 
-                        fill="#8884d8" 
-                        fillOpacity={0.3}
+                        stroke="#3b82f6" 
+                        fill="#3b82f6" 
+                        fillOpacity={0.2}
                         name={getMetricLabel(selectedMetric)}
                       />
                     </AreaChart>
@@ -433,14 +484,31 @@ export function BillingsPage() {
                 <TabsContent value="bar" className="mt-4">
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart data={aggregatedData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#666' }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
+                      />
                       <Legend />
                       <Bar 
                         dataKey={selectedMetric} 
-                        fill="#8884d8" 
+                        fill="#3b82f6" 
+                        radius={[4, 4, 0, 0]}
                         name={getMetricLabel(selectedMetric)}
                       />
                     </BarChart>
@@ -449,31 +517,34 @@ export function BillingsPage() {
               </Tabs>
             </CardContent>
           </Card>
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
 
 
 
       {/* Billing History */}
-      <SearchFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder={t("billings.search") || "Search billing records..."}
-        filters={[
-          {
-            key: "status",
-            label: t("table.selectStatus") || "Filter by status",
-            value: statusFilter,
-            onValueChange: setStatusFilter,
-            options: [
-              { value: "all", label: t("table.allStatus") || "All Status" },
-              { value: "paid", label: t("table.paid") || "Paid" },
-              { value: "pending", label: t("table.pending") || "Pending" },
-              { value: "overdue", label: t("table.overdue") || "Overdue" }
-            ]
-          }
-        ]}
-      />
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1 max-w-md">
+          <Input
+            placeholder={t("billings.search") || "Search billing records..."}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+            <SelectItem value="paid">{t("table.paid") || "Paid"}</SelectItem>
+            <SelectItem value="pending">{t("table.pending") || "Pending"}</SelectItem>
+            <SelectItem value="overdue">{t("table.overdue") || "Overdue"}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <Card>
         <CardContent>
