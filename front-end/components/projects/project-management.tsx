@@ -242,26 +242,26 @@ export function ProjectManagement() {
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder={t("project.search") || "Search projects..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder={t("project.search") || "Search projects..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-            <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
-            <SelectItem value="archived">{t("table.archived") || "Archived"}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+                  <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                  <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
+                  <SelectItem value="archived">{t("table.archived") || "Archived"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
       {/* Projects Table */}
       <Card>

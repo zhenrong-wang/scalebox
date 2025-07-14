@@ -264,9 +264,9 @@ export function BillingsPage() {
         description: t("billings.monitorUsage"),
         children: (
           <Button onClick={() => setShowAnalytics(true)}>
-            <BarChart3 className="h-4 w-4 mr-2" />
+              <BarChart3 className="h-4 w-4 mr-2" />
             {t("billings.showAnalytics") || "Show Analytics"}
-          </Button>
+              </Button>
         )
       }}
       summaryCards={[

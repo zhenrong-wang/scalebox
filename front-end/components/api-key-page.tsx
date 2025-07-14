@@ -421,26 +421,26 @@ export function ApiKeyPage() {
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder={t("apiKey.search") || "Search API keys..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder={t("apiKey.search") || "Search API keys..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
-            />
+              />
           </div>
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
-            <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
-            <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+                <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                <SelectItem value="active">{t("table.active") || "Active"}</SelectItem>
+                <SelectItem value="disabled">{t("table.disabled") || "Disabled"}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
       {/* Table */}
       <Card>
@@ -575,10 +575,10 @@ export function ApiKeyPage() {
                         </Button>
                       </div>
                       <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleKeyStatus(apiKey.key_id)}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleKeyStatus(apiKey.key_id)}
                           disabled={apiKey.is_expired}
                           className="h-8 w-8 p-0"
                           title={apiKey.is_expired
@@ -587,24 +587,24 @@ export function ApiKeyPage() {
                               ? (t("apiKey.disableKey") || "Disable key") 
                               : (t("apiKey.enableKey") || "Enable key")
                           }
-                        >
-                          {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                        </Button>
+                      >
+                        {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                      </Button>
                       </div>
                       <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteDialog(apiKey.key_id, apiKey.name)}
                           disabled={apiKey.is_active}
                           className="h-8 w-8 p-0"
                           title={apiKey.is_active 
                             ? (t("apiKey.cannotDeleteActive") || "Cannot delete an active API key. Please disable it first.") 
                             : (t("apiKey.deleteKey") || "Delete key")
                           }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                       </div>
                     </div>
                   </ResizableTableCell>

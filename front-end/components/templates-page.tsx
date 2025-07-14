@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Search, Filter, Edit, Trash2, Eye, Copy, Globe, Lock, Cpu, HardDrive, ExternalLink } from "lucide-react"
+import { Plus, Search, Filter, Edit, Trash2, Eye, Copy, Globe, Lock, Cpu, HardDrive, ExternalLink, User, Play } from "lucide-react"
 import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,7 +30,7 @@ export function TemplatesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [languageFilter, setLanguageFilter] = useState<string>("all")
-  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [activeTab, setActiveTab] = useState<"official" | "private">("official")
   const [sortField, setSortField] = useState<string>("")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
@@ -90,14 +90,6 @@ export function TemplatesPage() {
       const filters: any = {}
       if (categoryFilter !== "all") filters.category = categoryFilter
       if (languageFilter !== "all") filters.language = languageFilter
-      if (typeFilter !== "all") {
-        if (typeFilter === "official") filters.is_official = true
-        if (typeFilter === "public") filters.is_public = true
-        if (typeFilter === "private") {
-          filters.is_official = false
-          filters.is_public = false
-        }
-      }
       
       const response = await templateService.getTemplates(filters)
       setTemplates(response.templates)
@@ -154,6 +146,13 @@ export function TemplatesPage() {
       const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            template.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            template.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      
+      // Filter by tab
+      const isOfficial = template.is_official
+      const isPrivate = !template.is_official && !template.is_public
+      
+      if (activeTab === "official" && !isOfficial) return false
+      if (activeTab === "private" && !isPrivate) return false
       
       return matchesSearch
     })
@@ -298,6 +297,40 @@ export function TemplatesPage() {
     }
   }
 
+  const handleUseTemplate = async (template: Template) => {
+    try {
+      // TODO: Implement template usage logic
+      toast({
+        title: "Success",
+        description: t('templates.template_used') || 'Template usage initiated',
+      })
+    } catch (error) {
+      console.error('Failed to use template:', error)
+      toast({
+        title: "Error",
+        description: t('templates.failed_to_use') || 'Failed to use template',
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleViewTemplate = async (template: Template) => {
+    try {
+      // TODO: Implement template details view
+      toast({
+        title: "Template Details",
+        description: `${template.name} - ${template.description || 'No description'}`,
+      })
+    } catch (error) {
+      console.error('Failed to view template:', error)
+      toast({
+        title: "Error",
+        description: t('templates.failed_to_view') || 'Failed to view template details',
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSelectAll = () => {
     if (selectedTemplates.length === filteredTemplates.length) {
       setSelectedTemplates([])
@@ -343,27 +376,31 @@ export function TemplatesPage() {
   const categories = Array.from(new Set(templates.map(t => t.category)))
   const languages = Array.from(new Set(templates.map(t => t.language)))
 
-  // Prepare summary cards data
-  const summaryCards = [
+  // Prepare summary cards data based on active tab
+  const officialTemplates = templates.filter(t => t.is_official)
+  const privateTemplates = templates.filter(t => !t.is_official && !t.is_public)
+  
+  const summaryCards = activeTab === "official" ? [
     {
-      title: t('templates.total'),
-      value: templates.length,
-      icon: <Globe className="h-4 w-4 text-muted-foreground" />
-    },
-    {
-      title: t('templates.official'),
-      value: templates.filter(t => t.is_official).length,
+      title: t('templates.total_official') || 'Total Official',
+      value: officialTemplates.length,
       icon: <Lock className="h-4 w-4 text-muted-foreground" />
     },
     {
-      title: t('templates.public'),
-      value: templates.filter(t => t.is_public && !t.is_official).length,
+      title: t('templates.available') || 'Available',
+      value: officialTemplates.length,
       icon: <Globe className="h-4 w-4 text-muted-foreground" />
+    }
+  ] : [
+    {
+      title: t('templates.total_private') || 'Total Private',
+      value: privateTemplates.length,
+      icon: <Edit className="h-4 w-4 text-muted-foreground" />
     },
     {
-      title: t('templates.private'),
-      value: templates.filter(t => !t.is_official && !t.is_public).length,
-      icon: <Lock className="h-4 w-4 text-muted-foreground" />
+      title: t('templates.owned') || 'Owned',
+      value: privateTemplates.filter(t => t.owner_id === currentUser.id).length,
+      icon: <User className="h-4 w-4 text-muted-foreground" />
     }
   ]
 
@@ -373,13 +410,15 @@ export function TemplatesPage() {
   return (
     <PageLayout
       header={{
-        description: t('templates.description'),
-        children: (
+        description: activeTab === "official" 
+          ? (t('templates.official_description') || 'Browse and use official templates provided by ScaleBox')
+          : (t('templates.private_description') || 'Manage your private templates'),
+        children: activeTab === "private" ? (
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             {t('templates.create')}
           </Button>
-        )
+        ) : undefined
       }}
       summaryCards={summaryCards}
     >
@@ -418,21 +457,25 @@ export function TemplatesPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t('templates.filter_type')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('templates.all_types')}</SelectItem>
-            <SelectItem value="official">{t('templates.official')}</SelectItem>
-            <SelectItem value="public">{t('templates.public')}</SelectItem>
-            <SelectItem value="private">{t('templates.private')}</SelectItem>
-          </SelectContent>
-        </Select>
+
       </div>
 
+      {/* Template Type Tabs */}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "official" | "private")}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="official" className="flex items-center gap-2">
+            <Lock className="h-4 w-4" />
+            {t('templates.official_templates') || 'Official Templates'}
+          </TabsTrigger>
+          <TabsTrigger value="private" className="flex items-center gap-2">
+            <Edit className="h-4 w-4" />
+            {t('templates.private_templates') || 'Private Templates'}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Batch Actions */}
-      {selectedTemplates.length > 0 && (
+      {activeTab === "private" && selectedTemplates.length > 0 && (
         <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
           <span className="text-sm">{tReplace(t('templates.templates_selected'), { count: selectedTemplates.length })}</span>
           <AlertDialog>
@@ -482,12 +525,14 @@ export function TemplatesPage() {
             >
               <TableHeader>
                 <TableRow>
-                  <ResizableTableHead columnId="checkbox" defaultWidth={48}>
-                    <Checkbox
-                      checked={selectedTemplates.length === filteredTemplates.length && filteredTemplates.length > 0}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </ResizableTableHead>
+                  {activeTab === "private" && (
+                    <ResizableTableHead columnId="checkbox" defaultWidth={48}>
+                      <Checkbox
+                        checked={selectedTemplates.length === filteredTemplates.length && filteredTemplates.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </ResizableTableHead>
+                  )}
                   <ResizableTableHead columnId="id" defaultWidth={80}>
                     <Button variant="ghost" onClick={() => handleSort("id")} className="h-auto p-0 group">
                       ID {getSortIcon("id")}
@@ -530,13 +575,15 @@ export function TemplatesPage() {
               <TableBody>
                 {filteredTemplates.map((template) => (
                   <TableRow key={template.id}>
-                    <ResizableTableCell>
+                                      <ResizableTableCell>
+                    {activeTab === "private" && (
                       <Checkbox
                         checked={selectedTemplates.includes(template.id)}
                         onCheckedChange={() => handleSelectTemplate(template.id)}
                         disabled={!templateService.canDelete(template, currentUser.id, currentUser.role === 'admin')}
                       />
-                    </ResizableTableCell>
+                    )}
+                  </ResizableTableCell>
                     <ResizableTableCell className="font-mono text-xs">{template.id}</ResizableTableCell>
                     <ResizableTableCell>
                       <div>
@@ -559,33 +606,42 @@ export function TemplatesPage() {
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
                             <span className="sr-only">Open menu</span>
-                            <Edit className="h-4 w-4" />
+                            {activeTab === "official" ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {templateService.canEdit(template, currentUser.id, currentUser.role === 'admin') && (
-                            <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              {t('templates.edit')}
-                            </DropdownMenuItem>
-                          )}
-                          {currentUser.role === 'admin' && !template.is_official && (
-                            <DropdownMenuItem onClick={() => handleMakeOfficial(template)}>
-                              <Lock className="mr-2 h-4 w-4" />
-                              {t('templates.make_official')}
-                            </DropdownMenuItem>
-                          )}
-                          {currentUser.role === 'admin' && !template.is_public && !template.is_official && (
-                            <DropdownMenuItem onClick={() => handleMakePublic(template)}>
-                              <Globe className="mr-2 h-4 w-4" />
-                              {t('templates.make_public')}
-                            </DropdownMenuItem>
-                          )}
-                          {templateService.canDelete(template, currentUser.id, currentUser.role === 'admin') && (
-                            <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              {t('templates.delete')}
-                            </DropdownMenuItem>
+                          {activeTab === "official" ? (
+                            <>
+                              <DropdownMenuItem onClick={() => handleUseTemplate(template)}>
+                                <Play className="mr-2 h-4 w-4" />
+                                {t('templates.use') || 'Use Template'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewTemplate(template)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                {t('templates.view_details') || 'View Details'}
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              {templateService.canEdit(template, currentUser.id, currentUser.role === 'admin') && (
+                                <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  {t('templates.edit')}
+                                </DropdownMenuItem>
+                              )}
+                              {currentUser.role === 'admin' && !template.is_official && (
+                                <DropdownMenuItem onClick={() => handleMakeOfficial(template)}>
+                                  <Lock className="mr-2 h-4 w-4" />
+                                  {t('templates.make_official')}
+                                </DropdownMenuItem>
+                              )}
+                              {templateService.canDelete(template, currentUser.id, currentUser.role === 'admin') && (
+                                <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {t('templates.delete')}
+                                </DropdownMenuItem>
+                              )}
+                            </>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>

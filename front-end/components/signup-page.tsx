@@ -384,7 +384,7 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
                     className="px-0 text-sm h-auto p-0" 
                     onClick={() => setIsTermsModalOpen(true)}
                   >
-                    {t("action.terms")}
+                      {t("action.terms")}
                   </Button>
                   {t("signup.terms.and")}
                   <Button 
@@ -392,7 +392,7 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
                     className="px-0 text-sm h-auto p-0" 
                     onClick={() => setIsPrivacyModalOpen(true)}
                   >
-                    {t("action.privacy")}
+                      {t("action.privacy")}
                   </Button>
                 </Label>
               </div>

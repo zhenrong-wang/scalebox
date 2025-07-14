@@ -457,26 +457,26 @@ export function SandboxPage() {
       summaryCards={summaryCards}
     >
       {/* Filters and Search */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Search and Status Filter */}
-        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search and Status Filter */}
+            <div className="flex flex-col sm:flex-row gap-2 flex-1">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder={t("sandbox.search") || "Search sandboxes..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder={t("sandbox.search") || "Search sandboxes..."}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
             </div>
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
+                  <SelectValue placeholder={t("table.selectStatus") || "Filter by status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("table.allStatus") || "All Status"}</SelectItem>
               {activeTab === "active" ? (
                 <>
                   <SelectItem value="running">{t("table.running") || "Running"}</SelectItem>
@@ -486,57 +486,57 @@ export function SandboxPage() {
               ) : (
                 <SelectItem value="deleted">{t("table.deleted") || "Deleted"}</SelectItem>
               )}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Date Range Filter */}
-        <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
-          dateRange.from || dateRange.to 
-            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
-            : 'bg-muted/50 border-border'
-        }`}>
-          <Label className={`text-sm font-medium whitespace-nowrap ${
-            dateRange.from || dateRange.to 
-              ? 'text-blue-700 dark:text-blue-300' 
-              : ''
-          }`}>{t("table.created") || "Created"}</Label>
-          <div className="flex items-center gap-1">
-            <div className="relative">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => openDatePicker('from', e)}
-                className="w-[120px] h-8 text-sm justify-start"
-              >
-                {dateRange.from ? new Date(dateRange.from).toLocaleDateString(localStorage.getItem('language') === 'zh-CN' ? 'zh-CN' : 'en-US') : t("table.from") || "From"}
-              </Button>
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Date Range Filter */}
+            <div className={`flex items-center gap-2 p-2 rounded-lg border transition-colors h-10 ${
+              dateRange.from || dateRange.to 
+                ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' 
+                : 'bg-muted/50 border-border'
+            }`}>
+              <Label className={`text-sm font-medium whitespace-nowrap ${
+                dateRange.from || dateRange.to 
+                  ? 'text-blue-700 dark:text-blue-300' 
+                  : ''
+              }`}>{t("table.created") || "Created"}</Label>
+              <div className="flex items-center gap-1">
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => openDatePicker('from', e)}
+                    className="w-[120px] h-8 text-sm justify-start"
+                  >
+                {dateRange.from ? new Date(dateRange.from).toLocaleDateString(localStorage.getItem('language') === 'zh-CN' ? 'zh-CN' : 'en-US') : t("table.from") || "From"}
+                  </Button>
+                </div>
             <span className="text-muted-foreground text-sm">{t("table.to") || "to"}</span>
-            <div className="relative">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => openDatePicker('to', e)}
-                className="w-[120px] h-8 text-sm justify-start"
-              >
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => openDatePicker('to', e)}
+                    className="w-[120px] h-8 text-sm justify-start"
+                  >
                 {dateRange.to ? new Date(dateRange.to).toLocaleDateString(localStorage.getItem('language') === 'zh-CN' ? 'zh-CN' : 'en-US') : t("table.to") || "To"}
-              </Button>
+                  </Button>
+                </div>
+              </div>
+              {(dateRange.from || dateRange.to) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange({ from: null, to: null })}
+                  className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  title="Clear date range"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </div>
-          {(dateRange.from || dateRange.to) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDateRange({ from: null, to: null })}
-              className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-              title="Clear date range"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      </div>
 
       {/* Tabs for Active/Deleted Sandboxes */}
       <Tabs value={activeTab} onValueChange={(value) => {
@@ -566,32 +566,32 @@ export function SandboxPage() {
               <div className="flex gap-2">
                 {activeTab === "active" ? (
                   <>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                <Button
+                  variant="outline"
+                  size="sm"
                       disabled={!allSelectedStopped}
-                      onClick={() => setStartDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                    >
-                      <Play className="h-4 w-4 mr-1" />
-                      {t("table.startSelected") || "Start Selected"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                  onClick={() => setStartDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                >
+                  <Play className="h-4 w-4 mr-1" />
+                  {t("table.startSelected") || "Start Selected"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                       disabled={!allSelectedRunning}
-                      onClick={() => setStopDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                    >
-                      <Square className="h-4 w-4 mr-1" />
-                      {t("table.stopSelected") || "Stop Selected"}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      {t("table.deleteSelected") || "Delete Selected"}
-                    </Button>
+                  onClick={() => setStopDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                >
+                  <Square className="h-4 w-4 mr-1" />
+                  {t("table.stopSelected") || "Stop Selected"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {t("table.deleteSelected") || "Delete Selected"}
+                </Button>
                   </>
                 ) : (
                   <Button
@@ -621,9 +621,9 @@ export function SandboxPage() {
               {activeTab === "active" ? (
                 <>
                   <p>{t("sandbox.noActiveSandboxes") || "No active sandboxes found."}</p>
-                  <p className="text-sm mt-2">
-                    {t("sandbox.createFirst") || "Create your first sandbox to get started."}
-                  </p>
+              <p className="text-sm mt-2">
+                {t("sandbox.createFirst") || "Create your first sandbox to get started."}
+              </p>
                 </>
               ) : (
                 <>
@@ -766,40 +766,40 @@ export function SandboxPage() {
                         </Button>
                         {activeTab === "active" ? (
                           <>
-                            {sandbox.status === "stopped" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                              >
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {sandbox.status === "running" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                              >
-                                <Square className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                        {sandbox.status === "stopped" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {sandbox.status === "running" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                          >
+                            <Square className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
                               onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                            >
+                        >
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                        </Button>
                           </>
                         ) : (
-                          <Button
+                        <Button
                             variant="destructive"
-                            size="sm"
+                          size="sm"
                             onClick={() => setPermanentDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                         )}
                       </div>
                     </ResizableTableCell>

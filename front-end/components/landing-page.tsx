@@ -36,20 +36,20 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 dark:bg-gray-900/80 dark:border-gray-700/50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Box className="h-4 w-4" />
-              </div>
-              <span className="text-xl font-bold">ScaleBox</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Box className="h-4 w-4" />
             </div>
-            <div className="flex items-center gap-3">
-              <LanguageToggle />
+            <span className="text-xl font-bold">ScaleBox</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <LanguageToggle />
               <ThemeToggle />
-              <Button variant="outline" onClick={onSignIn}>
-                {t("action.signIn")}
-              </Button>
-              <Button onClick={onSignUp}>{t("action.signUp")}</Button>
+            <Button variant="outline" onClick={onSignIn}>
+              {t("action.signIn")}
+            </Button>
+            <Button onClick={onSignUp}>{t("action.signUp")}</Button>
             </div>
           </div>
         </div>
@@ -57,89 +57,89 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
 
       {/* Main Content with top padding to account for fixed header */}
       <main className="pt-24">
-        {/* Hero Section */}
+      {/* Hero Section */}
         <div className="container mx-auto px-4 py-16">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl font-bold tracking-tight mb-6">
-              {t("landing.title")}
-              <span className="text-primary block">{t("landing.subtitle")}</span>
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              {t("landing.description")}
-            </p>
+        <div className="text-center max-w-4xl mx-auto">
+          <h1 className="text-5xl font-bold tracking-tight mb-6">
+            {t("landing.title")}
+            <span className="text-primary block">{t("landing.subtitle")}</span>
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            {t("landing.description")}
+          </p>
 
-            <div className="flex gap-4 justify-center mb-16">
-              <Button size="lg" onClick={onSignUp} className="gap-2">
-                {t("landing.getStarted")}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <a href="https://docs.scalebox.dev" target="_blank" rel="noopener noreferrer">
-                  {t("landing.viewDocs")}
-                </a>
-              </Button>
-            </div>
+          <div className="flex gap-4 justify-center mb-16">
+            <Button size="lg" onClick={onSignUp} className="gap-2">
+              {t("landing.getStarted")}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <a href="https://docs.scalebox.dev" target="_blank" rel="noopener noreferrer">
+                {t("landing.viewDocs")}
+              </a>
+            </Button>
+          </div>
 
-            {/* Features Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("landing.card.instantSandboxes")}</CardTitle>
-                  <CardDescription>
-                    {t("landing.card.instantSandboxes.desc")}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("landing.card.apiManagement")}</CardTitle>
-                  <CardDescription>
-                    {t("landing.card.apiManagement.desc")}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("landing.card.budgetControl")}</CardTitle>
-                  <CardDescription>{t("landing.card.budgetControl.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-
-            {/* Feature List */}
-            <Card className="max-w-2xl mx-auto">
+          {/* Features Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+            <Card>
               <CardHeader>
-                <CardTitle>{t("landing.card.scale")}</CardTitle>
+                <CardTitle>{t("landing.card.instantSandboxes")}</CardTitle>
+                <CardDescription>
+                  {t("landing.card.instantSandboxes.desc")}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("landing.card.apiManagement")}</CardTitle>
+                <CardDescription>
+                  {t("landing.card.apiManagement.desc")}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("landing.card.budgetControl")}</CardTitle>
+                <CardDescription>{t("landing.card.budgetControl.desc")}</CardDescription>
+              </CardHeader>
             </Card>
           </div>
+
+          {/* Feature List */}
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle>{t("landing.card.scale")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-3">
+                {features.map((feature, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         </div>
 
-        {/* Footer */}
-        <footer className="container mx-auto px-4 py-8 border-t">
-          <div className="text-center text-sm text-muted-foreground">
+      {/* Footer */}
+      <footer className="container mx-auto px-4 py-8 border-t">
+        <div className="text-center text-sm text-muted-foreground">
             <p>&copy; 2024 Cloudsway.AI. {t("footer.allRightsReserved")}</p>
-            <div className="flex justify-center gap-6 mt-4">
-              <button 
-                onClick={() => setIsPrivacyModalOpen(true)}
-                className="hover:text-foreground cursor-pointer"
-              >
+          <div className="flex justify-center gap-6 mt-4">
+            <button 
+              onClick={() => setIsPrivacyModalOpen(true)}
+              className="hover:text-foreground cursor-pointer"
+            >
                 {t("action.privacy")}
-              </button>
-              <button 
-                onClick={() => setIsCookieSettingsOpen(true)}
+            </button>
+            <button 
+              onClick={() => setIsCookieSettingsOpen(true)}
                 className="hover:text-foreground cursor-pointer"
               >
                 {t("cookie.settings")}
@@ -150,17 +150,17 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
             >
               {t("action.terms")}
             </button>
-              <a
-                href="https://docs.scalebox.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-foreground"
-              >
+            <a
+              href="https://docs.scalebox.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground"
+            >
                 {t("landing.viewDocs")}
-              </a>
-            </div>
+            </a>
           </div>
-        </footer>
+        </div>
+      </footer>
       </main>
 
       {/* Cookie Consent */}

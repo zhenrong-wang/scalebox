@@ -258,44 +258,44 @@ export function SandboxManagement() {
       <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder={t("admin.searchSandboxes")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+                <Input
+                  placeholder={t("admin.searchSandboxes")}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
-          />
-        </div>
+                />
+              </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsFiltersOpen(!isFiltersOpen)}>
-            <Filter className="h-4 w-4 mr-2" />
-            {t("admin.filters")}
-          </Button>
-          <Select value={sortBy} onValueChange={(value: "name" | "created" | "cost" | "status") => setSortBy(value)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created">{t("admin.createdDate")}</SelectItem>
-              <SelectItem value="name">{t("admin.name")}</SelectItem>
-              <SelectItem value="cost">{t("admin.cost")}</SelectItem>
-              <SelectItem value="status">{t("admin.status")}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}>
-            {sortOrder === "asc" ? "↑" : "↓"}
-          </Button>
-        </div>
-      </div>
+              <Button variant="outline" size="sm" onClick={() => setIsFiltersOpen(!isFiltersOpen)}>
+                <Filter className="h-4 w-4 mr-2" />
+                {t("admin.filters")}
+              </Button>
+              <Select value={sortBy} onValueChange={(value: "name" | "created" | "cost" | "status") => setSortBy(value)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created">{t("admin.createdDate")}</SelectItem>
+                  <SelectItem value="name">{t("admin.name")}</SelectItem>
+                  <SelectItem value="cost">{t("admin.cost")}</SelectItem>
+                  <SelectItem value="status">{t("admin.status")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}>
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </Button>
+            </div>
+          </div>
 
-      {isFiltersOpen && (
-        <div className="mb-4">
-          <SandboxFiltersPanel
-            filters={filters}
-            onFiltersChange={setFilters}
-            onClose={() => setIsFiltersOpen(false)}
-          />
-        </div>
-      )}
+          {isFiltersOpen && (
+            <div className="mb-4">
+              <SandboxFiltersPanel
+                filters={filters}
+                onFiltersChange={setFilters}
+                onClose={() => setIsFiltersOpen(false)}
+              />
+            </div>
+          )}
 
       <Card>
         <CardContent>
