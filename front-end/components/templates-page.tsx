@@ -511,16 +511,15 @@ export function TemplatesPage() {
           ) : (
             <ResizableTable
               defaultColumnWidths={{
-                checkbox: 48,
-                id: 80,
-                name: 200,
+                checkbox: activeTab === "private" ? 48 : 0,
+                name: 250,
                 category: 120,
                 language: 100,
-                cpu: 100,
-                memory: 100,
-                created: 120,
-                updated: 120,
-                actions: 100
+                cpu: 80,
+                memory: 80,
+                created: 100,
+                updated: 100,
+                actions: 80
               }}
             >
               <TableHeader>
@@ -533,43 +532,43 @@ export function TemplatesPage() {
                       />
                     </ResizableTableHead>
                   )}
-                  <ResizableTableHead columnId="id" defaultWidth={80}>
-                    <Button variant="ghost" onClick={() => handleSort("id")} className="h-auto p-0 group">
-                      ID {getSortIcon("id")}
-                    </Button>
-                  </ResizableTableHead>
-                  <ResizableTableHead columnId="name" defaultWidth={200}>
+                  
+                                      <ResizableTableHead columnId="name" defaultWidth={250}>
                     <Button variant="ghost" onClick={() => handleSort("name")} className="h-auto p-0 group">
                       {t('templates.name')} {getSortIcon("name")}
                     </Button>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="category" defaultWidth={120}>{t('templates.category')}</ResizableTableHead>
                   <ResizableTableHead columnId="language" defaultWidth={100}>{t('templates.language')}</ResizableTableHead>
-                  <ResizableTableHead columnId="cpu" defaultWidth={100}>
+                  <ResizableTableHead columnId="cpu" defaultWidth={80}>
                     <Button variant="ghost" onClick={() => handleSort("cpu_spec")} className="h-auto p-0 group">
                       <div className="flex items-center gap-1">
-                        CPU {getSortIcon("cpu_spec")}
+                        <Cpu className="h-4 w-4" />
+                        {getSortIcon("cpu_spec")}
                       </div>
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="memory" defaultWidth={100}>
+                  <ResizableTableHead columnId="memory" defaultWidth={80}>
                     <Button variant="ghost" onClick={() => handleSort("memory_spec")} className="h-auto p-0 group">
                       <div className="flex items-center gap-1">
-                        {t("table.memory") || "Memory"} {getSortIcon("memory_spec")}
+                        <HardDrive className="h-4 w-4" />
+                        {getSortIcon("memory_spec")}
                       </div>
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="created" defaultWidth={120}>
+                  <ResizableTableHead columnId="created" defaultWidth={100}>
                     <Button variant="ghost" onClick={() => handleSort("created_at")} className="h-auto p-0 group">
-                      {t('templates.created')} {getSortIcon("created_at")}
+                      <span className="text-xs">{t('templates.created')}</span> {getSortIcon("created_at")}
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="updated" defaultWidth={120}>
+                  <ResizableTableHead columnId="updated" defaultWidth={100}>
                     <Button variant="ghost" onClick={() => handleSort("updated_at")} className="h-auto p-0 group">
-                      {t('templates.updated')} {getSortIcon("updated_at")}
+                      <span className="text-xs">{t('templates.updated')}</span> {getSortIcon("updated_at")}
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="actions" defaultWidth={100}>{t('templates.actions')}</ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={80}>
+                    <span className="text-xs">{t('templates.actions')}</span>
+                  </ResizableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -584,23 +583,71 @@ export function TemplatesPage() {
                       />
                     )}
                   </ResizableTableCell>
-                    <ResizableTableCell className="font-mono text-xs">{template.id}</ResizableTableCell>
+
                     <ResizableTableCell>
                       <div>
-                        <div className="font-medium">{template.name}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {template.name}
+                          {template.is_official && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Lock className="h-3 w-3 mr-1" />
+                              Official
+                            </Badge>
+                          )}
+                        </div>
                         {template.description && (
-                          <div className="text-sm text-muted-foreground">{template.description}</div>
+                          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {template.description}
+                          </div>
+                        )}
+                        {template.tags && template.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {template.tags.slice(0, 3).map((tag, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {template.tags.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{template.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
                         )}
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
-                      <Badge variant="outline">{template.category}</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {template.category}
+                      </Badge>
                     </ResizableTableCell>
-                    <ResizableTableCell>{template.language}</ResizableTableCell>
-                    <ResizableTableCell>{template.cpu_spec} vCPU</ResizableTableCell>
-                    <ResizableTableCell>{template.memory_spec} GB</ResizableTableCell>
-                    <ResizableTableCell>{new Date(template.created_at).toLocaleDateString()}</ResizableTableCell>
-                    <ResizableTableCell>{new Date(template.updated_at).toLocaleDateString()}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {template.language}
+                      </Badge>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="flex items-center gap-1">
+                        <Cpu className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm">{template.cpu_spec}</span>
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="flex items-center gap-1">
+                        <HardDrive className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm">{template.memory_spec}GB</span>
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(template.created_at).toLocaleDateString()}
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(template.updated_at).toLocaleDateString()}
+                      </div>
+                    </ResizableTableCell>
                     <ResizableTableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
