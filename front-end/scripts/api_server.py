@@ -39,7 +39,7 @@ class CreateAPIKeyRequest(BaseModel):
     expires_in_days: Optional[int] = Field(default=None, ge=1, le=365, description="Expiration in days")
 
 class UpdateAPIKeyRequest(BaseModel):
-    status: str = Field(..., regex="^(active|disabled)$", description="New status for the API key")
+    status: str = Field(..., pattern="^(active|disabled)$", description="New status for the API key")
 
 class APIKeyResponse(BaseModel):
     key_id: str
@@ -114,8 +114,8 @@ async def create_api_key(
         result = api_key_service.create_api_key(
             name=request.name,
             user_id=user_id,
-            permissions=request.permissions,
-            rate_limit=request.rate_limit,
+            permissions=request.permissions or {},
+            rate_limit=request.rate_limit or 1000,
             expires_in_days=request.expires_in_days
         )
         

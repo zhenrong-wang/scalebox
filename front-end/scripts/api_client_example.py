@@ -16,7 +16,7 @@ class ScaleBoxAPIClient:
     
     def create_api_key(self, 
                       name: str, 
-                      permissions: Dict = None,
+                      permissions: Optional[Dict] = None,
                       rate_limit: int = 1000,
                       expires_in_days: Optional[int] = None) -> Dict:
         """Create a new API key."""

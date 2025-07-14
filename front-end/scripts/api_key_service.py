@@ -83,7 +83,7 @@ class APIKeyService:
     def create_api_key(self, 
                       name: str, 
                       user_id: str,
-                      permissions: Dict = None,
+                      permissions: Optional[Dict] = None,
                       rate_limit: int = 1000,
                       expires_in_days: Optional[int] = None) -> Dict:
         """
