@@ -807,8 +807,8 @@ export function SandboxPage() {
             <DialogTitle>{t("table.confirmDelete") || "Confirm Delete"}</DialogTitle>
             <DialogDescription>
               {deleteDialog.isBatch 
-                ? t("table.confirmDeleteMessage") || `Are you sure you want to delete ${selectedSandboxes.size} sandbox${selectedSandboxes.size > 1 ? 'es' : ''}? This action cannot be undone.`
-                : t("table.confirmDeleteMessage") || "Are you sure you want to delete this sandbox? This action cannot be undone."
+                ? t("table.confirmDeleteMessage", { count: String(selectedSandboxes.size), plural: selectedSandboxes.size > 1 ? 'es' : '' }) || `Are you sure you want to delete ${selectedSandboxes.size} sandbox${selectedSandboxes.size > 1 ? 'es' : ''}? This action cannot be undone.`
+                : t("table.confirmDeleteMessage", { count: "1", plural: "" }) || "Are you sure you want to delete this sandbox? This action cannot be undone."
               }
             </DialogDescription>
           </DialogHeader>
