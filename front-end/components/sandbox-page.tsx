@@ -181,9 +181,24 @@ export function SandboxPage() {
     }
   }
 
+  // Get permanently deleted sandbox IDs from localStorage
+  const getPermanentlyDeletedIds = (): Set<string> => {
+    const stored = localStorage.getItem('permanently_deleted_sandboxes')
+    return stored ? new Set(JSON.parse(stored)) : new Set()
+  }
+
+  // Store permanently deleted sandbox IDs in localStorage
+  const storePermanentlyDeletedId = (sandboxId: string) => {
+    const deletedIds = getPermanentlyDeletedIds()
+    deletedIds.add(sandboxId)
+    localStorage.setItem('permanently_deleted_sandboxes', JSON.stringify(Array.from(deletedIds)))
+  }
+
   const handlePermanentDelete = async (sandboxId: string) => {
     try {
-      // For now, we'll just remove from frontend since backend keeps deleted sandboxes for billing
+      // Store the ID in localStorage so it won't appear after refresh
+      storePermanentlyDeletedId(sandboxId)
+      // Remove from frontend state
       setSandboxes(prev => prev.filter(s => s.id !== sandboxId))
       setSelectedSandboxes(prev => {
         const newSet = new Set(prev)
@@ -197,7 +212,12 @@ export function SandboxPage() {
 
   const handleBatchPermanentDelete = async () => {
     try {
-      // Remove selected sandboxes from frontend
+      // Store all selected IDs in localStorage
+      const deletedIds = getPermanentlyDeletedIds()
+      selectedSandboxes.forEach(id => deletedIds.add(id))
+      localStorage.setItem('permanently_deleted_sandboxes', JSON.stringify(Array.from(deletedIds)))
+      
+      // Remove from frontend state
       setSandboxes(prev => prev.filter(s => !selectedSandboxes.has(s.id)))
       setSelectedSandboxes(new Set())
     } catch (error) {
@@ -276,6 +296,12 @@ export function SandboxPage() {
   }
 
   const filteredSandboxes = sandboxes.filter(sandbox => {
+    // Filter out permanently deleted sandboxes
+    const permanentlyDeletedIds = getPermanentlyDeletedIds()
+    if (permanentlyDeletedIds.has(sandbox.id)) {
+      return false
+    }
+    
     // First filter by active/deleted tab
     const matchesTab = activeTab === "active" ? sandbox.status !== "deleted" : sandbox.status === "deleted"
     

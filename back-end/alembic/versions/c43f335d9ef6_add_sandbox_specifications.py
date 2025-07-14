@@ -104,7 +104,7 @@ def downgrade() -> None:
     op.alter_column('users', 'account_id',
                existing_type=mysql.VARCHAR(length=36),
                nullable=False)
-    op.drop_constraint(None, 'templates', type_='foreignkey')
+    op.drop_constraint('templates_ibfk_1', 'templates', type_='foreignkey')
     op.create_foreign_key(op.f('templates_ibfk_1'), 'templates', 'users', ['owner_id'], ['id'], ondelete='CASCADE')
     op.alter_column('templates', 'updated_at',
                existing_type=mysql.DATETIME(),
@@ -132,7 +132,7 @@ def downgrade() -> None:
     op.add_column('sandbox_usage', sa.Column('bandwidth_usage', mysql.FLOAT(), nullable=False))
     op.add_column('sandbox_usage', sa.Column('timestamp', mysql.DATETIME(), nullable=False))
     op.add_column('sandbox_usage', sa.Column('memory_usage', mysql.FLOAT(), nullable=False))
-    op.drop_constraint(None, 'sandbox_usage', type_='foreignkey')
+    op.drop_constraint('sandbox_usage_ibfk_1', 'sandbox_usage', type_='foreignkey')
     op.create_index(op.f('ix_sandbox_usage_timestamp'), 'sandbox_usage', ['timestamp'], unique=False)
     op.create_index(op.f('ix_sandbox_usage_sandbox_id'), 'sandbox_usage', ['sandbox_id'], unique=False)
     op.create_index(op.f('ix_sandbox_usage_id'), 'sandbox_usage', ['id'], unique=False)
