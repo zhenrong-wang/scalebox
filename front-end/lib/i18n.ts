@@ -1212,7 +1212,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "table.totalCategories": "总类别数",
     "table.totalBudget": "总预算",
     "table.totalStars": "总星标数",
-    "table.totalSessions": "总会话数",
+    "table.totalSessions": "总工作阶段数",
     "table.totalRevenue": "总收入",
     "table.totalActive": "总活跃数",
     "table.totalInactive": "总非活跃数",
@@ -1272,10 +1272,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "dialog.delete.batch.stop.desc": "您确定要停止所有选取的执行中{itemType}吗？",
     "dialog.delete.batch.stop.stop": "停止",
     "dialog.delete.batch.stop.cancel": "取消",
-    "dialog.emailVerification.title": "邮箱验证",
-    "dialog.emailVerification.desc": "输入发送到您邮箱的6位验证码：",
-    "dialog.emailVerification.error": "验证码不正确。请重试。",
-    "dialog.emailVerification.button": "验证",
+    "dialog.delete.batch.confirm": "Confirm Delete",
+    "dialog.delete.batch.confirmDesc": "Are you sure you want to delete {count} sandbox{plural}? This action cannot be undone.",
+    "dialog.emailVerification.title": "Email Verification",
+    "dialog.emailVerification.desc": "Enter the 6-digit code sent to your email:",
+    "dialog.emailVerification.error": "Incorrect verification code. Please try again.",
+    "dialog.emailVerification.button": "Verify",
 
     // Account Settings
     "account.settings": "账户设置",
@@ -1930,7 +1932,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "terms.contact.email": "電子郵件：privacy@scalebox.com",
     "terms.contact.address": "地址：[您的公司地址]",
   },
-,
 }
 
 // Helper for variable interpolation in translations
