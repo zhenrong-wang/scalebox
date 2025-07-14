@@ -188,7 +188,7 @@ def resend_verification(data: ResendVerificationRequest, background_tasks: Backg
 def reset_password(data: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
-        return {"msg": "If the email exists, a reset link will be sent."}  # Do not reveal user existence
+        return {"error": "email_not_found", "msg": "No account found with this email address."}
     now = datetime.datetime.utcnow()
     last_req = getattr(user, 'last_password_reset_request', None)
     if last_req and (now - last_req).total_seconds() < 30:
@@ -200,7 +200,7 @@ def reset_password(data: PasswordResetRequest, background_tasks: BackgroundTasks
     setattr(user, 'last_password_reset_request', now)
     db.commit()
     background_tasks.add_task(send_reset_email, data.email, reset_token)
-    return {"msg": "If the email exists, a reset link will be sent."}
+    return {"msg": "Password reset link has been sent to your email address."}
 
 @router.get("/reset-password/validate/{token}")
 def validate_reset_token(token: str, db: Session = Depends(get_db)):

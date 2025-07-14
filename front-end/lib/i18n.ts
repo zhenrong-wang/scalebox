@@ -146,6 +146,19 @@ export const translations: Record<Language, Record<string, string>> = {
     "signup.verification.error": "Incorrect verification code. Please try again.",
     "signup.verification.button": "Verify",
 
+    // Reset Password
+    "resetPassword.title": "Reset Password",
+    "resetPassword.description": "Enter your email address and we'll send you a link to reset your password.",
+    "resetPassword.email": "Email Address",
+    "resetPassword.emailPlaceholder": "Enter your email",
+    "resetPassword.button": "Send Reset Link",
+    "resetPassword.loading": "Sending Reset Link...",
+    "resetPassword.success": "Password reset link has been sent to your email address.",
+    "resetPassword.emailNotFound": "No account found with this email address.",
+    "resetPassword.error": "Failed to send reset email. Please try again.",
+    "resetPassword.rememberPassword": "Remember your password?",
+    "resetPassword.signInHere": "Sign in here",
+
     // Dashboard & Header
     "dashboard.accountSettings": "Account settings",
     "dashboard.accessRestricted": "Access Restricted",
@@ -1092,6 +1105,19 @@ export const translations: Record<Language, Record<string, string>> = {
     "signup.verification.error": "验证码不正确。请重试。",
     "signup.verification.button": "验证",
 
+    // Reset Password
+    "resetPassword.title": "重置密码",
+    "resetPassword.description": "输入您的邮箱地址，我们将向您发送重置密码的链接。",
+    "resetPassword.email": "邮箱地址",
+    "resetPassword.emailPlaceholder": "输入您的邮箱",
+    "resetPassword.button": "发送重置链接",
+    "resetPassword.loading": "正在发送重置链接...",
+    "resetPassword.success": "密码重置链接已发送到您的邮箱地址。",
+    "resetPassword.emailNotFound": "未找到使用此邮箱地址的账户。",
+    "resetPassword.error": "发送重置邮件失败。请重试。",
+    "resetPassword.rememberPassword": "记得您的密码？",
+    "resetPassword.signInHere": "在此登录",
+
     // Dashboard & Header
     "dashboard.accountSettings": "账户设置",
     "dashboard.accessRestricted": "访问受限",
@@ -1781,10 +1807,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "terms.section6.title": "付款和计费",
     "terms.section6.desc": "ScaleBox服务的付款条款：",
     "terms.section6.item1": "费用基于实际资源使用情况收取",
-    "terms.section6.item2": "计费按月进行或按您计划中指定的方式进行",
-    "terms.section6.item3": "付款在收到发票时到期",
-    "terms.section6.item4": "逾期付款可能导致服务暂停",
-    "terms.section6.item5": "所有费用不可退还，除非另有说明",
+    "terms.section6.item2": "計費按月進行或按您計劃中指定的方式進行",
+    "terms.section6.item3": "付款在收到發票時到期",
+    "terms.section6.item4": "逾期付款可能导致服務暫停",
+    "terms.section6.item5": "所有費用不可退還，除非另有說明",
     "terms.section7.title": "知识产权",
     "terms.section7.desc": "知识产权和所有权：",
     "terms.section7.item1": "ScaleBox保留平台及其技术的所有权",
@@ -1816,7 +1842,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "terms.section11.item3": "终止后，您的数据可能被永久删除",
     "terms.section11.item4": "终止时未付费用仍然到期",
     "terms.section12.title": "条款变更",
-    "terms.section12.desc": "我们可能会不时更新这些条款。我们将通过在此页面上发布新条款并更新\"最后更新\"日期来通知您重大变更。您在这些变更后继续使用服务即表示接受新条款。",
+    "terms.section12.desc": "我们可能会不时更新这些条款。我们将通过在此頁面上發布新條款並更新\"最後更新\"日期來通知您重大變更。您在這些變更後繼續使用服務即表示接受新條款。",
     "terms.section13.title": "联系信息",
     "terms.section13.desc": "如果您对这些服务条款有任何疑问，请联系我们：",
     "terms.contact.title": "ScaleBox支持",
@@ -1970,6 +1996,19 @@ export const translations: Record<Language, Record<string, string>> = {
     "signup.verification.desc": "輸入傳送到您電子郵件的6位數驗證碼：",
     "signup.verification.error": "驗證碼不正確。請重試。",
     "signup.verification.button": "驗證",
+
+    // Reset Password
+    "resetPassword.title": "重設密碼",
+    "resetPassword.description": "輸入您的電子郵件地址，我們將向您傳送重設密碼的連結。",
+    "resetPassword.email": "電子郵件地址",
+    "resetPassword.emailPlaceholder": "輸入您的電子郵件",
+    "resetPassword.button": "傳送重設連結",
+    "resetPassword.loading": "正在傳送重設連結...",
+    "resetPassword.success": "密碼重設連結已傳送到您的電子郵件地址。",
+    "resetPassword.emailNotFound": "未找到使用此電子郵件地址的帳戶。",
+    "resetPassword.error": "傳送重設電子郵件失敗。請重試。",
+    "resetPassword.rememberPassword": "記得您的密碼？",
+    "resetPassword.signInHere": "在此登入",
 
     // Dashboard & Header
     "dashboard.accountSettings": "帳戶設定",

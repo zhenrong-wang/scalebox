@@ -37,14 +37,16 @@ export function ResetPasswordRequest({ onBackToSignIn }: ResetPasswordRequestPro
 
     try {
       const result = await UserService.resetPassword(email)
-      if (result && !result.error && !result.detail) {
-        setSuccess("If an account with that email exists, a password reset link has been sent to your inbox.")
+      if (result && result.error === "email_not_found") {
+        setError(t("resetPassword.emailNotFound"))
+      } else if (result && !result.error && !result.detail) {
+        setSuccess(t("resetPassword.success"))
         setEmail("") // Clear the email field
       } else {
-        setError(result?.detail || result?.error || "Failed to send reset email")
+        setError(result?.detail || result?.error || t("resetPassword.error"))
       }
     } catch (err) {
-      setError("Failed to send reset email. Please try again.")
+      setError(t("resetPassword.error"))
     } finally {
       setIsLoading(false)
     }
@@ -57,7 +59,7 @@ export function ResetPasswordRequest({ onBackToSignIn }: ResetPasswordRequestPro
         <div className="text-center mb-8">
           <Button variant="ghost" onClick={onBackToSignIn} className="absolute top-4 left-4 gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Back to Sign In
+            {t("action.back")} {t("action.signIn")}
           </Button>
 
           <div className="absolute top-4 right-4">
@@ -68,16 +70,16 @@ export function ResetPasswordRequest({ onBackToSignIn }: ResetPasswordRequestPro
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Mail className="h-5 w-5" />
             </div>
-            <span className="text-2xl font-bold">Reset Password</span>
+            <span className="text-2xl font-bold">{t("resetPassword.title")}</span>
           </div>
         </div>
 
         {/* Reset Password Form */}
         <Card>
           <CardHeader className="text-center">
-            <CardTitle>Forgot Your Password?</CardTitle>
+            <CardTitle>{t("resetPassword.title")}</CardTitle>
             <CardDescription>
-              Enter your email address and we'll send you a link to reset your password.
+              {t("resetPassword.description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -96,11 +98,11 @@ export function ResetPasswordRequest({ onBackToSignIn }: ResetPasswordRequestPro
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">{t("resetPassword.email")}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t("resetPassword.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -112,19 +114,19 @@ export function ResetPasswordRequest({ onBackToSignIn }: ResetPasswordRequestPro
                 {isLoading ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                    Sending Reset Link...
+                    {t("resetPassword.loading")}
                   </>
                 ) : (
-                  "Send Reset Link"
+                  t("resetPassword.button")
                 )}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Remember your password?{" "}
+                {t("resetPassword.rememberPassword")}{" "}
                 <Button variant="link" onClick={onBackToSignIn} className="p-0 h-auto">
-                  Sign in here
+                  {t("resetPassword.signInHere")}
                 </Button>
               </p>
             </div>

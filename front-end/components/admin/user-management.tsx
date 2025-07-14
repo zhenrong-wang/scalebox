@@ -67,7 +67,8 @@ export function UserManagement() {
         return;
       }
       
-      const response = await fetch('http://localhost:8000/users/admin/users', {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${API_BASE}/users/admin/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -102,7 +103,8 @@ export function UserManagement() {
         return;
       }
       
-      const response = await fetch('http://localhost:8000/users/admin/user-stats', {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${API_BASE}/users/admin/user-stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -163,7 +165,8 @@ export function UserManagement() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8000/users/admin/users/${userId}/status`, {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${API_BASE}/users/admin/users/${userId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -191,7 +194,8 @@ export function UserManagement() {
           return;
         }
 
-        const response = await fetch(`http://localhost:8000/users/admin/users/${userId}`, {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${API_BASE}/users/admin/users/${userId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
