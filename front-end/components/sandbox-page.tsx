@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Play, Square, Trash2, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check, Search, Filter } from "lucide-react"
+
 import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -331,7 +332,7 @@ export function SandboxPage() {
   const allSelectedRunning = selectedSandboxesData.length > 0 && selectedSandboxesData.every(s => s.status === "running")
   const allSelectedStopped = selectedSandboxesData.length > 0 && selectedSandboxesData.every(s => s.status === "stopped")
 
-  // Update the date picker to use proper localization
+  // Open date picker with proper localization
   const openDatePicker = (type: 'from' | 'to', event: React.MouseEvent<HTMLButtonElement>) => {
     const button = event.currentTarget
     const buttonRect = button.getBoundingClientRect()
@@ -354,6 +355,8 @@ export function SandboxPage() {
     const currentLang = localStorage.getItem('language') || 'en'
     if (currentLang === 'zh-CN') {
       input.setAttribute('lang', 'zh-CN')
+      // Set Chinese locale for the input
+      input.setAttribute('data-locale', 'zh-CN')
     }
     
     document.body.appendChild(input)
@@ -483,7 +486,7 @@ export function SandboxPage() {
                 {dateRange.from ? new Date(dateRange.from).toLocaleDateString(localStorage.getItem('language') === 'zh-CN' ? 'zh-CN' : 'en-US') : t("table.from") || "From"}
               </Button>
             </div>
-            <span className="text-muted-foreground text-sm">to</span>
+            <span className="text-muted-foreground text-sm">{t("table.to") || "to"}</span>
             <div className="relative">
               <Button
                 variant="outline"
@@ -942,6 +945,8 @@ export function SandboxPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
     </PageLayout>
   )
 }
