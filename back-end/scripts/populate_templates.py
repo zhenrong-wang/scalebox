@@ -25,56 +25,56 @@ def create_sample_templates():
         # Sample official templates
         official_templates = [
             {
-                "name": "Python Flask Web App",
-                "description": "A modern Flask web application template with authentication and database integration",
-                "category": "Web Development",
+                "name": "Python Basic",
+                "description": "A basic Python environment.",
+                "category": "Programming",
                 "language": "Python",
-                "cpu_requirements": 1.0,
-                "memory_requirements": 2.0,
+                "cpu_spec": 1.0,
+                "memory_spec": 2.0,
                 "is_official": True,
                 "is_public": True,
                 "tags": ["flask", "python", "web", "authentication"],
-                "stars": 150,
-                "downloads": 1200
+                # "stars": 150,  # Removed from model
+                # "downloads": 1200  # Removed from model
             },
             {
                 "name": "React TypeScript App",
                 "description": "Full-stack React application with TypeScript, Redux, and modern tooling",
                 "category": "Frontend",
                 "language": "TypeScript",
-                "cpu_requirements": 1.5,
-                "memory_requirements": 3.0,
+                "cpu_spec": 1.5,
+                "memory_spec": 3.0,
                 "is_official": True,
                 "is_public": True,
                 "tags": ["react", "typescript", "redux", "frontend"],
-                "stars": 200,
-                "downloads": 1800
+                # "stars": 200,  # Removed from model
+                # "downloads": 1800  # Removed from model
             },
             {
-                "name": "Node.js Express API",
-                "description": "RESTful API template with Express.js, JWT authentication, and MongoDB",
-                "category": "Backend",
+                "name": "Node.js Starter",
+                "description": "A Node.js starter template.",
+                "category": "Programming",
                 "language": "JavaScript",
-                "cpu_requirements": 1.0,
-                "memory_requirements": 2.5,
+                "cpu_spec": 2.0,
+                "memory_spec": 4.0,
                 "is_official": True,
                 "is_public": True,
                 "tags": ["nodejs", "express", "api", "mongodb"],
-                "stars": 180,
-                "downloads": 1500
+                # "stars": 180,  # Removed from model
+                # "downloads": 1500  # Removed from model
             },
             {
                 "name": "Django E-commerce",
                 "description": "Complete e-commerce platform with Django, PostgreSQL, and payment integration",
                 "category": "E-commerce",
                 "language": "Python",
-                "cpu_requirements": 2.0,
-                "memory_requirements": 4.0,
+                "cpu_spec": 2.0,
+                "memory_spec": 4.0,
                 "is_official": True,
                 "is_public": True,
                 "tags": ["django", "python", "ecommerce", "postgresql"],
-                "stars": 120,
-                "downloads": 900
+                # "stars": 120,  # Removed from model
+                # "downloads": 900  # Removed from model
             }
         ]
         
@@ -85,28 +85,28 @@ def create_sample_templates():
                 "description": "Personal blog template with custom styling and admin panel",
                 "category": "Blog",
                 "language": "Python",
-                "cpu_requirements": 0.5,
-                "memory_requirements": 1.0,
+                "cpu_spec": 0.5,
+                "memory_spec": 1.0,
                 "is_official": False,
                 "is_public": False,
                 "owner_id": user.id,
                 "tags": ["blog", "python", "personal"],
-                "stars": 5,
-                "downloads": 25
+                # "stars": 5,  # Removed from model
+                # "downloads": 25  # Removed from model
             },
             {
                 "name": "Portfolio Website",
                 "description": "Professional portfolio template with animations and responsive design",
                 "category": "Portfolio",
                 "language": "JavaScript",
-                "cpu_requirements": 0.8,
-                "memory_requirements": 1.5,
+                "cpu_spec": 0.8,
+                "memory_spec": 1.5,
                 "is_official": False,
                 "is_public": False,
                 "owner_id": user.id,
                 "tags": ["portfolio", "javascript", "responsive"],
-                "stars": 8,
-                "downloads": 15
+                # "stars": 8,  # Removed from model
+                # "downloads": 15  # Removed from model
             }
         ]
         

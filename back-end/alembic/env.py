@@ -8,10 +8,8 @@ import os
 from dotenv import load_dotenv
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-load_dotenv(os.path.join(os.path.dirname(__file__), 'app', '.env'))
-from app.models import Base, User
-from app.api_keys import ApiKey, ApiKeyUsage, ApiRateLimit
-from app.sandboxes import Sandbox, SandboxUsage
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+from app.models import Base, User, ApiKey, Template, Project, Notification, Sandbox, SandboxUsage, SandboxMetrics, PendingSignup
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

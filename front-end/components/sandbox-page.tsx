@@ -59,6 +59,13 @@ export function SandboxPage() {
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsRange, setMetricsRange] = useState<{ start: string | null, end: string | null }>({ start: null, end: null })
 
+  // Add state for permanently delete dialog
+  const [permanentDeleteDialog, setPermanentDeleteDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
+    isOpen: false,
+    sandboxId: null,
+    isBatch: false
+  })
+
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -170,6 +177,30 @@ export function SandboxPage() {
       setSelectedSandboxes(new Set())
     } catch (error) {
       console.error('Failed to delete sandboxes:', error)
+    }
+  }
+
+  const handlePermanentDelete = async (sandboxId: string) => {
+    try {
+      // For now, we'll just remove from frontend since backend keeps deleted sandboxes for billing
+      setSandboxes(prev => prev.filter(s => s.id !== sandboxId))
+      setSelectedSandboxes(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(sandboxId)
+        return newSet
+      })
+    } catch (error) {
+      console.error('Failed to permanently delete sandbox:', error)
+    }
+  }
+
+  const handleBatchPermanentDelete = async () => {
+    try {
+      // Remove selected sandboxes from frontend
+      setSandboxes(prev => prev.filter(s => !selectedSandboxes.has(s.id)))
+      setSelectedSandboxes(new Set())
+    } catch (error) {
+      console.error('Failed to permanently delete sandboxes:', error)
     }
   }
 
@@ -295,16 +326,20 @@ export function SandboxPage() {
     }
   ] : []
 
+  // Calculate batch operation states
+  const selectedSandboxesData = sandboxes.filter(s => selectedSandboxes.has(s.id))
+  const allSelectedRunning = selectedSandboxesData.length > 0 && selectedSandboxesData.every(s => s.status === "running")
+  const allSelectedStopped = selectedSandboxesData.length > 0 && selectedSandboxesData.every(s => s.status === "stopped")
+
+  // Update the date picker to use proper localization
   const openDatePicker = (type: 'from' | 'to', event: React.MouseEvent<HTMLButtonElement>) => {
-    // Get the button element that was clicked
     const button = event.currentTarget
     const buttonRect = button.getBoundingClientRect()
     
-    // Create a visible date input positioned relative to the button
     const input = document.createElement('input')
     input.type = 'date'
     input.style.position = 'fixed'
-    input.style.top = `${buttonRect.bottom + 5}px` // 5px below the button
+    input.style.top = `${buttonRect.bottom + 5}px`
     input.style.left = `${buttonRect.left}px`
     input.style.zIndex = '9999'
     input.style.padding = '8px'
@@ -315,12 +350,15 @@ export function SandboxPage() {
     input.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
     input.style.minWidth = '140px'
     
-    document.body.appendChild(input)
+    // Set locale for date input based on current language
+    const currentLang = localStorage.getItem('language') || 'en'
+    if (currentLang === 'zh-CN') {
+      input.setAttribute('lang', 'zh-CN')
+    }
     
-    // Focus and show the input
+    document.body.appendChild(input)
     input.focus()
     
-    // Try to show the picker for modern browsers
     if (input.showPicker) {
       input.showPicker()
     }
@@ -333,7 +371,6 @@ export function SandboxPage() {
       document.body.removeChild(input)
     })
     
-    // Track if the input has been removed
     let isRemoved = false
     
     const removeInput = () => {
@@ -344,20 +381,10 @@ export function SandboxPage() {
       }
     }
     
-    input.addEventListener('change', (e) => {
-      const target = e.target as HTMLInputElement
-      if (target.value) {
-        setDateRange(prev => ({ ...prev, [type]: target.value }))
-      }
-      removeInput()
-    })
-    
     input.addEventListener('blur', () => {
-      // Remove the input if user clicks away
       setTimeout(removeInput, 100)
     })
     
-    // Also handle escape key - use keyup to catch it after the input processes it
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         removeInput()
@@ -453,7 +480,7 @@ export function SandboxPage() {
                 onClick={(e) => openDatePicker('from', e)}
                 className="w-[120px] h-8 text-sm justify-start"
               >
-                {dateRange.from ? new Date(dateRange.from).toLocaleDateString() : "From"}
+                {dateRange.from ? new Date(dateRange.from).toLocaleDateString(localStorage.getItem('language') === 'zh-CN' ? 'zh-CN' : 'en-US') : t("table.from") || "From"}
               </Button>
             </div>
             <span className="text-muted-foreground text-sm">to</span>
@@ -464,7 +491,7 @@ export function SandboxPage() {
                 onClick={(e) => openDatePicker('to', e)}
                 className="w-[120px] h-8 text-sm justify-start"
               >
-                {dateRange.to ? new Date(dateRange.to).toLocaleDateString() : "To"}
+                {dateRange.to ? new Date(dateRange.to).toLocaleDateString(localStorage.getItem('language') === 'zh-CN' ? 'zh-CN' : 'en-US') : t("table.to") || "To"}
               </Button>
             </div>
           </div>
@@ -513,6 +540,7 @@ export function SandboxPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!allSelectedStopped}
                       onClick={() => setStartDialog({ isOpen: true, sandboxId: null, isBatch: true })}
                     >
                       <Play className="h-4 w-4 mr-1" />
@@ -521,6 +549,7 @@ export function SandboxPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!allSelectedRunning}
                       onClick={() => setStopDialog({ isOpen: true, sandboxId: null, isBatch: true })}
                     >
                       <Square className="h-4 w-4 mr-1" />
@@ -537,15 +566,12 @@ export function SandboxPage() {
                   </>
                 ) : (
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
-                    onClick={() => {
-                      // TODO: Implement restore functionality
-                      console.log("Restore selected sandboxes:", Array.from(selectedSandboxes))
-                    }}
+                    onClick={() => setPermanentDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
                   >
-                    <Check className="h-4 w-4 mr-1" />
-                    {t("action.restore") || "Restore Selected"}
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    {t("action.permanentlyDelete") || "Permanently Delete Selected"}
                   </Button>
                 )}
               </div>
@@ -690,7 +716,14 @@ export function SandboxPage() {
                     <ResizableTableCell>{formatUptime(sandbox.uptime)}</ResizableTableCell>
                     <ResizableTableCell>{formatDate(sandbox.createdAt)}</ResizableTableCell>
                     <ResizableTableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openMetricsDialog(sandbox)}
+                        >
+                          <Activity className="h-4 w-4" />
+                        </Button>
                         {activeTab === "active" ? (
                           <>
                             {sandbox.status === "stopped" && (
@@ -698,7 +731,6 @@ export function SandboxPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                                title={t("table.start") || "Start"}
                               >
                                 <Play className="h-4 w-4" />
                               </Button>
@@ -708,7 +740,6 @@ export function SandboxPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                                title={t("table.stop") || "Stop"}
                               >
                                 <Square className="h-4 w-4" />
                               </Button>
@@ -716,31 +747,18 @@ export function SandboxPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openMetricsDialog(sandbox)}
-                              title={t("table.metrics") || "Metrics"}
-                            >
-                              <Activity className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
                               onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                              title={t("table.delete") || "Delete"}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </>
                         ) : (
                           <Button
-                            variant="ghost"
+                            variant="destructive"
                             size="sm"
-                            onClick={() => {
-                              // TODO: Implement restore functionality
-                              console.log("Restore sandbox:", sandbox.id)
-                            }}
-                            title={t("action.restore") || "Restore"}
+                            onClick={() => setPermanentDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
                           >
-                            <Check className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -889,6 +907,39 @@ export function SandboxPage() {
               </ResponsiveContainer>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Permanent Delete Dialog */}
+      <Dialog open={permanentDeleteDialog.isOpen} onOpenChange={(open) => !open && setPermanentDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("action.permanentlyDelete") || "Permanently Delete"}</DialogTitle>
+            <DialogDescription>
+              {permanentDeleteDialog.isBatch 
+                ? t("sandbox.permanentlyDeleteBatchWarning") || "This will permanently delete all selected sandboxes from the frontend. They will still be retained in the backend for billing purposes."
+                : t("sandbox.permanentlyDeleteWarning") || "This will permanently delete this sandbox from the frontend. It will still be retained in the backend for billing purposes."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermanentDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={async () => {
+                if (permanentDeleteDialog.isBatch) {
+                  await handleBatchPermanentDelete()
+                } else if (permanentDeleteDialog.sandboxId) {
+                  await handlePermanentDelete(permanentDeleteDialog.sandboxId)
+                }
+                setPermanentDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })
+              }}
+            >
+              {t("action.permanentlyDelete") || "Permanently Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </PageLayout>

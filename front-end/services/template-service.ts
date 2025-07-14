@@ -25,8 +25,8 @@ export interface Template {
   description?: string;
   category: string;
   language: string;
-  cpu_requirements: number;
-  memory_requirements: number;
+  cpu_spec: number;
+  memory_spec: number;
   is_official: boolean;
   is_public: boolean;
   owner_id?: number;
@@ -36,26 +36,28 @@ export interface Template {
   updated_at: string;
 }
 
-export interface TemplateCreate {
+export interface TemplateCreateRequest {
   name: string;
   description?: string;
   category: string;
   language: string;
-  cpu_requirements: number;
-  memory_requirements: number;
-  is_official: boolean;
-  is_public: boolean;
+  cpu_spec: number;
+  memory_spec: number;
+  is_official?: boolean;
+  is_public?: boolean;
+  repository_url: string;
   tags?: string[];
 }
 
-export interface TemplateUpdate {
+export interface TemplateUpdateRequest {
   name?: string;
   description?: string;
   category?: string;
   language?: string;
-  cpu_requirements?: number;
-  memory_requirements?: number;
+  cpu_spec?: number;
+  memory_spec?: number;
   is_public?: boolean;
+  repository_url?: string;
   tags?: string[];
 }
 
@@ -103,7 +105,7 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async createTemplate(template: TemplateCreate): Promise<Template> {
+  async createTemplate(template: TemplateCreateRequest): Promise<Template> {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -113,7 +115,7 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async updateTemplate(id: string, template: TemplateUpdate): Promise<Template> {
+  async updateTemplate(id: string, template: TemplateUpdateRequest): Promise<Template> {
     const response = await fetch(`${this.baseUrl}/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),

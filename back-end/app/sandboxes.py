@@ -47,6 +47,8 @@ class SandboxCreateRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     framework: str = Field(..., max_length=50)
     region: str = Field(..., max_length=20)
+    cpu_spec: float = Field(..., ge=1.0, le=8.0)  # 1-8 vCPU
+    memory_spec: float = Field(..., ge=0.5, le=16.0)  # 0.5, 1, 2, 4, 8, 16 GB
     visibility: SandboxVisibility = SandboxVisibility.PRIVATE
     project_id: Optional[str] = None
 
@@ -78,8 +80,8 @@ class SandboxResponse(BaseModel):
     updated_at: datetime
     last_accessed_at: Optional[datetime]
     uptime: int  # minutes
-    cpu_spec: Optional[Dict[str, Any]] = None
-    memory_spec: Optional[Dict[str, Any]] = None
+    cpu_spec: Optional[float] = None
+    memory_spec: Optional[float] = None
 
 
 class SandboxFilters(BaseModel):
@@ -290,8 +292,8 @@ def list_sandboxes(
             updated_at=updated_at_val,
             last_accessed_at=last_accessed_at_val,
             uptime=uptime,
-            cpu_spec=getattr(sandbox, 'cpu_requirements', None),
-            memory_spec=getattr(sandbox, 'memory_requirements', None)
+            cpu_spec=getattr(sandbox, 'cpu_spec', None),
+            memory_spec=getattr(sandbox, 'memory_spec', None)
         ))
 
     return result
@@ -472,8 +474,8 @@ def get_sandbox(
         updated_at=updated_at_val,
         last_accessed_at=last_accessed_at_val,
         uptime=uptime,
-        cpu_spec=getattr(sandbox, 'cpu_requirements', None),
-        memory_spec=getattr(sandbox, 'memory_requirements', None)
+        cpu_spec=getattr(sandbox, 'cpu_spec', None),
+        memory_spec=getattr(sandbox, 'memory_spec', None)
     )
 
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -15,21 +15,37 @@ class TemplateCreate(BaseModel):
     description: Optional[str] = None
     category: str = Field(..., min_length=1, max_length=100)
     language: str = Field(..., min_length=1, max_length=100)
-    cpu_requirements: float = Field(..., ge=0.1, le=32.0)
-    memory_requirements: float = Field(..., ge=0.1, le=128.0)
+    cpu_spec: float = Field(..., ge=1.0, le=8.0)
+    memory_spec: float = Field(..., description="Allowed: 0.5, 1, 2, 4, 8, 16")
     is_official: bool = False
     is_public: bool = False
     tags: Optional[List[str]] = None
+
+    @validator('memory_spec')
+    def validate_memory_spec(cls, value):
+        allowed = {0.5, 1, 2, 4, 8, 16}
+        if value not in allowed:
+            raise ValueError("memory_spec must be one of: 0.5, 1, 2, 4, 8, 16")
+        return value
 
 class TemplateUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     category: Optional[str] = Field(None, min_length=1, max_length=100)
     language: Optional[str] = Field(None, min_length=1, max_length=100)
-    cpu_requirements: Optional[float] = Field(None, ge=0.1, le=32.0)
-    memory_requirements: Optional[float] = Field(None, ge=0.1, le=128.0)
+    cpu_spec: Optional[float] = Field(None, ge=1.0, le=8.0)
+    memory_spec: Optional[float] = Field(None, description="Allowed: 0.5, 1, 2, 4, 8, 16")
     is_public: Optional[bool] = None
     tags: Optional[List[str]] = None
+
+    @validator('memory_spec')
+    def validate_memory_spec(cls, value):
+        if value is None:
+            return value
+        allowed = {0.5, 1, 2, 4, 8, 16}
+        if value not in allowed:
+            raise ValueError("memory_spec must be one of: 0.5, 1, 2, 4, 8, 16")
+        return value
 
 class TemplateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -39,8 +55,8 @@ class TemplateResponse(BaseModel):
     description: Optional[str]
     category: str
     language: str
-    cpu_requirements: float
-    memory_requirements: float
+    cpu_spec: float
+    memory_spec: float
     is_official: bool
     is_public: bool
     owner_id: Optional[int]

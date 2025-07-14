@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useLanguage } from "../contexts/language-context"
 import { tReplace } from "../lib/i18n"
-import { templateService, type Template, type TemplateCreate, type TemplateUpdate } from "../services/template-service"
+import { templateService, type Template, type TemplateCreateRequest, type TemplateUpdateRequest } from "../services/template-service"
 import { useToast } from "@/hooks/use-toast"
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
@@ -35,27 +35,30 @@ export function TemplatesPage() {
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editDialog, setEditDialog] = useState<{ open: boolean; template: Template | null }>({ open: false, template: null })
-  const [newTemplate, setNewTemplate] = useState<TemplateCreate>({
-    name: "",
-    description: "",
-    category: "",
-    language: "",
-    cpu_requirements: 1.0,
-    memory_requirements: 1.0,
-    is_official: false,
+  const [newTemplate, setNewTemplate] = useState({
+    name: '',
+    description: '',
+    category: '',
+    language: '',
+    cpu_spec: 1.0,
+    memory_spec: 1.0,
+    repository_url: '',
+    tags: [] as string[],
     is_public: false,
-    tags: [],
-  })
-  const [editTemplate, setEditTemplate] = useState<TemplateUpdate>({
-    name: "",
-    description: "",
-    category: "",
-    language: "",
-    cpu_requirements: 1.0,
-    memory_requirements: 1.0,
+  });
+
+  const [editTemplate, setEditTemplate] = useState({
+    id: '',
+    name: '',
+    description: '',
+    category: '',
+    language: '',
+    cpu_spec: 1.0,
+    memory_spec: 1.0,
+    repository_url: '',
+    tags: [] as string[],
     is_public: false,
-    tags: [],
-  })
+  });
   const [currentUser, setCurrentUser] = useState<{ id?: number; isAdmin?: boolean }>({})
   const { t } = useLanguage()
   const { toast } = useToast()
@@ -97,7 +100,7 @@ export function TemplatesPage() {
     }
   }
 
-  const handleSort = (field: string) => {
+  const handleSort = (field: keyof Template) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -144,42 +147,65 @@ export function TemplatesPage() {
   }
 
   const handleCreateTemplate = async () => {
+    if (!newTemplate.name || !newTemplate.category || !newTemplate.language || !newTemplate.repository_url) {
+      toast({
+        title: "Error",
+        description: t('templates.fill_required_fields') || 'Please fill in all required fields',
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      // Convert tags string to array
-      const templateData = {
+      await templateService.createTemplate({
         ...newTemplate,
-        tags: newTemplate.tags?.filter(tag => tag.trim()) || []
-      }
-      
-      await templateService.createTemplate(templateData)
+        cpu_spec: newTemplate.cpu_spec,
+        memory_spec: newTemplate.memory_spec,
+      });
       setIsCreateDialogOpen(false)
       setNewTemplate({
         name: "",
         description: "",
         category: "",
         language: "",
-        cpu_requirements: 1.0,
-        memory_requirements: 1.0,
-        is_official: false,
-        is_public: false,
+        cpu_spec: 1.0,
+        memory_spec: 1.0,
+        repository_url: '',
         tags: [],
+        is_public: false,
       })
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('templates.template_created'),
+        description: t('templates.created_successfully') || 'Template created successfully',
       })
     } catch (error) {
-      console.error('Failed to create template:', error)
+      console.error('Error creating template:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_create'),
+        description: t('templates.create_error') || 'Failed to create template',
         variant: "destructive",
       })
     }
   }
 
-  const handleEditTemplate = async () => {
+  const handleEditTemplate = (template: Template) => {
+    setEditTemplate({
+      id: template.id,
+      name: template.name,
+      description: template.description || '',
+      category: template.category,
+      language: template.language,
+      cpu_spec: template.cpu_spec,
+      memory_spec: template.memory_spec,
+      repository_url: template.repository_url || '',
+      tags: template.tags || [],
+      is_public: template.is_public,
+    })
+    setEditDialog({ open: true, template })
+  }
+
+  const handleUpdateTemplate = async () => {
     if (!editDialog.template) return
     
     try {
@@ -193,30 +219,16 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('templates.template_updated'),
+        description: t('templates.template_updated') || 'Template updated successfully',
       })
     } catch (error) {
       console.error('Failed to update template:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_update'),
+        description: t('templates.failed_to_update') || 'Failed to update template',
         variant: "destructive",
       })
     }
-  }
-
-  const openEditDialog = (template: Template) => {
-    setEditTemplate({
-      name: template.name,
-      description: template.description || "",
-      category: template.category,
-      language: template.language,
-      cpu_requirements: template.cpu_requirements,
-      memory_requirements: template.memory_requirements,
-      is_public: template.is_public,
-      tags: template.tags || [],
-    })
-    setEditDialog({ open: true, template })
   }
 
   const handleDeleteTemplate = async (template: Template) => {
@@ -341,6 +353,9 @@ export function TemplatesPage() {
       icon: <Lock className="h-4 w-4 text-muted-foreground" />
     }
   ]
+
+  // Memory spec options for dropdown
+  const memoryOptions = [0.5, 1, 2, 4, 8, 16];
 
   return (
     <PageLayout
@@ -473,15 +488,17 @@ export function TemplatesPage() {
                   <ResizableTableHead columnId="category" defaultWidth={120}>{t('templates.category')}</ResizableTableHead>
                   <ResizableTableHead columnId="language" defaultWidth={100}>{t('templates.language')}</ResizableTableHead>
                   <ResizableTableHead columnId="cpu" defaultWidth={100}>
-                    <Button variant="ghost" onClick={() => handleSort("cpu_requirements")} className="h-auto p-0 group">
-                      <Cpu className="h-4 w-4 mr-1" />
-                      CPU {getSortIcon("cpu_requirements")}
+                    <Button variant="ghost" onClick={() => handleSort("cpu_spec")} className="h-auto p-0 group">
+                      <div className="flex items-center gap-1">
+                        CPU {getSortIcon("cpu_spec")}
+                      </div>
                     </Button>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="memory" defaultWidth={100}>
-                    <Button variant="ghost" onClick={() => handleSort("memory_requirements")} className="h-auto p-0 group">
-                      <HardDrive className="h-4 w-4 mr-1" />
-                      {t("table.memory") || "Memory"} {getSortIcon("memory_requirements")}
+                    <Button variant="ghost" onClick={() => handleSort("memory_spec")} className="h-auto p-0 group">
+                      <div className="flex items-center gap-1">
+                        {t("table.memory") || "Memory"} {getSortIcon("memory_spec")}
+                      </div>
                     </Button>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="created" defaultWidth={120}>
@@ -519,8 +536,8 @@ export function TemplatesPage() {
                       <Badge variant="outline">{template.category}</Badge>
                     </ResizableTableCell>
                     <ResizableTableCell>{template.language}</ResizableTableCell>
-                    <ResizableTableCell>{template.cpu_requirements} vCPU</ResizableTableCell>
-                    <ResizableTableCell>{template.memory_requirements} GB</ResizableTableCell>
+                    <ResizableTableCell>{template.cpu_spec} vCPU</ResizableTableCell>
+                    <ResizableTableCell>{template.memory_spec} GB</ResizableTableCell>
                     <ResizableTableCell>{new Date(template.created_at).toLocaleDateString()}</ResizableTableCell>
                     <ResizableTableCell>{new Date(template.updated_at).toLocaleDateString()}</ResizableTableCell>
                     <ResizableTableCell>
@@ -532,7 +549,7 @@ export function TemplatesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(template)}>
+                          <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
                             <Edit className="mr-2 h-4 w-4" />
                             {t('templates.edit')}
                           </DropdownMenuItem>
@@ -591,25 +608,38 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cpu">{t('templates.cpu_requirements')}</Label>
+              <Label htmlFor="cpu">{t('templates.cpu_spec')}</Label>
               <Input
                 id="cpu"
                 type="number"
-                step="0.1"
-                min="0.1"
-                value={newTemplate.cpu_requirements}
-                onChange={(e) => setNewTemplate({ ...newTemplate, cpu_requirements: parseFloat(e.target.value) || 1.0 })}
+                min="1"
+                max="8"
+                step="0.5"
+                value={newTemplate.cpu_spec}
+                onChange={(e) => setNewTemplate({ ...newTemplate, cpu_spec: parseFloat(e.target.value) || 1.0 })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="memory">{t('templates.memory_requirements')}</Label>
+              <Label htmlFor="memory">{t('templates.memory_spec')}</Label>
+              <Select value={newTemplate.memory_spec.toString()} onValueChange={(value) => setNewTemplate({ ...newTemplate, memory_spec: parseFloat(value) })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {memoryOptions.map(option => (
+                    <SelectItem key={option} value={option.toString()}>
+                      {option} GB
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="repository_url">{t('templates.repository_url')}</Label>
               <Input
-                id="memory"
-                type="number"
-                step="0.1"
-                min="0.1"
-                value={newTemplate.memory_requirements}
-                onChange={(e) => setNewTemplate({ ...newTemplate, memory_requirements: parseFloat(e.target.value) || 1.0 })}
+                id="repository_url"
+                value={newTemplate.repository_url}
+                onChange={(e) => setNewTemplate({ ...newTemplate, repository_url: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -640,16 +670,6 @@ export function TemplatesPage() {
               />
               <Label htmlFor="is_public">{t('templates.make_public')}</Label>
             </div>
-            {currentUser.isAdmin && (
-              <div className="col-span-2 flex items-center space-x-2">
-                <Checkbox
-                  id="is_official"
-                  checked={newTemplate.is_official}
-                  onCheckedChange={(checked) => setNewTemplate({ ...newTemplate, is_official: checked as boolean })}
-                />
-                <Label htmlFor="is_official">{t('templates.make_official')}</Label>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -694,25 +714,38 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-cpu">{t('templates.cpu_requirements')}</Label>
+              <Label htmlFor="edit-cpu">{t('templates.cpu_spec')}</Label>
               <Input
                 id="edit-cpu"
                 type="number"
-                step="0.1"
-                min="0.1"
-                value={editTemplate.cpu_requirements}
-                onChange={(e) => setEditTemplate({ ...editTemplate, cpu_requirements: parseFloat(e.target.value) || 1.0 })}
+                min="1"
+                max="8"
+                step="0.5"
+                value={editTemplate.cpu_spec}
+                onChange={(e) => setEditTemplate({ ...editTemplate, cpu_spec: parseFloat(e.target.value) || 1.0 })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-memory">{t('templates.memory_requirements')}</Label>
+              <Label htmlFor="edit-memory">{t('templates.memory_spec')}</Label>
+              <Select value={editTemplate.memory_spec.toString()} onValueChange={(value) => setEditTemplate({ ...editTemplate, memory_spec: parseFloat(value) })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {memoryOptions.map(option => (
+                    <SelectItem key={option} value={option.toString()}>
+                      {option} GB
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-repository_url">{t('templates.repository_url')}</Label>
               <Input
-                id="edit-memory"
-                type="number"
-                step="0.1"
-                min="0.1"
-                value={editTemplate.memory_requirements}
-                onChange={(e) => setEditTemplate({ ...editTemplate, memory_requirements: parseFloat(e.target.value) || 1.0 })}
+                id="edit-repository_url"
+                value={editTemplate.repository_url}
+                onChange={(e) => setEditTemplate({ ...editTemplate, repository_url: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -748,7 +781,7 @@ export function TemplatesPage() {
             <Button variant="outline" onClick={() => setEditDialog({ open: false, template: null })}>
               {t('action.cancel')}
             </Button>
-            <Button onClick={handleEditTemplate}>
+            <Button onClick={handleUpdateTemplate}>
               {t('templates.save')}
             </Button>
           </DialogFooter>

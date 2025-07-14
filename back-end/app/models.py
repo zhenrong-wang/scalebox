@@ -37,8 +37,8 @@ class Template(Base):
     description = Column(Text, nullable=True)
     category = Column(String(100), nullable=False)
     language = Column(String(100), nullable=False)
-    cpu_requirements = Column(Float, nullable=False, default=1.0)
-    memory_requirements = Column(Float, nullable=False, default=1.0)
+    cpu_spec = Column(Float, nullable=False, default=1.0)  # 1-8 vCPU
+    memory_spec = Column(Float, nullable=False, default=1.0)  # 0.5, 1, 2, 4, 8, 16 GB
     is_official = Column(Boolean, nullable=False, default=False)
     is_public = Column(Boolean, nullable=False, default=False)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL for official templates
@@ -71,7 +71,7 @@ class ApiKey(Base):
     description = Column(Text, nullable=True)
     key_hash = Column(String(255), nullable=False)
     full_key = Column(String(255), nullable=False)
-    prefix = Column(String(8), nullable=False)
+    prefix = Column(String(16), nullable=False)
     permissions = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=True)
     expires_in_days = Column(Integer, nullable=True)
@@ -104,6 +104,8 @@ class Sandbox(Base):
     region = Column(String(20), nullable=False)
     visibility = Column(String(20), nullable=False)
     project_id = Column(String(36), nullable=True)
+    cpu_spec = Column(Float, nullable=False, default=1.0)  # 1-8 vCPU
+    memory_spec = Column(Float, nullable=False, default=1.0)  # 0.5, 1, 2, 4, 8, 16 GB
     cpu_usage = Column(Float, nullable=True)
     memory_usage = Column(Float, nullable=True)
     storage_usage = Column(Float, nullable=True)
