@@ -1814,7 +1814,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "terms.section11.item3": "终止后，您的数据可能被永久删除",
     "terms.section11.item4": "终止时未付费用仍然到期",
     "terms.section12.title": "条款变更",
-    "terms.section12.desc": "我们可能会不时更新这些条款。我们将通过在此頁面上發布新條款並更新\"最後更新\"日期來通知您重大變更。您在這些變更後繼續使用服務即表示接受新條款。",
+    "terms.section12.desc": "我们可能会不时更新这些条款。我们将通过在此页面上发布新条款并更新\"最后更新\"日期来通知您重大变更。您在这些变更后继续使用服务即表示接受新条款。",
     "terms.section13.title": "联系信息",
     "terms.section13.desc": "如果您对这些服务条款有任何疑问，请联系我们：",
     "terms.contact.title": "ScaleBox支持",
