@@ -25,7 +25,9 @@ def get_current_user(
         user_id = payload.get("sub")
         if user_id is None:
             return None
-    except jwt.PyJWTError:
+        # Convert user_id to integer since it's stored as string in JWT
+        user_id = int(user_id)
+    except (jwt.PyJWTError, ValueError):
         return None
     
     user = db.query(User).filter(User.id == user_id).first()
