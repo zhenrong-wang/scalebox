@@ -534,6 +534,7 @@ export function TemplatesPage() {
                       <Checkbox
                         checked={selectedTemplates.includes(template.id)}
                         onCheckedChange={() => handleSelectTemplate(template.id)}
+                        disabled={!templateService.canDelete(template, currentUser.id, currentUser.role === 'admin')}
                       />
                     </ResizableTableCell>
                     <ResizableTableCell className="font-mono text-xs">{template.id}</ResizableTableCell>
@@ -562,22 +563,30 @@ export function TemplatesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            {t('templates.edit')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMakeOfficial(template)}>
-                            <Lock className="mr-2 h-4 w-4" />
-                            {t('templates.make_official')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMakePublic(template)}>
-                            <Globe className="mr-2 h-4 w-4" />
-                            {t('templates.make_public')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            {t('templates.delete')}
-                          </DropdownMenuItem>
+                          {templateService.canEdit(template, currentUser.id, currentUser.role === 'admin') && (
+                            <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              {t('templates.edit')}
+                            </DropdownMenuItem>
+                          )}
+                          {currentUser.role === 'admin' && !template.is_official && (
+                            <DropdownMenuItem onClick={() => handleMakeOfficial(template)}>
+                              <Lock className="mr-2 h-4 w-4" />
+                              {t('templates.make_official')}
+                            </DropdownMenuItem>
+                          )}
+                          {currentUser.role === 'admin' && !template.is_public && !template.is_official && (
+                            <DropdownMenuItem onClick={() => handleMakePublic(template)}>
+                              <Globe className="mr-2 h-4 w-4" />
+                              {t('templates.make_public')}
+                            </DropdownMenuItem>
+                          )}
+                          {templateService.canDelete(template, currentUser.id, currentUser.role === 'admin') && (
+                            <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              {t('templates.delete')}
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </ResizableTableCell>
