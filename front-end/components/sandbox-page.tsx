@@ -545,10 +545,10 @@ export function SandboxPage() {
       }}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="active">
-            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "deleted").length})
+            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "deleted" && !getPermanentlyDeletedIds().has(s.id)).length})
           </TabsTrigger>
           <TabsTrigger value="deleted">
-            {t("table.deleted") || "Deleted"} ({sandboxes.filter(s => s.status === "deleted").length})
+            {t("table.deleted") || "Deleted"} ({sandboxes.filter(s => s.status === "deleted" && !getPermanentlyDeletedIds().has(s.id)).length})
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -618,10 +618,21 @@ export function SandboxPage() {
             </div>
           ) : filteredSandboxes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>{t("sandbox.noSandboxes") || "No sandboxes found."}</p>
-              <p className="text-sm mt-2">
-                {t("sandbox.createFirst") || "Create your first sandbox to get started."}
-              </p>
+              {activeTab === "active" ? (
+                <>
+                  <p>{t("sandbox.noActiveSandboxes") || "No active sandboxes found."}</p>
+                  <p className="text-sm mt-2">
+                    {t("sandbox.createFirst") || "Create your first sandbox to get started."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>{t("sandbox.noDeletedSandboxes") || "No deleted sandboxes found."}</p>
+                  <p className="text-sm mt-2">
+                    {t("sandbox.noDeletedSandboxesDesc") || "Deleted sandboxes will appear here for permanent deletion."}
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <ResizableTable
