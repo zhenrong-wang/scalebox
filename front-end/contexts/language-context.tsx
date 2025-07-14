@@ -32,8 +32,6 @@ export function LanguageProvider({
       const nav = navigator.language.toLowerCase()
       if (nav.startsWith("zh-cn") || nav === "zh") {
         setLanguage("zh-CN")
-      } else if (nav.startsWith("zh-tw") || nav.startsWith("zh-hk")) {
-        setLanguage("zh-TW")
       }
       // If none of the above, keep the default language
     }

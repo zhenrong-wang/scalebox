@@ -12,7 +12,6 @@ export function LanguageToggle() {
   const options: { code: Language; label: string }[] = [
     { code: "en", label: "English" },
     { code: "zh-CN", label: "简体中文" },
-    { code: "zh-TW", label: "繁體中文" },
   ]
 
   // Don't render until hydration is complete to prevent SSR/client mismatch
