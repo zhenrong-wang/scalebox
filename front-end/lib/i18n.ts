@@ -1798,7 +1798,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "action.viewSandboxes": "查看沙盒",
     "sandbox.description": "创建、运行和管理隔离的开发环境。跟踪每个沙盒的使用和成本。",
     "budget.search": "搜索预算...",
-    
+
     // Cookie Settings
     "cookie.title": "我们使用Cookie",
     "cookie.description": "我们使用Cookie来增强您的体验、分析网站流量和个性化内容。继续使用我们的网站即表示您同意我们使用Cookie。",
@@ -1811,7 +1811,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "cookie.rejected": "❌ Cookie已拒绝",
     "cookie.noPreference": "⏳ 未设置偏好",
     "cookie.changeSettings": "您可以随时点击页脚的\"Cookie设置\"来更改这些设置。",
-    
+
     // Privacy Policy
     "privacy.title": "隐私政策",
     "privacy.lastUpdated": "最后更新：",

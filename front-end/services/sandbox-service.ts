@@ -3,9 +3,18 @@ import type { Sandbox } from "../types/sandbox"
 // API base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+// Helper function to check if user is authenticated
+export const isAuthenticated = (): boolean => {
+  const token = localStorage.getItem('auth-token')
+  return !!token
+}
+
 // Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth-token')
+  if (!token) {
+    console.warn('No auth token found in localStorage')
+  }
   return {
     'Content-Type': 'application/json',
     'Authorization': token ? `Bearer ${token}` : '',
@@ -35,22 +44,28 @@ export class SandboxService {
     limit?: number
     offset?: number
   }): Promise<Sandbox[]> {
-    const queryParams = new URLSearchParams()
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          queryParams.append(key, value.toString())
-        }
+    try {
+      const queryParams = new URLSearchParams()
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryParams.append(key, value.toString())
+          }
+        })
+      }
+
+      const response = await fetch(`${API_BASE_URL}/sandboxes/?${queryParams}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
       })
+
+      const data = await handleResponse(response)
+      return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+    } catch (error) {
+      console.error('Failed to fetch sandboxes:', error)
+      // Return empty array if the request fails
+      return []
     }
-
-    const response = await fetch(`${API_BASE_URL}/sandboxes/?${queryParams}`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    })
-
-    const data = await handleResponse(response)
-    return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
   }
 
   // Get sandbox statistics
@@ -65,12 +80,28 @@ export class SandboxService {
     avg_memory_usage: number
     total_uptime_hours: number
   }> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/stats`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/sandboxes/stats`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      })
 
-    return handleResponse(response)
+      return handleResponse(response)
+    } catch (error) {
+      console.error('Failed to fetch sandbox stats:', error)
+      // Return default stats if the request fails
+      return {
+        total_sandboxes: 0,
+        running_sandboxes: 0,
+        stopped_sandboxes: 0,
+        error_sandboxes: 0,
+        deleted_sandboxes: 0,
+        total_cost: 0,
+        avg_cpu_usage: 0,
+        avg_memory_usage: 0,
+        total_uptime_hours: 0,
+      }
+    }
   }
 
   // Create a new sandbox
@@ -157,7 +188,7 @@ export class SandboxService {
     framework?: string
     region?: string
     visibility?: string
-    user_id?: string
+    user_account_id?: string
     project_id?: string
     search?: string
     sort_by?: string
@@ -238,6 +269,23 @@ export class SandboxService {
     return data.metrics
   }
 
+  // Get all sandboxes for a specific project
+  static async getSandboxesByProject(projectId: string): Promise<Sandbox[]> {
+    try {
+      const queryParams = new URLSearchParams()
+      queryParams.append('project_id', projectId)
+      const response = await fetch(`${API_BASE_URL}/sandboxes/?${queryParams}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      })
+      const data = await handleResponse(response)
+      return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+    } catch (error) {
+      console.error('Failed to fetch sandboxes by project:', error)
+      return []
+    }
+  }
+
   // Helper function to map API response to Sandbox interface
   private static mapApiResponseToSandbox(apiData: any): Sandbox {
     return {
@@ -246,7 +294,7 @@ export class SandboxService {
       description: apiData.description || '',
       framework: apiData.framework,
       status: apiData.status,
-      userId: apiData.user_id,
+      user_account_id: apiData.user_account_id,
       userName: apiData.user_name,
       userEmail: apiData.user_email,
       region: apiData.region,

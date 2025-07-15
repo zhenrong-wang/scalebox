@@ -8,7 +8,7 @@ from .models import Base, User, Project
 from .auth import get_current_user
 from .schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+router = APIRouter(tags=["projects"])
 
 @router.get("/", response_model=ProjectListResponse)
 async def list_projects(
@@ -19,7 +19,7 @@ async def list_projects(
     current_user: User = Depends(get_current_user)
 ):
     """List projects for the current user"""
-    query = db.query(Project).filter(Project.user_id == current_user.id)
+    query = db.query(Project).filter(Project.owner_account_id == current_user.account_id)
     
     if status:
         query = query.filter(Project.status == status)
@@ -42,7 +42,7 @@ async def create_project(
     db_project = Project(
         name=project.name,
         description=project.description,
-        user_id=current_user.id
+        owner_account_id=current_user.account_id
     )
     
     db.add(db_project)
@@ -59,8 +59,8 @@ async def get_project(
 ):
     """Get a specific project"""
     project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
+        Project.project_id == project_id,
+        Project.owner_account_id == current_user.account_id
     ).first()
     
     if not project:
@@ -77,21 +77,21 @@ async def update_project(
 ):
     """Update a project"""
     project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
+        Project.project_id == project_id,
+        Project.owner_account_id == current_user.account_id
     ).first()
     
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
     if project_update.name is not None:
-        project.name = project_update.name
+        setattr(project, 'name', project_update.name)
     if project_update.description is not None:
-        project.description = project_update.description
+        setattr(project, 'description', project_update.description)
     if project_update.status is not None:
-        project.status = project_update.status
+        setattr(project, 'status', project_update.status)
     
-    project.updated_at = datetime.utcnow()
+    setattr(project, 'updated_at', datetime.utcnow())
     db.commit()
     db.refresh(project)
     
@@ -105,8 +105,8 @@ async def delete_project(
 ):
     """Delete a project"""
     project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
+        Project.project_id == project_id,
+        Project.owner_account_id == current_user.account_id
     ).first()
     
     if not project:

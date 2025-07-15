@@ -21,7 +21,7 @@ const handleResponse = async (response: Response) => {
 
 export interface Notification {
   id: string;
-  user_id: number;
+  user_account_id: string;
   title: string;
   message: string;
   type: 'info' | 'warning' | 'error' | 'success';
@@ -221,7 +221,7 @@ export class NotificationService {
     }
   }
 
-  async createDemoNotifications(): Promise<{ message: string; count: number }> {
+  async createDemoNotifications(): Promise<{ message: string }> {
     const response = await fetch(`${this.baseUrl}/demo`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -251,13 +251,10 @@ export class NotificationService {
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      return `${diffInMinutes} minutes ago`;
+      const diffInMinutes = Math.floor(diffInHours * 60);
+      return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
     } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)} hours ago`;
-    } else if (diffInHours < 168) { // 7 days
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays} days ago`;
+      return `${Math.floor(diffInHours)} hour${Math.floor(diffInHours) !== 1 ? 's' : ''} ago`;
     } else {
       return date.toLocaleDateString();
     }
@@ -271,4 +268,5 @@ export class NotificationService {
   }
 }
 
+// Export a singleton instance
 export const notificationService = new NotificationService(); 

@@ -4,7 +4,7 @@ export interface Sandbox {
   description: string
   framework: string
   status: "running" | "stopped" | "deleted" | "error"
-  userId: string
+  user_account_id: string
   userName: string
   userEmail: string
   region: string
@@ -51,6 +51,6 @@ export interface SandboxStats {
   avgMemoryUsage: number
   totalUptime: number
   topFrameworks: Array<{ framework: string; count: number }>
-  topUsers: Array<{ userId: string; userName: string; count: number; cost: number }>
+  topUsers: Array<{ user_account_id: string; userName: string; count: number; cost: number }>
   regionDistribution: Array<{ region: string; count: number }>
 }

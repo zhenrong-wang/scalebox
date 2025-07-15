@@ -54,7 +54,7 @@ export class UserService {
     const res = await fetch(`${this.API_BASE}/users/verify-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: code, email }),
+      body: JSON.stringify({ token: code }),
     });
     return await res.json();
   }

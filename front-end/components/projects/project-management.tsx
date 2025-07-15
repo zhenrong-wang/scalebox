@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Search, Filter, FolderOpen, Settings, Trash2, Edit, Box, DollarSign, Eye } from "lucide-react"
 import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
@@ -16,57 +16,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { PageLayout } from "@/components/ui/page-layout"
 import { useLanguage } from "../../contexts/language-context"
-
-interface Project {
-  id: string
-  name: string
-  description: string
-  sandboxCount: number
-  apiKeyCount: number
-  totalSpent: number
-  createdAt: string
-  updatedAt: string
-  status: "active" | "archived"
-}
-
-const mockProjects: Project[] = [
-  {
-    id: "proj_001",
-    name: "E-commerce Platform",
-    description: "Main e-commerce application with microservices architecture",
-    sandboxCount: 5,
-    apiKeyCount: 3,
-    totalSpent: 245.3,
-    createdAt: "2024-01-15",
-    updatedAt: "2024-01-28",
-    status: "active",
-  },
-  {
-    id: "proj_002",
-    name: "Mobile App Backend",
-    description: "REST API backend for mobile application",
-    sandboxCount: 2,
-    apiKeyCount: 1,
-    totalSpent: 89.2,
-    createdAt: "2024-01-20",
-    updatedAt: "2024-01-27",
-    status: "active",
-  },
-  {
-    id: "proj_003",
-    name: "Analytics Dashboard",
-    description: "Internal analytics and reporting dashboard",
-    sandboxCount: 1,
-    apiKeyCount: 2,
-    totalSpent: 156.75,
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-25",
-    status: "archived",
-  },
-]
+import { ProjectService, Project } from "../../services/project-service"
+import type { Sandbox } from "../../types/sandbox"
+import { SandboxService } from "../../services/sandbox-service"
+import { toast } from "sonner"
 
 export function ProjectManagement() {
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
+  const [projects, setProjects] = useState<Project[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<string>("")
@@ -82,16 +38,22 @@ export function ProjectManagement() {
     name: "",
     description: "",
   })
+  const [projectSandboxes, setProjectSandboxes] = useState<Sandbox[]>([])
+  const [sandboxesLoading, setSandboxesLoading] = useState(false)
   const { t } = useLanguage()
+  const projectService = new ProjectService()
 
-  // Mock sandboxes data for demonstration
-  const mockSandboxes = [
-    { id: "sb-001", name: "Web Development", status: "running", projectId: "proj_001" },
-    { id: "sb-002", name: "API Testing", status: "stopped", projectId: "proj_002" },
-    { id: "sb-003", name: "Data Processing", status: "running", projectId: "proj_001" },
-    { id: "sb-004", name: "Machine Learning", status: "running", projectId: "proj_003" },
-    { id: "sb-005", name: "Database Testing", status: "stopped" },
-  ]
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await projectService.getProjects()
+        setProjects(response.projects)
+      } catch (error) {
+        console.error("Error fetching projects:", error)
+      }
+    }
+    fetchProjects()
+  }, [])
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -115,7 +77,7 @@ export function ProjectManagement() {
     .filter((project) => {
       const matchesSearch =
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase()))
       const matchesStatus = statusFilter === "all" || project.status === statusFilter
       return matchesSearch && matchesStatus
     })
@@ -135,71 +97,94 @@ export function ProjectManagement() {
       return 0
     })
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (!newProject.name.trim() || !newProject.description.trim()) return
 
-    const project: Project = {
-      id: `proj_${Date.now()}`,
-      name: newProject.name,
-      description: newProject.description,
-      sandboxCount: 0,
-      apiKeyCount: 0,
-      totalSpent: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-      status: "active",
+    try {
+      const createdProject = await projectService.createProject({
+        name: newProject.name,
+        description: newProject.description
+      })
+      setProjects([createdProject, ...projects])
+      setNewProject({ name: "", description: "" })
+      setIsCreateDialogOpen(false)
+      toast.success(t("project.createSuccess") || "Project created successfully");
+    } catch (error) {
+      console.error("Error creating project:", error)
+      toast.error(t("project.createError") || "Failed to create project");
     }
-
-    setProjects([project, ...projects])
-    setNewProject({ name: "", description: "" })
-    setIsCreateDialogOpen(false)
   }
 
-  const handleEditProject = () => {
-    if (!editDialog.project || !editProject.name.trim() || !editProject.description.trim()) return
-
-    setProjects(prev => prev.map(project => 
-      project.id === editDialog.project!.id 
-        ? {
-            ...project,
-            name: editProject.name,
-            description: editProject.description,
-            updatedAt: new Date().toISOString().split("T")[0],
-          }
-        : project
-    ))
-    setEditDialog({ open: false, project: null })
-    setEditProject({ name: "", description: "" })
-  }
+  const handleEditProject = async () => {
+    if (!editDialog.project) return;
+    
+    try {
+      const updatedProject = await projectService.updateProject(editDialog.project.project_id, {
+        name: editProject.name,
+        description: editProject.description
+      });
+      
+      setProjects(projects.map(project => 
+        project.project_id === editDialog.project!.project_id ? updatedProject : project
+      ));
+      
+      setEditDialog({ open: false, project: null });
+      toast.success(t("project.editSuccess") || "Project updated successfully");
+    } catch (error) {
+      console.error("Error updating project:", error);
+      toast.error(t("project.editError") || "Failed to update project");
+    }
+  };
 
   const openEditDialog = (project: Project) => {
     setEditProject({
       name: project.name,
-      description: project.description,
+      description: project.description || "",
     })
     setEditDialog({ open: true, project })
   }
 
-  const handleDeleteProject = (projectId: string) => {
-    setProjects(projects.filter((p) => p.id !== projectId))
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      await projectService.deleteProject(projectId)
+      setProjects(projects.filter((p) => p.project_id !== projectId))
+      toast.success(t("project.deleteSuccess") || "Project deleted successfully");
+    } catch (error) {
+      console.error("Error deleting project:", error)
+      toast.error(t("project.deleteError") || "Failed to delete project");
+    }
   }
 
-  const handleArchiveProject = (projectId: string) => {
-    setProjects(projects.map((p) => (p.id === projectId ? { ...p, status: "archived" as const } : p)))
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      const updatedProject = await projectService.updateProject(projectId, { status: "archived" })
+      setProjects(projects.map((p) => (p.project_id === projectId ? updatedProject : p)))
+      toast.success(t("project.archiveSuccess") || "Project archived successfully");
+    } catch (error) {
+      console.error("Error archiving project:", error)
+      toast.error(t("project.archiveError") || "Failed to archive project");
+    }
   }
 
-  const getProjectSandboxes = (projectId: string) => {
-    return mockSandboxes.filter(sb => sb.projectId === projectId)
-  }
-
-  const openViewSandboxes = (project: Project) => {
-    setViewSandboxesDialog({ open: true, project })
-  }
+  const openViewSandboxes = async (project: Project) => {
+    setViewSandboxesDialog({ open: true, project });
+    setSandboxesLoading(true);
+    
+    try {
+      const sandboxes = await SandboxService.getSandboxesByProject(project.project_id)
+      setProjectSandboxes(sandboxes);
+    } catch (error) {
+      console.error("Error fetching sandboxes:", error);
+      toast.error(t("project.sandboxesError") || "Failed to load sandboxes");
+    } finally {
+      setSandboxesLoading(false);
+    }
+  };
 
   const totalProjects = projects.length
   const activeProjects = projects.filter((p) => p.status === "active").length
-  const totalSandboxes = projects.reduce((sum, p) => sum + p.sandboxCount, 0)
-  const totalSpent = projects.reduce((sum, p) => sum + p.totalSpent, 0)
+  const totalSandboxes = projects.reduce((sum, p) => sum + p.sandbox_count, 0)
+  const totalSpent = projects.reduce((sum, p) => sum + p.total_spent, 0)
 
   // Prepare summary cards data
   const summaryCards = [
@@ -364,11 +349,11 @@ export function ProjectManagement() {
               </TableHeader>
               <TableBody>
                 {filteredAndSortedProjects.map((project) => (
-                  <TableRow key={project.id}>
+                  <TableRow key={project.project_id}>
                     <ResizableTableCell>
                       <div>
                         <div className="font-medium">{project.name}</div>
-                        <div className="text-sm text-muted-foreground">{project.id}</div>
+                        <div className="text-sm text-muted-foreground">{project.project_id}</div>
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell className="break-words">{project.description}</ResizableTableCell>
@@ -379,17 +364,17 @@ export function ProjectManagement() {
                         onClick={() => openViewSandboxes(project)}
                         className="h-auto p-0"
                       >
-                        {project.sandboxCount} {t("table.sandboxes") || "sandboxes"}
+                        {sandboxesLoading ? "Loading..." : projectSandboxes.length} {t("table.sandboxes") || "sandboxes"}
                       </Button>
                     </ResizableTableCell>
-                    <ResizableTableCell>{project.apiKeyCount}</ResizableTableCell>
-                    <ResizableTableCell>${project.totalSpent.toFixed(2)}</ResizableTableCell>
+                    <ResizableTableCell>{project.api_key_count}</ResizableTableCell>
+                    <ResizableTableCell>${project.total_spent.toFixed(2)}</ResizableTableCell>
                     <ResizableTableCell>
                       <Badge variant={project.status === "active" ? "default" : "secondary"}>
                         {project.status === "active" ? t("table.active") || "Active" : t("table.archived") || "Archived"}
                       </Badge>
                     </ResizableTableCell>
-                    <ResizableTableCell>{new Date(project.createdAt).toLocaleDateString()}</ResizableTableCell>
+                    <ResizableTableCell>{new Date(project.created_at).toLocaleDateString()}</ResizableTableCell>
                     <ResizableTableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -407,14 +392,14 @@ export function ProjectManagement() {
                             {t("action.viewSandboxes") || "View Sandboxes"}
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => handleArchiveProject(project.id)}
+                            onClick={() => handleArchiveProject(project.project_id)}
                             className={project.status === "active" ? "" : "hidden"}
                           >
                             <FolderOpen className="h-4 w-4 mr-2" />
                             {t("action.archive") || "Archive"}
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => handleDeleteProject(project.id)}
+                            onClick={() => handleDeleteProject(project.project_id)}
                             className="text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -514,26 +499,26 @@ export function ProjectManagement() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {getProjectSandboxes(viewSandboxesDialog.project?.id || "").length} sandboxes in this project
-            </p>
-            <div className="space-y-2">
-              {getProjectSandboxes(viewSandboxesDialog.project?.id || "").map((sandbox) => (
-                <div key={sandbox.id} className="flex items-center justify-between p-2 border rounded">
-                  <div>
-                    <div className="font-medium">{sandbox.name}</div>
-                    <div className="text-sm text-muted-foreground">{sandbox.id}</div>
+            {sandboxesLoading ? (
+              <div className="text-center py-8">
+                <p>{t("project.loadingSandboxes") || "Loading sandboxes..."}</p>
+              </div>
+            ) : projectSandboxes.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>{t("project.noSandboxes") || "No sandboxes in this project"}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {projectSandboxes.map((sandbox) => (
+                  <div key={sandbox.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                    <div>
+                      <p className="font-medium">{sandbox.name}</p>
+                      <p className="text-sm text-muted-foreground">{sandbox.id}</p>
+                    </div>
+                    <Badge variant="secondary">{sandbox.status}</Badge>
                   </div>
-                  <Badge variant={sandbox.status === "running" ? "default" : "secondary"}>
-                    {sandbox.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-            {getProjectSandboxes(viewSandboxesDialog.project?.id || "").length === 0 && (
-              <p className="text-center text-muted-foreground py-4">
-                {t("project.noSandboxes") || "No sandboxes in this project"}
-              </p>
+                ))}
+              </div>
             )}
           </div>
         </DialogContent>

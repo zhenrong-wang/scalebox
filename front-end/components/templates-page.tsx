@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,7 +29,7 @@ export function TemplatesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [languageFilter, setLanguageFilter] = useState<string>("all")
-  const [activeTab, setActiveTab] = useState<"official" | "private">("official")
+  const [visibilityFilter, setVisibilityFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<string>("")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
@@ -97,7 +96,7 @@ export function TemplatesPage() {
       console.error('Failed to fetch templates:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_load'),
+        description: t('common.failed_to_load'),
         variant: "destructive",
       })
     } finally {
@@ -147,12 +146,9 @@ export function TemplatesPage() {
                            template.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            template.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       
-      // Filter by tab
-      const isOfficial = template.is_official
-      const isPrivate = !template.is_official && !template.is_public
-      
-      if (activeTab === "official" && !isOfficial) return false
-      if (activeTab === "private" && !isPrivate) return false
+      // Filter by visibility
+      if (visibilityFilter === "public" && !template.is_public) return false
+      if (visibilityFilter === "private" && template.is_public) return false
       
       return matchesSearch
     })
@@ -162,7 +158,7 @@ export function TemplatesPage() {
     if (!newTemplate.name || !newTemplate.category || !newTemplate.language || !newTemplate.repository_url) {
       toast({
         title: "Error",
-        description: t('templates.fill_required_fields') || 'Please fill in all required fields',
+        description: t('common.fill_required_fields') || 'Please fill in all required fields',
         variant: "destructive",
       });
       return;
@@ -189,13 +185,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('templates.created_successfully') || 'Template created successfully',
+        description: t('common.created_successfully') || 'Template created successfully',
       })
     } catch (error) {
       console.error('Error creating template:', error)
       toast({
         title: "Error",
-        description: t('templates.create_error') || 'Failed to create template',
+        description: t('common.create_error') || 'Failed to create template',
         variant: "destructive",
       })
     }
@@ -231,13 +227,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('templates.template_updated') || 'Template updated successfully',
+        description: t('common.updated_successfully') || 'Template updated successfully',
       })
     } catch (error) {
       console.error('Failed to update template:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_update') || 'Failed to update template',
+        description: t('common.failed_to_update') || 'Failed to update template',
         variant: "destructive",
       })
     }
@@ -249,49 +245,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('templates.template_deleted'),
+        description: t('common.deleted_successfully'),
       })
     } catch (error) {
       console.error('Failed to delete template:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_delete'),
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleMakeOfficial = async (template: Template) => {
-    try {
-      await templateService.makeTemplateOfficial(template.id)
-      fetchTemplates()
-      toast({
-        title: "Success",
-        description: t('templates.template_made_official'),
-      })
-    } catch (error) {
-      console.error('Failed to make template official:', error)
-      toast({
-        title: "Error",
-        description: t('templates.failed_to_make_official'),
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleMakePublic = async (template: Template) => {
-    try {
-      await templateService.makeTemplatePublic(template.id)
-      fetchTemplates()
-      toast({
-        title: "Success",
-        description: t('templates.template_made_public'),
-      })
-    } catch (error) {
-      console.error('Failed to make template public:', error)
-      toast({
-        title: "Error",
-        description: t('templates.failed_to_make_public'),
+        description: t('common.failed_to_delete'),
         variant: "destructive",
       })
     }
@@ -302,13 +262,13 @@ export function TemplatesPage() {
       // TODO: Implement template usage logic
       toast({
         title: "Success",
-        description: t('templates.template_used') || 'Template usage initiated',
+        description: t('common.usage_initiated') || 'Template usage initiated',
       })
     } catch (error) {
       console.error('Failed to use template:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_use') || 'Failed to use template',
+        description: t('common.failed_to_use') || 'Failed to use template',
         variant: "destructive",
       })
     }
@@ -325,7 +285,7 @@ export function TemplatesPage() {
       console.error('Failed to view template:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_view') || 'Failed to view template details',
+        description: t('common.failed_to_view') || 'Failed to view template details',
         variant: "destructive",
       })
     }
@@ -359,13 +319,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('templates.templates_deleted'),
+        description: t('common.batch_deleted'),
       })
     } catch (error) {
       console.error('Failed to delete templates:', error)
       toast({
         title: "Error",
-        description: t('templates.failed_to_delete_some'),
+        description: t('common.failed_to_delete_some'),
         variant: "destructive",
       })
     }
@@ -376,31 +336,25 @@ export function TemplatesPage() {
   const categories = Array.from(new Set(templates.map(t => t.category)))
   const languages = Array.from(new Set(templates.map(t => t.language)))
 
-  // Prepare summary cards data based on active tab
-  const officialTemplates = templates.filter(t => t.is_official)
-  const privateTemplates = templates.filter(t => !t.is_official && !t.is_public)
+  // Prepare summary cards data
+  const publicTemplates = templates.filter(t => t.is_public)
+  const privateTemplates = templates.filter(t => !t.is_public)
   
-  const summaryCards = activeTab === "official" ? [
+  const summaryCards = [
     {
-      title: t('templates.total_official') || 'Total Official',
-      value: officialTemplates.length,
-      icon: <Lock className="h-4 w-4 text-muted-foreground" />
+      title: t('common.total') || 'Total Templates',
+      value: templates.length,
+      icon: <Copy className="h-4 w-4 text-muted-foreground" />
     },
     {
-      title: t('templates.available') || 'Available',
-      value: officialTemplates.length,
+      title: t('common.public') || 'Public Templates',
+      value: publicTemplates.length,
       icon: <Globe className="h-4 w-4 text-muted-foreground" />
-    }
-  ] : [
-    {
-      title: t('templates.total_private') || 'Total Private',
-      value: privateTemplates.length,
-      icon: <Edit className="h-4 w-4 text-muted-foreground" />
     },
     {
-      title: t('templates.owned') || 'Owned',
-      value: privateTemplates.filter(t => t.owner_id === currentUser.id).length,
-      icon: <User className="h-4 w-4 text-muted-foreground" />
+      title: t('common.private') || 'Private Templates',
+      value: privateTemplates.length,
+      icon: <Lock className="h-4 w-4 text-muted-foreground" />
     }
   ]
 
@@ -410,15 +364,13 @@ export function TemplatesPage() {
   return (
     <PageLayout
       header={{
-        description: activeTab === "official" 
-          ? (t('templates.official_description') || 'Browse and use official templates provided by ScaleBox')
-          : (t('templates.private_description') || 'Manage your private templates'),
-        children: activeTab === "private" ? (
+        description: t('common.manage_browse_templates') || 'Manage and browse templates for your sandboxes',
+        children: (
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            {t('templates.create')}
+            {t('common.create')}
           </Button>
-        ) : undefined
+        )
       }}
       summaryCards={summaryCards}
     >
@@ -428,7 +380,7 @@ export function TemplatesPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder={t('templates.search_placeholder')}
+              placeholder={t('common.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -437,10 +389,10 @@ export function TemplatesPage() {
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t('templates.filter_category')} />
+            <SelectValue placeholder={t('common.filter_category')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('templates.all_categories')}</SelectItem>
+            <SelectItem value="all">{t('common.all_categories')}</SelectItem>
             {categories.map(category => (
               <SelectItem key={category} value={category}>{category}</SelectItem>
             ))}
@@ -448,53 +400,48 @@ export function TemplatesPage() {
         </Select>
         <Select value={languageFilter} onValueChange={setLanguageFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t('templates.filter_language')} />
+            <SelectValue placeholder={t('common.filter_language')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('templates.all_languages')}</SelectItem>
+            <SelectItem value="all">{t('common.all_languages')}</SelectItem>
             {languages.map(language => (
               <SelectItem key={language} value={language}>{language}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-
+        <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder={t('common.filter_visibility')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('common.all_visibility')}</SelectItem>
+            <SelectItem value="public">{t('common.public_only')}</SelectItem>
+            <SelectItem value="private">{t('common.private_only')}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Template Type Tabs */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "official" | "private")}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="official" className="flex items-center gap-2">
-            <Lock className="h-4 w-4" />
-            {t('templates.official_templates') || 'Official Templates'}
-          </TabsTrigger>
-          <TabsTrigger value="private" className="flex items-center gap-2">
-            <Edit className="h-4 w-4" />
-            {t('templates.private_templates') || 'Private Templates'}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
       {/* Batch Actions */}
-      {activeTab === "private" && selectedTemplates.length > 0 && (
+      {selectedTemplates.length > 0 && (
         <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
-          <span className="text-sm">{tReplace(t('templates.templates_selected'), { count: selectedTemplates.length })}</span>
+          <span className="text-sm">{tReplace(t('common.items_selected'), { count: selectedTemplates.length })}</span>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm">
                 <Trash2 className="h-4 w-4 mr-2" />
-                {t('templates.delete_selected')}
+                {t('common.delete_selected')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{t('templates.delete_templates')}</AlertDialogTitle>
+                <AlertDialogTitle>{t('common.delete_items')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {tReplace(t('templates.delete_confirmation'), { count: selectedTemplates.length })}
+                  {tReplace(t('common.delete_confirmation'), { count: selectedTemplates.length })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{t('action.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleBatchDelete}>{t('templates.delete')}</AlertDialogAction>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBatchDelete}>{t('common.delete')}</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -511,36 +458,32 @@ export function TemplatesPage() {
           ) : (
             <ResizableTable
               defaultColumnWidths={{
-                checkbox: activeTab === "private" ? 48 : 0,
-                name: 250,
-                category: 120,
-                language: 100,
-                cpu: 80,
-                memory: 80,
-                created: 100,
-                updated: 100,
+                checkbox: 48,
+                id: 80,
+                name: 180,
+                cpu: 100,
+                memory: 100,
+                created: 120,
+                updated: 120,
+                visibility: 100,
                 actions: 80
               }}
             >
               <TableHeader>
                 <TableRow>
-                  {activeTab === "private" && (
-                    <ResizableTableHead columnId="checkbox" defaultWidth={48}>
-                      <Checkbox
-                        checked={selectedTemplates.length === filteredTemplates.length && filteredTemplates.length > 0}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </ResizableTableHead>
-                  )}
-                  
-                                      <ResizableTableHead columnId="name" defaultWidth={250}>
+                  <ResizableTableHead columnId="checkbox" defaultWidth={48}>
+                    <Checkbox
+                      checked={selectedTemplates.length === filteredTemplates.length && filteredTemplates.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="id" defaultWidth={80}>ID</ResizableTableHead>
+                  <ResizableTableHead columnId="name" defaultWidth={180}>
                     <Button variant="ghost" onClick={() => handleSort("name")} className="h-auto p-0 group">
-                      {t('templates.name')} {getSortIcon("name")}
+                      {t('common.name')} {getSortIcon("name")}
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="category" defaultWidth={120}>{t('templates.category')}</ResizableTableHead>
-                  <ResizableTableHead columnId="language" defaultWidth={100}>{t('templates.language')}</ResizableTableHead>
-                  <ResizableTableHead columnId="cpu" defaultWidth={80}>
+                  <ResizableTableHead columnId="cpu" defaultWidth={100}>
                     <Button variant="ghost" onClick={() => handleSort("cpu_spec")} className="h-auto p-0 group">
                       <div className="flex items-center gap-1">
                         <Cpu className="h-4 w-4" />
@@ -548,7 +491,7 @@ export function TemplatesPage() {
                       </div>
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="memory" defaultWidth={80}>
+                  <ResizableTableHead columnId="memory" defaultWidth={100}>
                     <Button variant="ghost" onClick={() => handleSort("memory_spec")} className="h-auto p-0 group">
                       <div className="flex items-center gap-1">
                         <HardDrive className="h-4 w-4" />
@@ -556,75 +499,44 @@ export function TemplatesPage() {
                       </div>
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="created" defaultWidth={100}>
+                  <ResizableTableHead columnId="created" defaultWidth={120}>
                     <Button variant="ghost" onClick={() => handleSort("created_at")} className="h-auto p-0 group">
-                      <span className="text-xs">{t('templates.created')}</span> {getSortIcon("created_at")}
+                      {t('common.created')} {getSortIcon("created_at")}
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="updated" defaultWidth={100}>
+                  <ResizableTableHead columnId="updated" defaultWidth={120}>
                     <Button variant="ghost" onClick={() => handleSort("updated_at")} className="h-auto p-0 group">
-                      <span className="text-xs">{t('templates.updated')}</span> {getSortIcon("updated_at")}
+                      {t('common.updated')} {getSortIcon("updated_at")}
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="actions" defaultWidth={80}>
-                    <span className="text-xs">{t('templates.actions')}</span>
-                  </ResizableTableHead>
+                  <ResizableTableHead columnId="visibility" defaultWidth={100}>Visibility</ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={80}>Actions</ResizableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTemplates.map((template) => (
                   <TableRow key={template.id}>
-                                      <ResizableTableCell>
-                    {activeTab === "private" && (
+                    <ResizableTableCell>
                       <Checkbox
                         checked={selectedTemplates.includes(template.id)}
                         onCheckedChange={() => handleSelectTemplate(template.id)}
                         disabled={!templateService.canDelete(template, currentUser.id, currentUser.role === 'admin')}
                       />
-                    )}
-                  </ResizableTableCell>
-
+                    </ResizableTableCell>
                     <ResizableTableCell>
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {template.name}
-                          {template.is_official && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Official
-                            </Badge>
-                          )}
-                        </div>
-                        {template.description && (
-                          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {template.description}
-                          </div>
-                        )}
-                        {template.tags && template.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {template.tags.slice(0, 3).map((tag, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                            {template.tags.length > 3 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{template.tags.length - 3}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {template.id.slice(0, 8)}...
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {template.category}
-                      </Badge>
-                    </ResizableTableCell>
-                    <ResizableTableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {template.language}
-                      </Badge>
+                      <div>
+                        <div className="font-medium">{template.name}</div>
+                        {template.description && (
+                          <div className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                            {template.description}
+                          </div>
+                        )}
+                      </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
                       <div className="flex items-center gap-1">
@@ -649,46 +561,46 @@ export function TemplatesPage() {
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
+                      {template.is_public ? (
+                        <Badge variant="secondary" className="text-xs">
+                          <Globe className="h-3 w-3 mr-1" />
+                          Public
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          <Lock className="h-3 w-3 mr-1" />
+                          Private
+                        </Badge>
+                      )}
+                    </ResizableTableCell>
+                    <ResizableTableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
                             <span className="sr-only">Open menu</span>
-                            {activeTab === "official" ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+                            <Edit className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {activeTab === "official" ? (
-                            <>
-                              <DropdownMenuItem onClick={() => handleUseTemplate(template)}>
-                                <Play className="mr-2 h-4 w-4" />
-                                {t('templates.use') || 'Use Template'}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleViewTemplate(template)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                {t('templates.view_details') || 'View Details'}
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <>
-                              {templateService.canEdit(template, currentUser.id, currentUser.role === 'admin') && (
-                                <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  {t('templates.edit')}
-                                </DropdownMenuItem>
-                              )}
-                              {currentUser.role === 'admin' && !template.is_official && (
-                                <DropdownMenuItem onClick={() => handleMakeOfficial(template)}>
-                                  <Lock className="mr-2 h-4 w-4" />
-                                  {t('templates.make_official')}
-                                </DropdownMenuItem>
-                              )}
-                              {templateService.canDelete(template, currentUser.id, currentUser.role === 'admin') && (
-                                <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  {t('templates.delete')}
-                                </DropdownMenuItem>
-                              )}
-                            </>
+                          <DropdownMenuItem onClick={() => handleUseTemplate(template)}>
+                            <Play className="mr-2 h-4 w-4" />
+                            {t('common.use') || 'Use Template'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewTemplate(template)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            {t('common.view_details') || 'View Details'}
+                          </DropdownMenuItem>
+                          {templateService.canEdit(template, currentUser.id, currentUser.role === 'admin') && (
+                            <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              {t('common.edit')}
+                            </DropdownMenuItem>
+                          )}
+                          {templateService.canDelete(template, currentUser.id, currentUser.role === 'admin') && (
+                            <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              {t('common.delete')}
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -705,11 +617,11 @@ export function TemplatesPage() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t('templates.create_new')}</DialogTitle>
+            <DialogTitle>{t('common.create_new')}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">{t('templates.name')}</Label>
+              <Label htmlFor="name">{t('common.name')}</Label>
               <Input
                 id="name"
                 value={newTemplate.name}
@@ -717,7 +629,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">{t('templates.category')}</Label>
+              <Label htmlFor="category">{t('common.category')}</Label>
               <Input
                 id="category"
                 value={newTemplate.category}
@@ -725,7 +637,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="language">{t('templates.language')}</Label>
+              <Label htmlFor="language">{t('common.language')}</Label>
               <Input
                 id="language"
                 value={newTemplate.language}
@@ -733,7 +645,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cpu">{t('templates.cpu_spec')}</Label>
+              <Label htmlFor="cpu">{t('common.cpu_spec')}</Label>
               <Input
                 id="cpu"
                 type="number"
@@ -745,7 +657,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="memory">{t('templates.memory_spec')}</Label>
+              <Label htmlFor="memory">{t('common.memory_spec')}</Label>
               <Select value={newTemplate.memory_spec.toString()} onValueChange={(value) => setNewTemplate({ ...newTemplate, memory_spec: parseFloat(value) })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -760,7 +672,7 @@ export function TemplatesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="repository_url">{t('templates.repository_url')}</Label>
+              <Label htmlFor="repository_url">{t('common.repository_url')}</Label>
               <Input
                 id="repository_url"
                 value={newTemplate.repository_url}
@@ -768,7 +680,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tags">{t('templates.tags')}</Label>
+              <Label htmlFor="tags">{t('common.tags')}</Label>
               <Input
                 id="tags"
                 placeholder="tag1, tag2, tag3"
@@ -780,7 +692,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="description">{t('templates.description_field')}</Label>
+              <Label htmlFor="description">{t('common.description')}</Label>
               <Textarea
                 id="description"
                 value={newTemplate.description}
@@ -793,15 +705,15 @@ export function TemplatesPage() {
                 checked={newTemplate.is_public}
                 onCheckedChange={(checked) => setNewTemplate({ ...newTemplate, is_public: checked as boolean })}
               />
-              <Label htmlFor="is_public">{t('templates.make_public')}</Label>
+              <Label htmlFor="is_public">{t('common.make_public')}</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              {t('action.cancel')}
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleCreateTemplate}>
-              {t('templates.create')}
+              {t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -811,11 +723,11 @@ export function TemplatesPage() {
       <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, template: editDialog.template })}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t('templates.edit_template')}</DialogTitle>
+            <DialogTitle>{t('common.edit_template')}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">{t('templates.name')}</Label>
+              <Label htmlFor="edit-name">{t('common.name')}</Label>
               <Input
                 id="edit-name"
                 value={editTemplate.name}
@@ -823,7 +735,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-category">{t('templates.category')}</Label>
+              <Label htmlFor="edit-category">{t('common.category')}</Label>
               <Input
                 id="edit-category"
                 value={editTemplate.category}
@@ -831,7 +743,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-language">{t('templates.language')}</Label>
+              <Label htmlFor="edit-language">{t('common.language')}</Label>
               <Input
                 id="edit-language"
                 value={editTemplate.language}
@@ -839,7 +751,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-cpu">{t('templates.cpu_spec')}</Label>
+              <Label htmlFor="edit-cpu">{t('common.cpu_spec')}</Label>
               <Input
                 id="edit-cpu"
                 type="number"
@@ -851,7 +763,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-memory">{t('templates.memory_spec')}</Label>
+              <Label htmlFor="edit-memory">{t('common.memory_spec')}</Label>
               <Select value={editTemplate.memory_spec.toString()} onValueChange={(value) => setEditTemplate({ ...editTemplate, memory_spec: parseFloat(value) })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -866,7 +778,7 @@ export function TemplatesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-repository_url">{t('templates.repository_url')}</Label>
+              <Label htmlFor="edit-repository_url">{t('common.repository_url')}</Label>
               <Input
                 id="edit-repository_url"
                 value={editTemplate.repository_url}
@@ -874,7 +786,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-tags">{t('templates.tags')}</Label>
+              <Label htmlFor="edit-tags">{t('common.tags')}</Label>
               <Input
                 id="edit-tags"
                 placeholder="tag1, tag2, tag3"
@@ -886,7 +798,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="edit-description">{t('templates.description_field')}</Label>
+              <Label htmlFor="edit-description">{t('common.description')}</Label>
               <Textarea
                 id="edit-description"
                 value={editTemplate.description}
@@ -899,15 +811,15 @@ export function TemplatesPage() {
                 checked={editTemplate.is_public}
                 onCheckedChange={(checked) => setEditTemplate({ ...editTemplate, is_public: checked as boolean })}
               />
-              <Label htmlFor="edit-is-public">{t('templates.make_public')}</Label>
+              <Label htmlFor="edit-is-public">{t('common.make_public')}</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog({ open: false, template: null })}>
-              {t('action.cancel')}
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleUpdateTemplate}>
-              {t('templates.save')}
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -30,10 +30,14 @@ router = APIRouter(prefix="/sandboxes", tags=["sandboxes"])
 
 # Enums
 class SandboxStatus(str, Enum):
+    CREATED = "created"
+    STARTING = "starting"
     RUNNING = "running"
     STOPPED = "stopped"
     ERROR = "error"
     DELETED = "deleted"
+    TIMEOUT = "timeout"
+    RECYCLED = "recycled"
 
 
 class SandboxVisibility(str, Enum):
@@ -203,13 +207,14 @@ def list_sandboxes(
     offset: int = Query(0, ge=0)
 ):
     """List sandboxes for the current user with filtering and pagination."""
-    query = db.query(Sandbox).filter(Sandbox.user_id == current_user.account_id)
+    query = db.query(Sandbox).filter(Sandbox.owner_account_id == current_user.account_id)
 
     # Apply filters
     if status:
         query = query.filter(Sandbox.status == status.value)
-    if framework:
-        query = query.filter(Sandbox.framework == framework)
+    # Framework filter removed since framework is not in the model
+    # if framework:
+    #     query = query.filter(Sandbox.framework == framework)
     if region:
         query = query.filter(Sandbox.region == region)
     if visibility:
@@ -232,10 +237,11 @@ def list_sandboxes(
         query = query.order_by(
             Sandbox.status.desc() if sort_order == "desc" else Sandbox.status.asc()
         )
-    elif sort_by == "framework":
-        query = query.order_by(
-            Sandbox.framework.desc() if sort_order == "desc" else Sandbox.framework.asc()
-        )
+    # Framework sorting removed since framework is not in the model
+    # elif sort_by == "framework":
+    #     query = query.order_by(
+    #         Sandbox.framework.desc() if sort_order == "desc" else Sandbox.framework.asc()
+    #     )
     elif sort_by == "region":
         query = query.order_by(
             Sandbox.region.desc() if sort_order == "desc" else Sandbox.region.asc()
@@ -270,13 +276,13 @@ def list_sandboxes(
         )
 
         result.append(SandboxResponse(
-            id=str(getattr(sandbox, 'id', '')),
+            id=str(getattr(sandbox, 'sandbox_id', '')),
             name=str(getattr(sandbox, 'name', '')),
             description=str(getattr(sandbox, 'description', ''))
             if getattr(sandbox, 'description', None) is not None else None,
-            framework=str(getattr(sandbox, 'framework', '')),
+            framework="python",  # Default framework since it's not in the model
             status=SandboxStatus(str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value))),
-            user_id=str(getattr(sandbox, 'user_id', '')),
+            user_id=str(getattr(sandbox, 'owner_account_id', '')),
             user_name=user_name,
             user_email=str(current_user.email),
             region=str(getattr(sandbox, 'region', '')),
@@ -286,8 +292,16 @@ def list_sandboxes(
             project_id=str(getattr(sandbox, 'project_id', ''))
             if getattr(sandbox, 'project_id', None) is not None else None,
             project_name=None,  # TODO: Add project name lookup
-            resources=get_sandbox_resources(sandbox),
-            cost=get_sandbox_cost(sandbox),
+            resources={
+                "cpu": 0.0,
+                "memory": 0.0,
+                "storage": 0.0,
+                "bandwidth": 0.0,
+            },
+            cost={
+                "hourlyRate": 0.0,
+                "totalCost": 0.0,
+            },
             created_at=created_at_val,
             updated_at=updated_at_val,
             last_accessed_at=last_accessed_at_val,
@@ -306,7 +320,7 @@ def get_sandbox_stats(
 ):
     """Get sandbox statistics for the current user."""
     user_sandboxes = db.query(Sandbox).filter(
-        Sandbox.user_id == current_user.account_id
+        Sandbox.owner_account_id == current_user.account_id
     ).all()
 
     total_sandboxes = len(user_sandboxes)
@@ -366,7 +380,7 @@ def create_sandbox(
         description=sandbox_data.description,
         framework=sandbox_data.framework,
         status=SandboxStatus.STOPPED,
-        user_id=current_user.account_id,
+        owner_account_id=current_user.account_id,
         region=sandbox_data.region,
         visibility=sandbox_data.visibility,
         project_id=sandbox_data.project_id,
@@ -427,7 +441,7 @@ def get_sandbox(
     """Get a specific sandbox by ID."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.id == sandbox_id,
-        Sandbox.user_id == current_user.account_id
+        Sandbox.owner_account_id == current_user.account_id
     ).first()
 
     if not sandbox:
@@ -489,7 +503,7 @@ def update_sandbox(
     """Update a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.id == sandbox_id,
-        Sandbox.user_id == current_user.account_id
+        Sandbox.owner_account_id == current_user.account_id
     ).first()
 
     if not sandbox:
@@ -559,7 +573,7 @@ def delete_sandbox(
     """Delete a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.id == sandbox_id,
-        Sandbox.user_id == current_user.account_id
+        Sandbox.owner_account_id == current_user.account_id
     ).first()
 
     if not sandbox:
@@ -581,7 +595,7 @@ def start_sandbox(
     """Start a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.id == sandbox_id,
-        Sandbox.user_id == current_user.account_id
+        Sandbox.owner_account_id == current_user.account_id
     ).first()
 
     if not sandbox:
@@ -611,7 +625,7 @@ def stop_sandbox(
     """Stop a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.id == sandbox_id,
-        Sandbox.user_id == current_user.account_id
+        Sandbox.owner_account_id == current_user.account_id
     ).first()
 
     if not sandbox:
@@ -700,7 +714,7 @@ def get_all_sandboxes_admin(
     if visibility:
         query = query.filter(Sandbox.visibility == visibility.value)
     if user_id:
-        query = query.filter(Sandbox.user_id == user_id)
+        query = query.filter(Sandbox.owner_account_id == user_id)
     if project_id:
         query = query.filter(Sandbox.project_id == project_id)
     if search:
@@ -719,10 +733,11 @@ def get_all_sandboxes_admin(
         query = query.order_by(
             Sandbox.status.desc() if sort_order == "desc" else Sandbox.status.asc()
         )
-    elif sort_by == "framework":
-        query = query.order_by(
-            Sandbox.framework.desc() if sort_order == "desc" else Sandbox.framework.asc()
-        )
+    # Framework sorting removed since framework is not in the model
+    # elif sort_by == "framework":
+    #     query = query.order_by(
+    #         Sandbox.framework.desc() if sort_order == "desc" else Sandbox.framework.asc()
+    #     )
     elif sort_by == "region":
         query = query.order_by(
             Sandbox.region.desc() if sort_order == "desc" else Sandbox.region.asc()
@@ -739,7 +754,7 @@ def get_all_sandboxes_admin(
     result = []
     for sandbox in sandboxes:
         # Get user info
-        user = db.query(User).filter(User.account_id == sandbox.user_id).first()
+        user = db.query(User).filter(User.account_id == sandbox.owner_account_id).first()
         user_name = (
             user.full_name or user.username or user.email.split('@')[0]
             if user is not None else "Unknown"
@@ -763,7 +778,7 @@ def get_all_sandboxes_admin(
             description=str(sandbox.description) if sandbox.description is not None else None,
             framework=str(sandbox.framework),
             status=SandboxStatus(sandbox.status),
-            user_id=str(sandbox.user_id),
+            user_id=str(sandbox.owner_account_id),
             user_name=str(user_name),
             user_email=str(user_email),
             region=str(sandbox.region),

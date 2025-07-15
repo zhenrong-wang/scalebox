@@ -198,6 +198,8 @@ export function SandboxPage() {
     try {
       // Store the ID in localStorage so it won't appear after refresh
       storePermanentlyDeletedId(sandboxId)
+      // Force a re-render to update summary cards
+      setSandboxes(prev => [...prev])
       // Remove from frontend state
       setSandboxes(prev => prev.filter(s => s.id !== sandboxId))
       setSelectedSandboxes(prev => {
@@ -217,6 +219,8 @@ export function SandboxPage() {
       selectedSandboxes.forEach(id => deletedIds.add(id))
       localStorage.setItem('permanently_deleted_sandboxes', JSON.stringify(Array.from(deletedIds)))
       
+      // Force a re-render to update summary cards
+      setSandboxes(prev => [...prev])
       // Remove from frontend state
       setSandboxes(prev => prev.filter(s => !selectedSandboxes.has(s.id)))
       setSelectedSandboxes(new Set())
@@ -329,29 +333,52 @@ export function SandboxPage() {
     return 0
   })
 
-  // Prepare summary cards data
-  const summaryCards = stats ? [
+  // Filter out permanently deleted sandboxes
+  const permanentlyDeletedIds = getPermanentlyDeletedIds()
+  const activeSandboxes = sandboxes.filter(s => !permanentlyDeletedIds.has(s.id))
+  
+  // Calculate stats from actual sandbox data
+  const totalSandboxes = activeSandboxes.length
+  const runningSandboxes = activeSandboxes.filter(s => s.status === "running").length
+  const stoppedSandboxes = activeSandboxes.filter(s => s.status === "stopped").length
+  const errorSandboxes = activeSandboxes.filter(s => s.status === "error").length
+  const deletedSandboxes = activeSandboxes.filter(s => s.status === "deleted").length
+  
+  // Calculate average CPU and memory usage from active sandboxes
+  const runningSandboxesWithMetrics = activeSandboxes.filter(s => s.status === "running" && s.resources)
+  const avgCpuUsage = runningSandboxesWithMetrics.length > 0 
+    ? runningSandboxesWithMetrics.reduce((sum, s) => sum + (s.resources.cpu || 0), 0) / runningSandboxesWithMetrics.length
+    : 0
+  const avgMemoryUsage = runningSandboxesWithMetrics.length > 0
+    ? runningSandboxesWithMetrics.reduce((sum, s) => sum + (s.resources.memory || 0), 0) / runningSandboxesWithMetrics.length
+    : 0
+  
+  // Calculate total cost from active sandboxes
+  const totalCost = activeSandboxes.reduce((sum, s) => sum + (s.cost.totalCost || 0), 0)
+  
+  // Prepare summary cards data based on actual sandbox data
+  const summaryCards = [
     {
       title: t("table.totalSandboxes") || "Total Sandboxes",
-      value: stats.total,
+      value: totalSandboxes,
       icon: <Activity className="h-4 w-4 text-muted-foreground" />
     },
     {
       title: t("table.avgCpuUsage") || "Avg CPU Usage",
-      value: `${stats.avgCpuUsage.toFixed(1)}%`,
+      value: `${avgCpuUsage.toFixed(1)}%`,
       icon: <Cpu className="h-4 w-4 text-muted-foreground" />
     },
     {
       title: t("table.avgMemoryUsage") || "Avg Memory Usage",
-      value: `${stats.avgMemoryUsage.toFixed(1)}%`,
+      value: `${avgMemoryUsage.toFixed(1)}%`,
       icon: <HardDrive className="h-4 w-4 text-muted-foreground" />
     },
     {
       title: t("table.totalCost") || "Total Cost",
-      value: `$${stats.totalCost.toFixed(2)}`,
+      value: `$${totalCost.toFixed(2)}`,
       icon: <DollarSign className="h-4 w-4 text-muted-foreground" />
     }
-  ] : []
+  ]
 
   // Calculate batch operation states
   const selectedSandboxesData = sandboxes.filter(s => selectedSandboxes.has(s.id))

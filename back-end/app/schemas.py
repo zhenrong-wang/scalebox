@@ -82,16 +82,18 @@ class ProjectUpdate(BaseModel):
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    id: str
+    project_id: str
     name: str
     description: Optional[str]
-    user_id: int
-    sandbox_count: int
-    api_key_count: int
-    total_spent: float
+    owner_account_id: str
     status: str
     created_at: datetime
     updated_at: datetime
+    
+    # Computed fields (will be set to defaults)
+    sandbox_count: int = 0
+    api_key_count: int = 0
+    total_spent: float = 0.0
 
 class ProjectListResponse(BaseModel):
     projects: List[ProjectResponse]
@@ -107,7 +109,7 @@ class NotificationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     id: str
-    user_id: int
+    user_account_id: str
     title: str
     message: str
     type: NotificationType

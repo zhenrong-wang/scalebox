@@ -20,10 +20,10 @@ const handleResponse = async (response: Response) => {
 }
 
 export interface Project {
-  id: string;
+  project_id: string;
   name: string;
   description?: string;
-  user_id: number;
+  owner_account_id: string;
   sandbox_count: number;
   api_key_count: number;
   total_spent: number;

@@ -96,13 +96,16 @@ class AdminApiKeyAction(BaseModel):
 # Utility functions
 def generate_api_key() -> tuple[str, str, str]:
     """Generate a secure API key and return (full_key, key_hash, prefix)"""
-    # Generate a secure random key
-    full_key = f"sk-{secrets.token_urlsafe(32)}"
+    # Generate a secure random key with sbx- prefix and 36 random chars = 40 total
+    import string
+    chars = string.ascii_letters + string.digits
+    suffix = ''.join(secrets.choice(chars) for _ in range(36))
+    full_key = f"sbx-{suffix}"
     
     # Create hash for storage
     key_hash = hashlib.sha256(full_key.encode()).hexdigest()
     
-    # Create prefix for display
+    # Create prefix for display (first 16 chars)
     prefix = full_key[:16]
     
     return full_key, key_hash, prefix
@@ -135,8 +138,8 @@ def get_api_key_user(api_key: str = Depends(get_api_key_from_header), db: Sessio
         if datetime.datetime.utcnow() > expiration_date:
             raise HTTPException(status_code=401, detail="API key expired")
     
-    # Get user
-    user = db.query(User).filter(User.id == db_api_key.user_id).first()
+    # Get user using account_id
+    user = db.query(User).filter(User.account_id == db_api_key.user_account_id).first()
     if not user or not getattr(user, 'is_active', False):
         raise HTTPException(status_code=401, detail="User not found or inactive")
     
@@ -255,29 +258,27 @@ def create_api_key(
     db: Session = Depends(get_db)
 ):
     # Enforce max 5 keys per user
-    existing_keys = db.query(ApiKey).filter(ApiKey.user_id == current_user.id).count()
+    existing_keys = db.query(ApiKey).filter(ApiKey.user_account_id == current_user.account_id).count()
     if existing_keys >= 5:
         raise HTTPException(status_code=400, detail="Maximum 5 API keys allowed.")
     # Enforce unique name per user
-    if db.query(ApiKey).filter(ApiKey.user_id == current_user.id, ApiKey.name == request.name).first():
+    if db.query(ApiKey).filter(ApiKey.user_account_id == current_user.account_id, ApiKey.name == request.name).first():
         raise HTTPException(status_code=400, detail="API key name must be unique for your account.")
     full_key, key_hash, prefix = generate_api_key()
     permissions = {"read": True, "write": request.can_write}
     api_key = ApiKey(
-        key_id=str(uuid.uuid4()),
-        user_id=current_user.id,
+        api_key=full_key,
+        user_account_id=current_user.account_id,
         name=request.name,
         description=request.description,
         key_hash=key_hash,
-        full_key=full_key,  # Store the full key
-        prefix=prefix,
         permissions=permissions,
         is_active=True,
         expires_in_days=request.expires_in_days,
     )
     db.add(api_key)
     db.commit()
-    return {"api_key": full_key, "key_id": api_key.key_id, "prefix": prefix}
+    return {"api_key": full_key, "key_id": api_key.api_key, "prefix": prefix}
 
 @router.get("/", response_model=List[ApiKeyResponse])
 def list_api_keys(
@@ -285,7 +286,7 @@ def list_api_keys(
     db: Session = Depends(get_db)
 ):
     """List API keys for the current user"""
-    api_keys = db.query(ApiKey).filter(ApiKey.user_id == current_user.id).all()
+    api_keys = db.query(ApiKey).filter(ApiKey.user_account_id == current_user.account_id).all()
     
     response_keys = []
     for key in api_keys:
@@ -306,12 +307,12 @@ def list_api_keys(
                 remaining_days = 0
         
         response_keys.append(ApiKeyResponse(
-            id=getattr(key, 'id'),
-            key_id=getattr(key, 'key_id'),
+            id=str(getattr(key, 'id')),
+            key_id=getattr(key, 'api_key'),
             name=getattr(key, 'name'),
             description=getattr(key, 'description'),
-            prefix=getattr(key, 'prefix'),
-            full_key=getattr(key, 'full_key'),  # Include the full key
+            prefix=getattr(key, 'api_key')[:16] if getattr(key, 'api_key') else '',
+            full_key=getattr(key, 'api_key'),  # Include the full key
             permissions=getattr(key, 'permissions') or {"read": True, "write": True},
             is_active=getattr(key, 'is_active'),
             expires_in_days=expires_in_days,
@@ -331,8 +332,8 @@ def get_api_key(
 ):
     """Get a specific API key for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -355,12 +356,12 @@ def get_api_key(
             remaining_days = 0
     
     return ApiKeyResponse(
-        id=getattr(api_key, 'id'),
-        key_id=getattr(api_key, 'key_id'),
+        id=str(getattr(api_key, 'id')),
+        key_id=getattr(api_key, 'api_key'),
         name=getattr(api_key, 'name'),
         description=getattr(api_key, 'description'),
-        prefix=getattr(api_key, 'prefix'),
-        full_key=getattr(api_key, 'full_key'),  # Include the full key
+        prefix=getattr(api_key, 'api_key')[:16] if getattr(api_key, 'api_key') else '',
+        full_key=getattr(api_key, 'api_key'),  # Include the full key
         permissions=getattr(api_key, 'permissions') or {"read": True, "write": True},
         is_active=getattr(api_key, 'is_active'),
         expires_in_days=expires_in_days,
@@ -379,8 +380,8 @@ def update_api_key(
 ):
     """Update an API key for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -388,7 +389,7 @@ def update_api_key(
     
     # Enforce unique name per user if updating name
     if request.name is not None and request.name != api_key.name:
-        if db.query(ApiKey).filter(ApiKey.user_id == current_user.id, ApiKey.name == request.name).first():
+        if db.query(ApiKey).filter(ApiKey.user_account_id == current_user.account_id, ApiKey.name == request.name).first():
             raise HTTPException(status_code=400, detail="API key name must be unique for your account.")
         setattr(api_key, 'name', request.name)
     
@@ -409,11 +410,11 @@ def update_api_key(
     db.refresh(api_key)
     
     return ApiKeyResponse(
-        id=getattr(api_key, 'id'),
-        key_id=getattr(api_key, 'key_id'),
+        id=str(getattr(api_key, 'id')),
+        key_id=getattr(api_key, 'api_key'),
         name=getattr(api_key, 'name'),
         description=getattr(api_key, 'description'),
-        prefix=getattr(api_key, 'prefix'),
+        prefix=getattr(api_key, 'api_key')[:16] if getattr(api_key, 'api_key') else '',
         permissions=getattr(api_key, 'permissions') or {"read": True, "write": True},
         is_active=getattr(api_key, 'is_active'),
         expires_in_days=getattr(api_key, 'expires_in_days'),
@@ -429,8 +430,8 @@ def delete_api_key(
 ):
     """Delete an API key for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -451,8 +452,8 @@ def extend_api_key_expiration(
     """Extend API key expiration or make it permanent"""
     # Find the API key
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -502,8 +503,8 @@ def toggle_api_key_status(
 ):
     """Toggle API key status (enable/disable) for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -532,8 +533,8 @@ def get_full_api_key(
 ):
     """Get the full API key for display (only for newly created keys)"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -559,8 +560,8 @@ def get_api_key_usage(
     """Get usage history for an API key"""
     # Verify the API key belongs to the current user
     api_key = db.query(ApiKey).filter(
-        ApiKey.key_id == key_id,
-        ApiKey.user_id == current_user.id
+        ApiKey.api_key == key_id,
+        ApiKey.user_account_id == current_user.account_id
     ).first()
     
     if not api_key:
@@ -598,24 +599,24 @@ def get_all_api_keys(
     
     # Get user emails for display
     user_emails = {}
-    user_ids = list(set(key.user_id for key in api_keys))
-    users = db.query(User).filter(User.id.in_(user_ids)).all()
+    user_account_ids = list(set(key.user_account_id for key in api_keys))
+    users = db.query(User).filter(User.account_id.in_(user_account_ids)).all()
     for user in users:
-        user_emails[user.id] = user.email
+        user_emails[user.account_id] = user.email
     
     return [
         ApiKeyResponse(
-            id=getattr(key, 'id'),
-            key_id=getattr(key, 'key_id'),
+            id=str(getattr(key, 'id')),
+            key_id=getattr(key, 'api_key'),
             name=getattr(key, 'name'),
             description=getattr(key, 'description'),
-            prefix=getattr(key, 'prefix'),
+            prefix=getattr(key, 'api_key')[:16],
             permissions=getattr(key, 'permissions') or {"read": True, "write": True},
             is_active=getattr(key, 'is_active'),
             expires_in_days=getattr(key, 'expires_in_days'),
             last_used_at=getattr(key, 'last_used_at'),
             created_at=getattr(key, 'created_at'),
-            user_email=user_emails.get(getattr(key, 'user_id'))
+            user_email=user_emails.get(getattr(key, 'user_account_id'), None),
         )
         for key in api_keys
     ]
@@ -662,12 +663,12 @@ async def admin_api_key_action(
     db: Session = Depends(get_db)
 ):
     """Admin action on API key (disable/delete) with notification"""
-    api_key = db.query(ApiKey).filter(ApiKey.key_id == key_id).first()
+    api_key = db.query(ApiKey).filter(ApiKey.api_key == key_id).first()
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
     
     # Get the user who owns this key
-    user = db.query(User).filter(User.id == api_key.user_id).first()
+    user = db.query(User).filter(User.account_id == api_key.user_account_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Key owner not found")
     

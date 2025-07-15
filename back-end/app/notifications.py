@@ -27,7 +27,7 @@ async def get_notifications(
     current_user: User = Depends(get_current_user)
 ):
     """Get user's notifications with optional filtering"""
-    query = db.query(Notification).filter(Notification.user_id == current_user.id)
+    query = db.query(Notification).filter(Notification.user_account_id == current_user.account_id)
 
     if is_read is not None:
         query = query.filter(Notification.is_read.is_(is_read))
@@ -35,7 +35,7 @@ async def get_notifications(
     notifications = query.order_by(Notification.created_at.desc()).offset(skip).limit(limit).all()
     total = query.count()
     unread_count = db.query(Notification).filter(
-        Notification.user_id == current_user.id,
+        Notification.user_account_id == current_user.account_id,
         Notification.is_read.is_(False)
     ).count()
 
@@ -43,7 +43,7 @@ async def get_notifications(
         notifications=[
             NotificationResponse(
                 id=str(notification.id),
-                user_id=int(str(notification.user_id)),
+                user_account_id=str(notification.user_account_id),
                 title=str(notification.title),
                 message=str(notification.message),
                 type=NotificationType(notification.type),
@@ -65,7 +65,7 @@ async def mark_all_notifications_read(
 ):
     """Mark all user's notifications as read"""
     db.query(Notification).filter(
-        Notification.user_id == current_user.id,
+        Notification.user_account_id == current_user.account_id,
         Notification.is_read.is_(False)
     ).update({"is_read": True})
 
@@ -80,7 +80,7 @@ async def delete_all_notifications(
     current_user: User = Depends(get_current_user)
 ):
     """Delete all user's notifications"""
-    db.query(Notification).filter(Notification.user_id == current_user.id).delete()
+    db.query(Notification).filter(Notification.user_account_id == current_user.account_id).delete()
     db.commit()
 
     return {"message": "All notifications deleted successfully"}
@@ -95,7 +95,7 @@ async def bulk_delete_notifications(
     """Delete multiple notifications"""
     notifications = db.query(Notification).filter(
         Notification.id.in_(request.notification_ids),
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).all()
     
     if not notifications:
@@ -118,7 +118,7 @@ async def bulk_mark_notifications_read(
     """Mark multiple notifications as read"""
     notifications = db.query(Notification).filter(
         Notification.id.in_(request.notification_ids),
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).all()
     
     if not notifications:
@@ -141,7 +141,7 @@ async def bulk_mark_notifications_unread(
     """Mark multiple notifications as unread"""
     notifications = db.query(Notification).filter(
         Notification.id.in_(request.notification_ids),
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).all()
     
     if not notifications:
@@ -164,7 +164,7 @@ async def get_notification(
     """Get a specific notification"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).first()
 
     if not notification:
@@ -172,7 +172,7 @@ async def get_notification(
 
     return NotificationResponse(
         id=str(notification.id),
-        user_id=int(str(notification.user_id)),
+        user_account_id=str(notification.user_account_id),
         title=str(notification.title),
         message=str(notification.message),
         type=NotificationType(str(notification.type)),
@@ -192,7 +192,7 @@ async def mark_notification_read(
     """Mark a notification as read"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).first()
 
     if not notification:
@@ -213,7 +213,7 @@ async def mark_notification_unread(
     """Mark a notification as unread"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).first()
 
     if not notification:
@@ -234,7 +234,7 @@ async def delete_notification(
     """Delete a notification"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_id == current_user.id
+        Notification.user_account_id == current_user.account_id
     ).first()
 
     if not notification:
@@ -258,14 +258,14 @@ async def admin_send_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Admin endpoint to send a notification to a specific user"""
-    # Verify user exists
+    """Send a notification to a specific user (admin only)"""
+    # Find user by internal ID
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     notification = Notification(
-        user_id=user_id,
+        user_account_id=user.account_id,
         title=title,
         message=message,
         type=notification_type,
@@ -277,7 +277,7 @@ async def admin_send_notification(
     db.commit()
     db.refresh(notification)
 
-    return {"message": "Notification sent successfully", "notification_id": notification.id}
+    return {"message": "Notification sent successfully", "notification_id": notification.notification_id}
 
 
 @router.post("/admin/broadcast")
@@ -290,14 +290,13 @@ async def admin_broadcast_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Admin endpoint to send a notification to all active users"""
-    # Get all active users
-    users = db.query(User).filter(User.is_active.is_(True)).all()
-
+    """Send a notification to all users (admin only)"""
+    users = db.query(User).filter(User.is_active == True).all()
+    
     notifications = []
     for user in users:
         notification = Notification(
-            user_id=user.id,
+            user_account_id=user.account_id,
             title=title,
             message=message,
             type=notification_type,
@@ -305,7 +304,7 @@ async def admin_broadcast_notification(
             related_entity_id=related_entity_id
         )
         notifications.append(notification)
-
+    
     db.add_all(notifications)
     db.commit()
 
@@ -320,17 +319,17 @@ async def admin_get_user_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Admin endpoint to get notifications for a specific user"""
-    # Verify user exists
+    """Get notifications for a specific user (admin only)"""
+    # Find user by internal ID
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    query = db.query(Notification).filter(Notification.user_id == user_id)
+    query = db.query(Notification).filter(Notification.user_account_id == user.account_id)
     notifications = query.order_by(Notification.created_at.desc()).offset(skip).limit(limit).all()
     total = query.count()
     unread_count = db.query(Notification).filter(
-        Notification.user_id == user_id,
+        Notification.user_account_id == user.account_id,
         Notification.is_read.is_(False)
     ).count()
 
@@ -338,10 +337,10 @@ async def admin_get_user_notifications(
         notifications=[
             NotificationResponse(
                 id=str(notification.id),
-                user_id=int(str(notification.user_id)),
+                user_account_id=str(notification.user_account_id),
                 title=str(notification.title),
                 message=str(notification.message),
-                type=NotificationType(str(notification.type)),
+                type=NotificationType(notification.type),
                 is_read=bool(notification.is_read),
                 related_entity_type=str(notification.related_entity_type) if notification.related_entity_type is not None else None,
                 related_entity_id=str(notification.related_entity_id) if notification.related_entity_id is not None else None,
@@ -358,82 +357,64 @@ async def create_demo_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Create demo notifications for the current user"""
+    """Create demo notifications for testing"""
+    # Check if user already has demo notifications
+    existing_count = db.query(Notification).filter(Notification.user_account_id == current_user.account_id).count()
+    
+    if existing_count > 0:
+        return {"message": "Demo notifications already exist for this user"}
+
     demo_notifications = [
         {
-            "title": "Welcome to ScaleBox! 🎉",
-            "message": "Your account has been successfully created. You can now start creating sandboxes and templates.",
+            "title": "Welcome to ScaleBox!",
+            "message": "Your account has been successfully created. Start by creating your first sandbox.",
             "type": "success",
-            "related_entity_type": "account",
-            "related_entity_id": str(current_user.id)
-        },
-        {
-            "title": "New Template Available",
-            "message": "A new React TypeScript template has been added to the official collection. Check it out!",
-            "type": "info",
-            "related_entity_type": "template",
-            "related_entity_id": "demo-template-1"
-        },
-        {
-            "title": "Budget Alert ⚠️",
-            "message": "You've used 80% of your monthly budget. Consider reviewing your usage to avoid exceeding limits.",
-            "type": "warning",
-            "related_entity_type": "budget",
-            "related_entity_id": "current-month"
-        },
-        {
-            "title": "API Key Expiring Soon",
-            "message": "Your API key 'production-key' will expire in 7 days. Please rotate it to maintain access.",
-            "type": "warning",
-            "related_entity_type": "api_key",
-            "related_entity_id": "demo-api-key"
-        },
-        {
-            "title": "Sandbox Stopped",
-            "message": "Your sandbox 'react-app-demo' has been automatically stopped due to inactivity.",
-            "type": "info",
             "related_entity_type": "sandbox",
             "related_entity_id": "demo-sandbox-1"
         },
         {
-            "title": "System Maintenance",
-            "message": "Scheduled maintenance will occur on Sunday at 2 AM UTC. Services may be temporarily unavailable.",
+            "title": "New Template Available",
+            "message": "A new Python development template is now available for your projects.",
             "type": "info",
-            "related_entity_type": "system",
-            "related_entity_id": "maintenance-2024"
+            "related_entity_type": "template",
+            "related_entity_id": "python-dev-template"
         },
         {
-            "title": "New Feature Available",
-            "message": "Real-time collaboration is now available in all sandboxes. Invite team members to collaborate!",
+            "title": "Sandbox Timeout Warning",
+            "message": "Your sandbox 'test-project' will timeout in 30 minutes due to inactivity.",
+            "type": "warning",
+            "related_entity_type": "sandbox",
+            "related_entity_id": "test-project-sandbox"
+        },
+        {
+            "title": "API Key Created",
+            "message": "New API key 'production-key' has been successfully created.",
             "type": "success",
-            "related_entity_type": "feature",
-            "related_entity_id": "collaboration"
+            "related_entity_type": "api_key",
+            "related_entity_id": "prod-key-123"
         },
         {
-            "title": "Security Update",
-            "message": "We've updated our security protocols. Please review the new security settings in your account.",
-            "type": "info",
-            "related_entity_type": "security",
-            "related_entity_id": "update-2024"
+            "title": "Billing Update",
+            "message": "Your monthly usage has reached 80% of your current plan limit.",
+            "type": "warning",
+            "related_entity_type": "billing",
+            "related_entity_id": "monthly-usage"
         }
     ]
 
-    created_notifications = []
+    notifications = []
     for demo in demo_notifications:
         notification = Notification(
-            user_id=current_user.id,
+            user_account_id=current_user.account_id,
             title=demo["title"],
             message=demo["message"],
             type=demo["type"],
             related_entity_type=demo["related_entity_type"],
             related_entity_id=demo["related_entity_id"]
         )
-        created_notifications.append(notification)
+        notifications.append(notification)
 
-    db.add_all(created_notifications)
+    db.add_all(notifications)
     db.commit()
 
-    return {
-        "message": f"Created {len(created_notifications)} demo notifications",
-        "count": len(created_notifications)
-    } 
+    return {"message": f"Created {len(demo_notifications)} demo notifications"} 

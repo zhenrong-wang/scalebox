@@ -116,18 +116,24 @@ def signup(data: SignupRequest, background_tasks: BackgroundTasks, db: Session =
     hashed_password = get_password_hash(data.password)
     # Generate 6-digit verification code
     verification_code = str(random.randint(100000, 999999))
+    # Set expiration time (24 hours from now)
+    expires_at = datetime.datetime.utcnow() + timedelta(hours=24)
     # Check if pending signup exists
     pending = db.query(PendingSignup).filter(PendingSignup.email == data.email).first()
     if pending:
-        pending.password_hash = hashed_password  # type: ignore
         pending.full_name = data.name  # type: ignore
-        pending.verification_code = verification_code  # type: ignore
+        pending.verification_token = verification_code  # type: ignore
+        pending.expires_at = expires_at  # type: ignore
+        pending.username = data.email.split('@')[0]  # type: ignore
+        pending.password_hash = hashed_password  # type: ignore
     else:
         pending = PendingSignup(
             email=data.email,
-            password_hash=hashed_password,
+            username=data.email.split('@')[0],
             full_name=data.name,
-            verification_code=verification_code
+            verification_token=verification_code,
+            password_hash=hashed_password,
+            expires_at=expires_at
         )
         db.add(pending)
     db.commit()
@@ -148,7 +154,7 @@ def signin(data: SigninRequest, db: Session = Depends(get_db)):
 @router.post("/verify-email")
 def verify_email(data: VerifyEmailRequest, db: Session = Depends(get_db)):
     # Find pending signup by code
-    pending = db.query(PendingSignup).filter(PendingSignup.verification_code == data.token).first()
+    pending = db.query(PendingSignup).filter(PendingSignup.verification_token == data.token).first()
     if pending is None:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
     # Check if user already exists
@@ -158,12 +164,12 @@ def verify_email(data: VerifyEmailRequest, db: Session = Depends(get_db)):
     # Create user
     new_user = User(
         email=pending.email,
-        password_hash=pending.password_hash,
+        password_hash=pending.password_hash,  # Use the stored hashed password
         full_name=pending.full_name,
         is_active=True,
         is_verified=True,
         verification_token=None,
-        account_id=str(uuid.uuid4())
+        username=pending.email.split('@')[0]  # Use email prefix as username
     )
     db.add(new_user)
     db.delete(pending)

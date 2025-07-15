@@ -18,7 +18,7 @@ export interface UserProject {
   id: string
   name: string
   description: string
-  userId: string
+  user_account_id: string
   sandboxCount: number
   apiKeyCount: number
   totalSpent: number
@@ -27,7 +27,7 @@ export interface UserProject {
 }
 
 export interface UserUsageStats {
-  userId: string
+  user_account_id: string
   userName: string
   userEmail: string
   totalRequests: number
@@ -41,7 +41,7 @@ export interface UserUsageStats {
 
 export interface ActivityLog {
   id: string
-  userId: string
+  user_account_id: string
   action: string
   resource: string
   timestamp: string
