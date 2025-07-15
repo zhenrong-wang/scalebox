@@ -76,7 +76,7 @@ export interface TemplateFilters {
 }
 
 export class TemplateService {
-  private baseUrl = `${API_BASE_URL}/api/templates/api/templates`;
+  private baseUrl = `${API_BASE_URL}/api/templates`;
 
   async getTemplates(filters: TemplateFilters = {}): Promise<TemplateListResponse> {
     const params = new URLSearchParams();
@@ -88,7 +88,7 @@ export class TemplateService {
     if (filters.skip) params.append('skip', filters.skip.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const response = await fetch(`${this.baseUrl}/?${params.toString()}`, {
+    const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });

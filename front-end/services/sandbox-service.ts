@@ -152,10 +152,10 @@ export class SandboxService {
     return this.mapApiResponseToSandbox(data)
   }
 
-  // Delete a sandbox
-  static async deleteSandbox(sandboxId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}`, {
-      method: 'DELETE',
+  // Recycle a sandbox
+  static async recycleSandbox(sandboxId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}/recycle`, {
+      method: 'POST',
       headers: getAuthHeaders(),
     })
 
@@ -337,7 +337,7 @@ export class SandboxService {
 
   static deleteSandboxLegacy(id: string): void {
     // This method is deprecated, use the async version instead
-    console.warn('deleteSandboxLegacy() is deprecated. Use deleteSandbox(id) instead.')
+    console.warn('deleteSandboxLegacy() is deprecated. Use recycleSandbox(id) instead.')
   }
 
   // Utility methods for UI

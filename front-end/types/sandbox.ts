@@ -3,7 +3,7 @@ export interface Sandbox {
   name: string
   description: string
   framework: string
-  status: "running" | "stopped" | "deleted" | "error"
+  status: "running" | "stopped" | "recycled" | "error" | "created" | "starting" | "timeout"
   user_account_id: string
   userName: string
   userEmail: string

@@ -564,13 +564,13 @@ def update_sandbox(
     )
 
 
-@router.delete("/{sandbox_id}")
-def delete_sandbox(
+@router.post("/{sandbox_id}/recycle")
+def recycle_sandbox(
     sandbox_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a sandbox."""
+    """Recycle a sandbox - marks it as recycled for later cleanup."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.id == sandbox_id,
         Sandbox.owner_account_id == current_user.account_id
@@ -579,11 +579,16 @@ def delete_sandbox(
     if not sandbox:
         raise HTTPException(status_code=404, detail="Sandbox not found")
 
-    # Mark as deleted instead of actually deleting
-    setattr(sandbox, 'status', SandboxStatus.DELETED.value)
+    # Cannot recycle an already recycled sandbox
+    if str(sandbox.status) == SandboxStatus.RECYCLED.value:
+        raise HTTPException(status_code=400, detail="Sandbox is already recycled")
+
+    # Mark as recycled and set recycled timestamp
+    setattr(sandbox, 'status', SandboxStatus.RECYCLED.value)
+    setattr(sandbox, 'recycled_at', datetime.utcnow())
     db.commit()
 
-    return {"message": "Sandbox deleted successfully"}
+    return {"message": "Sandbox recycled successfully"}
 
 
 @router.post("/{sandbox_id}/start")

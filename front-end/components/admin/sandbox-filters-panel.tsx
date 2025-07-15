@@ -25,7 +25,7 @@ export function SandboxFiltersPanel({ filters, onFiltersChange, onClose }: Sandb
   const statusOptions = [
     { value: "running", label: "Running" },
     { value: "stopped", label: "Stopped" },
-    { value: "deleted", label: "Deleted" },
+    { value: "recycled", label: "Recycled" },
     { value: "error", label: "Error" },
   ]
 
