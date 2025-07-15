@@ -44,7 +44,7 @@ export interface SandboxStats {
   total: number
   running: number
   stopped: number
-  deleted: number
+  recycled: number
   error: number
   totalCost: number
   avgCpuUsage: number

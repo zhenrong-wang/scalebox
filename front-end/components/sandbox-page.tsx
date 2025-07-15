@@ -35,7 +35,7 @@ export function SandboxPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [dateRange, setDateRange] = useState<{ from: string | null, to: string | null }>({ from: null, to: null })
-  const [activeTab, setActiveTab] = useState<"active" | "deleted">("active")
+  const [activeTab, setActiveTab] = useState<"active" | "recycled">("active")
   
   // Confirmation dialogs
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
@@ -93,7 +93,7 @@ export function SandboxPage() {
         total: data.total_sandboxes,
         running: data.running_sandboxes,
         stopped: data.stopped_sandboxes,
-        deleted: data.deleted_sandboxes,
+        recycled: data.recycled_sandboxes,
         error: data.error_sandboxes,
         totalCost: data.total_cost,
         avgCpuUsage: data.avg_cpu_usage,
@@ -129,13 +129,13 @@ export function SandboxPage() {
     }
   }
 
-  const handleDeleteSandbox = async (sandboxId: string) => {
+  const handleRecycleSandbox = async (sandboxId: string) => {
     try {
-      await SandboxService.deleteSandbox(sandboxId)
+      await SandboxService.recycleSandbox(sandboxId)
       await loadSandboxes()
       await loadStats()
     } catch (error) {
-      console.error('Failed to delete sandbox:', error)
+      console.error('Failed to recycle sandbox:', error)
     }
   }
 
@@ -167,17 +167,17 @@ export function SandboxPage() {
     }
   }
 
-  const handleBatchDelete = async () => {
+  const handleBatchRecycle = async () => {
     try {
       const promises = Array.from(selectedSandboxes).map(id => 
-        SandboxService.deleteSandbox(id)
+        SandboxService.recycleSandbox(id)
       )
       await Promise.all(promises)
       await loadSandboxes()
       await loadStats()
       setSelectedSandboxes(new Set())
     } catch (error) {
-      console.error('Failed to delete sandboxes:', error)
+      console.error('Failed to recycle sandboxes:', error)
     }
   }
 
@@ -247,15 +247,15 @@ export function SandboxPage() {
     const variants = {
       running: "default",
       stopped: "secondary",
+      recycled: "destructive",
       error: "destructive",
-      deleted: "destructive",
     } as const
 
     const statusTranslations = {
       running: t("table.running") || "Running",
       stopped: t("table.stopped") || "Stopped",
+      recycled: t("table.recycled") || "Recycled",
       error: t("table.error") || "Error",
-      deleted: t("table.deleted") || "Deleted",
     }
 
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
@@ -306,8 +306,8 @@ export function SandboxPage() {
       return false
     }
     
-    // First filter by active/deleted tab
-    const matchesTab = activeTab === "active" ? sandbox.status !== "deleted" : sandbox.status === "deleted"
+    // First filter by active/recycled tab
+    const matchesTab = activeTab === "active" ? sandbox.status !== "recycled" : sandbox.status === "recycled"
     
     // Then apply other filters
     const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -342,7 +342,7 @@ export function SandboxPage() {
   const runningSandboxes = activeSandboxes.filter(s => s.status === "running").length
   const stoppedSandboxes = activeSandboxes.filter(s => s.status === "stopped").length
   const errorSandboxes = activeSandboxes.filter(s => s.status === "error").length
-  const deletedSandboxes = activeSandboxes.filter(s => s.status === "deleted").length
+  const recycledSandboxes = activeSandboxes.filter(s => s.status === "recycled").length
   
   // Calculate average CPU and memory usage from active sandboxes
   const runningSandboxesWithMetrics = activeSandboxes.filter(s => s.status === "running" && s.resources)
@@ -511,7 +511,9 @@ export function SandboxPage() {
                   <SelectItem value="error">{t("table.error") || "Error"}</SelectItem>
                 </>
               ) : (
-                <SelectItem value="deleted">{t("table.deleted") || "Deleted"}</SelectItem>
+                <>
+                  <SelectItem value="recycled">{t("table.recycled") || "Recycled"}</SelectItem>
+                </>
               )}
                 </SelectContent>
               </Select>
@@ -567,15 +569,15 @@ export function SandboxPage() {
 
       {/* Tabs for Active/Deleted Sandboxes */}
       <Tabs value={activeTab} onValueChange={(value) => {
-        setActiveTab(value as "active" | "deleted")
+        setActiveTab(value as "active" | "recycled")
         setStatusFilter("all") // Reset status filter when switching tabs
       }}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="active">
-            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "deleted" && !getPermanentlyDeletedIds().has(s.id)).length})
+            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "recycled" && !getPermanentlyDeletedIds().has(s.id)).length})
           </TabsTrigger>
-          <TabsTrigger value="deleted">
-            {t("table.deleted") || "Deleted"} ({sandboxes.filter(s => s.status === "deleted" && !getPermanentlyDeletedIds().has(s.id)).length})
+          <TabsTrigger value="recycled">
+            {t("table.deleted") || "Deleted"} ({sandboxes.filter(s => s.status === "recycled" && !getPermanentlyDeletedIds().has(s.id)).length})
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -858,9 +860,9 @@ export function SandboxPage() {
               variant="destructive" 
               onClick={async () => {
                 if (deleteDialog.isBatch) {
-                  await handleBatchDelete()
+                  await handleBatchRecycle()
                 } else if (deleteDialog.sandboxId) {
-                  await handleDeleteSandbox(deleteDialog.sandboxId)
+                  await handleRecycleSandbox(deleteDialog.sandboxId)
                 }
                 setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })
               }}

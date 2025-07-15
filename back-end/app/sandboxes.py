@@ -105,7 +105,7 @@ class SandboxStats(BaseModel):
     running_sandboxes: int
     stopped_sandboxes: int
     error_sandboxes: int
-    deleted_sandboxes: int
+    recycled_sandboxes: int
     total_cost: float
     avg_cpu_usage: float
     avg_memory_usage: float
@@ -336,9 +336,9 @@ def get_sandbox_stats(
         s for s in user_sandboxes
         if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ERROR.value
     ])
-    deleted_sandboxes = len([
+    recycled_sandboxes = len([
         s for s in user_sandboxes
-        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.DELETED.value
+        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RECYCLED.value
     ])
 
     total_cost = float(sum(float(getattr(s, 'total_cost', 0.0)) for s in user_sandboxes))
@@ -359,7 +359,7 @@ def get_sandbox_stats(
         running_sandboxes=running_sandboxes,
         stopped_sandboxes=stopped_sandboxes,
         error_sandboxes=error_sandboxes,
-        deleted_sandboxes=deleted_sandboxes,
+        recycled_sandboxes=recycled_sandboxes,
         total_cost=total_cost,
         avg_cpu_usage=avg_cpu_usage,
         avg_memory_usage=avg_memory_usage,
@@ -822,9 +822,9 @@ def get_admin_sandbox_stats(
         s for s in all_sandboxes
         if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ERROR.value
     ])
-    deleted_sandboxes = len([
+    recycled_sandboxes = len([
         s for s in all_sandboxes
-        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.DELETED.value
+        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RECYCLED.value
     ])
 
     total_cost = float(sum(float(getattr(s, 'total_cost', 0.0)) for s in all_sandboxes))
@@ -846,7 +846,7 @@ def get_admin_sandbox_stats(
         running_sandboxes=running_sandboxes,
         stopped_sandboxes=stopped_sandboxes,
         error_sandboxes=error_sandboxes,
-        deleted_sandboxes=deleted_sandboxes,
+        recycled_sandboxes=recycled_sandboxes,
         total_cost=total_cost,
         avg_cpu_usage=avg_cpu_usage,
         avg_memory_usage=avg_memory_usage,
