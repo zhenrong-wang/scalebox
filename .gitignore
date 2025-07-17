@@ -138,4 +138,17 @@ alembic.ini
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Test files with sensitive data
+test-*.html
+test_*.py
+*_test.py
+*_tests.py
+
+# Files that might contain credentials
+*credentials*
+*secret*
+*token*
+*password*
+*key* 
