@@ -41,11 +41,11 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 # Include routers
-app.include_router(users_router)
+app.include_router(users_router, prefix="/api/users")
 app.include_router(templates_router, prefix="/api/templates")
-app.include_router(sandboxes_router)
-app.include_router(api_keys_router, prefix="/api-keys")
-app.include_router(notifications_router)
+app.include_router(sandboxes_router, prefix="/api/sandboxes")
+app.include_router(api_keys_router, prefix="/api/api-keys")
+app.include_router(notifications_router, prefix="/api/notifications")
 app.include_router(projects_router, prefix="/api/projects")
 
 @app.get("/")

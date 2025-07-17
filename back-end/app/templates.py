@@ -13,7 +13,7 @@ from .schemas import (
 )
 
 
-router = APIRouter(prefix="/api/templates", tags=["templates"])
+router = APIRouter(tags=["templates"])
 
 # Configuration
 OFFICIAL_REPO_PREFIX = "https://github.com/scalebox/official-templates/"
@@ -26,6 +26,26 @@ def generate_repository_url(template_id: str, is_official: bool = False) -> str:
         return f"{OFFICIAL_REPO_PREFIX}{template_id}"
     else:
         return f"{PRIVATE_REPO_PREFIX}{template_id}"
+
+
+def template_to_response(template: Template) -> TemplateResponse:
+    """Convert Template model to TemplateResponse"""
+    return TemplateResponse(
+        id=getattr(template, 'template_id'),
+        name=getattr(template, 'name'),
+        description=getattr(template, 'description'),
+        category=getattr(template, 'category'),
+        language=getattr(template, 'language'),
+        cpu_spec=getattr(template, 'min_cpu_required'),
+        memory_spec=getattr(template, 'min_memory_required'),
+        is_official=getattr(template, 'is_official'),
+        is_public=getattr(template, 'is_public'),
+        owner_id=getattr(template.owner, 'id', None) if template.owner else None,
+        repository_url=getattr(template, 'repository_url'),
+        tags=getattr(template, 'tags'),
+        created_at=getattr(template, 'created_at'),
+        updated_at=getattr(template, 'updated_at')
+    )
 
 
 @router.get("/", response_model=TemplateListResponse)
@@ -57,13 +77,13 @@ async def get_templates(
         query = query.filter(
             (Template.is_official.is_(True))
             | (Template.is_public.is_(True))
-            | (current_user and Template.owner_account_id == current_user.id)
+            | (current_user and Template.owner_account_id == current_user.account_id)
         )
 
     templates = query.offset(skip).limit(limit).all()
 
     return TemplateListResponse(
-        templates=[TemplateResponse.from_orm(template) for template in templates],
+        templates=[template_to_response(template) for template in templates],
         total=query.count()
     )
 
@@ -75,16 +95,16 @@ async def get_template(
     current_user: Optional[User] = Depends(get_current_user)
 ):
     """Get a specific template by ID"""
-    template = db.query(Template).filter(Template.id == template_id).first()
+    template = db.query(Template).filter(Template.template_id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Check permissions
     if not current_user or getattr(current_user, 'role', 'user') != 'admin':
-        if not getattr(template, 'is_official', False) and not getattr(template, 'is_public', False) and getattr(template, 'owner_account_id', None) != getattr(current_user, 'id', None):
+        if not getattr(template, 'is_official', False) and not getattr(template, 'is_public', False) and getattr(template, 'owner_account_id', None) != getattr(current_user, 'account_id', None):
             raise HTTPException(status_code=403, detail="Access denied")
 
-    return TemplateResponse.from_orm(template)
+    return template_to_response(template)
 
 
 @router.post("/", response_model=TemplateResponse)
@@ -104,22 +124,22 @@ async def create_template(
     # Check for duplicate name per owner
     existing_template = db.query(Template).filter(
         Template.name == template_data.name,
-        Template.owner_account_id == current_user.id
+        Template.owner_account_id == current_user.account_id
     ).first()
     if existing_template:
         raise HTTPException(status_code=400, detail="Template name already exists for this user")
 
     template = Template(
-        id=template_id,
+        template_id=template_id,
         name=template_data.name,
         description=template_data.description,
         category=template_data.category,
         language=template_data.language,
-        cpu_spec=template_data.cpu_spec,
-        memory_spec=template_data.memory_spec,
+        min_cpu_required=template_data.cpu_spec,
+        min_memory_required=template_data.memory_spec,
         is_official=template_data.is_official,
         is_public=template_data.is_public,
-        owner_account_id=current_user.id if not template_data.is_official else None,
+        owner_account_id=current_user.account_id if not template_data.is_official else None,
         repository_url=repository_url,
         tags=template_data.tags
     )
@@ -128,7 +148,7 @@ async def create_template(
     db.commit()
     db.refresh(template)
 
-    return TemplateResponse.from_orm(template)
+    return template_to_response(template)
 
 
 @router.put("/{template_id}", response_model=TemplateResponse)
@@ -139,12 +159,12 @@ async def update_template(
     current_user: User = Depends(get_current_user_required)
 ):
     """Update a template - only owner or admin can update"""
-    template = db.query(Template).filter(Template.id == template_id).first()
+    template = db.query(Template).filter(Template.template_id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Check permissions
-    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_account_id', None) != current_user.id:
+    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_account_id', None) != current_user.account_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Official templates can only be updated by admins
@@ -152,15 +172,21 @@ async def update_template(
         raise HTTPException(status_code=403, detail="Only admins can update official templates")
 
     # Update fields
-    for field, value in template_data.dict(exclude_unset=True).items():
-        setattr(template, field, value)
+    update_data = template_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == 'cpu_spec':
+            setattr(template, 'min_cpu_required', value)
+        elif field == 'memory_spec':
+            setattr(template, 'min_memory_required', value)
+        else:
+            setattr(template, field, value)
 
     # Update the updated_at field using setattr to avoid SQLAlchemy column assignment issues
     setattr(template, 'updated_at', datetime.utcnow())
     db.commit()
     db.refresh(template)
 
-    return TemplateResponse.from_orm(template)
+    return template_to_response(template)
 
 
 @router.delete("/{template_id}")
@@ -169,18 +195,23 @@ async def delete_template(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_required)
 ):
-    """Delete a template - only owner or admin can delete"""
-    template = db.query(Template).filter(Template.id == template_id).first()
+    """Delete a template - only owner or admin can delete. Allow deletion even if sandboxes reference it."""
+    template = db.query(Template).filter(Template.template_id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Check permissions
-    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_account_id', None) != current_user.id:
+    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_account_id', None) != current_user.account_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Official templates can only be deleted by admins
+    # Official and public templates can only be deleted by admins
     if getattr(template, 'is_official', False) and getattr(current_user, 'role', 'user') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete official templates")
+    
+    if getattr(template, 'is_public', False) and getattr(current_user, 'role', 'user') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete public templates")
+
+    # No longer check for sandboxes using this template. Allow deletion.
 
     # Send notification if admin is deleting
     if getattr(current_user, 'role', 'user') == 'admin' and getattr(template, 'owner_account_id', None):
@@ -213,7 +244,7 @@ async def admin_get_all_templates(
     templates = query.offset(skip).limit(limit).all()
 
     return TemplateListResponse(
-        templates=[TemplateResponse.from_orm(template) for template in templates],
+        templates=[template_to_response(template) for template in templates],
         total=query.count()
     )
 
@@ -225,7 +256,7 @@ async def admin_make_template_official(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Admin endpoint to make a template official"""
-    template = db.query(Template).filter(Template.id == template_id).first()
+    template = db.query(Template).filter(Template.template_id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
@@ -260,7 +291,7 @@ async def admin_make_template_public(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Admin endpoint to make a template public"""
-    template = db.query(Template).filter(Template.id == template_id).first()
+    template = db.query(Template).filter(Template.template_id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 

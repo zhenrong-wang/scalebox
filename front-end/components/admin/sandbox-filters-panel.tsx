@@ -25,17 +25,9 @@ export function SandboxFiltersPanel({ filters, onFiltersChange, onClose }: Sandb
   const statusOptions = [
     { value: "running", label: "Running" },
     { value: "stopped", label: "Stopped" },
-    { value: "recycled", label: "Recycled" },
-    { value: "error", label: "Error" },
-  ]
-
-  const frameworkOptions = [
-    { value: "React", label: "React" },
-    { value: "Vue", label: "Vue" },
-    { value: "Angular", label: "Angular" },
-    { value: "Node.js", label: "Node.js" },
-    { value: "Python", label: "Python" },
-    { value: "Next.js", label: "Next.js" },
+    { value: "starting", label: "Starting" },
+    { value: "timeout", label: "Timeout" },
+    { value: "archived", label: "Archived" },
   ]
 
   const regionOptions = [
@@ -45,13 +37,8 @@ export function SandboxFiltersPanel({ filters, onFiltersChange, onClose }: Sandb
     { value: "ap-southeast-1", label: "Asia Pacific (Singapore)" },
   ]
 
-  const visibilityOptions = [
-    { value: "public", label: "Public" },
-    { value: "private", label: "Private" },
-  ]
-
   const handleCheckboxChange = (
-    filterType: "status" | "framework" | "region" | "visibility",
+    filterType: "status" | "region",
     value: string,
     checked: boolean,
   ) => {
@@ -69,9 +56,7 @@ export function SandboxFiltersPanel({ filters, onFiltersChange, onClose }: Sandb
   const handleClearFilters = () => {
     const clearedFilters: SandboxFilters = {
       status: [],
-      framework: [],
       region: [],
-      visibility: [],
       user: "",
       dateRange: { from: null, to: null },
       search: "",
@@ -109,25 +94,6 @@ export function SandboxFiltersPanel({ filters, onFiltersChange, onClose }: Sandb
             </div>
           </div>
 
-          {/* Framework Filter */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">{t("admin.framework")}</Label>
-            <div className="space-y-2">
-              {frameworkOptions.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`framework-${option.value}`}
-                    checked={localFilters.framework.includes(option.value)}
-                    onCheckedChange={(checked) => handleCheckboxChange("framework", option.value, checked as boolean)}
-                  />
-                  <Label htmlFor={`framework-${option.value}`} className="text-sm font-normal cursor-pointer">
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Region Filter */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">{t("admin.region")}</Label>
@@ -140,25 +106,6 @@ export function SandboxFiltersPanel({ filters, onFiltersChange, onClose }: Sandb
                     onCheckedChange={(checked) => handleCheckboxChange("region", option.value, checked as boolean)}
                   />
                   <Label htmlFor={`region-${option.value}`} className="text-sm font-normal cursor-pointer">
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Visibility Filter */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">{t("admin.visibility")}</Label>
-            <div className="space-y-2">
-              {visibilityOptions.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`visibility-${option.value}`}
-                    checked={localFilters.visibility.includes(option.value)}
-                    onCheckedChange={(checked) => handleCheckboxChange("visibility", option.value, checked as boolean)}
-                  />
-                  <Label htmlFor={`visibility-${option.value}`} className="text-sm font-normal cursor-pointer">
                     {option.label}
                   </Label>
                 </div>

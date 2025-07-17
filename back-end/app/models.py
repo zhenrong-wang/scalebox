@@ -10,28 +10,56 @@ import base64
 Base = declarative_base()
 
 def generate_account_id():
-    """Generate a cryptographically secure, URL-safe 13-character account ID"""
-    # Generate 8 random bytes and encode as base32, then take first 13 chars
-    random_bytes = secrets.token_bytes(8)
-    encoded = base64.b32encode(random_bytes).decode('ascii')
-    # Remove padding and take first 13 characters
-    return encoded.replace('=', '')[:13].upper()
+    """Generate a 12-digit numeric account ID"""
+    return str(secrets.randbelow(10**12)).zfill(12)
+
+def generate_resource_id(prefix: str, length: int = 17) -> str:
+    """Generate AWS-style resource ID: prefix-xxxxxxxxxxxxxxxxx (17 chars)"""
+    chars = string.ascii_lowercase + string.digits
+    suffix = ''.join(secrets.choice(chars) for _ in range(length))
+    return f"{prefix}-{suffix}"
+
+def generate_project_id():
+    """Generate a project ID: prj-xxxxxxxxxxxxxxxxx (21 chars total)"""
+    return generate_resource_id("prj", 17)
+
+def generate_template_id():
+    """Generate a template ID: tpl-xxxxxxxxxxxxxxxxx (21 chars total)"""
+    return generate_resource_id("tpl", 17)
+
+def generate_sandbox_id():
+    """Generate a sandbox ID: sbx-xxxxxxxxxxxxxxxxx (21 chars total)"""
+    return generate_resource_id("sbx", 17)
 
 def generate_api_key():
-    """Generate a 40-character API key with sbx- prefix"""
-    # Generate 36 random characters (40 - 4 for prefix)
+    """Generate a user-facing API key: sbk- + 40 chars (43 chars total)"""
     chars = string.ascii_letters + string.digits
-    suffix = ''.join(secrets.choice(chars) for _ in range(36))
-    return f"sbx-{suffix}"
+    suffix = ''.join(secrets.choice(chars) for _ in range(40))
+    return f"sbk-{suffix}"
 
 def hash_api_key(api_key: str) -> str:
     """Hash an API key for secure storage"""
     return hashlib.sha256(api_key.encode()).hexdigest()
 
-def generate_uuid():
-    """Generate a UUID string"""
-    import uuid
-    return str(uuid.uuid4())
+def generate_notification_id():
+    """Generate a notification ID: not-xxxxxxxxxxxx"""
+    return generate_resource_id("not", 12)
+
+def generate_usage_id():
+    """Generate a usage record ID: usg-xxxxxxxxxxxx"""
+    return generate_resource_id("usg", 12)
+
+def generate_metric_id():
+    """Generate a metric record ID: mtr-xxxxxxxxxxxx"""
+    return generate_resource_id("mtr", 12)
+
+def generate_billing_id():
+    """Generate a billing record ID: bil-xxxxxxxxxxxx"""
+    return generate_resource_id("bil", 12)
+
+def generate_signup_id():
+    """Generate a signup record ID: sgn-xxxxxxxxxxxx"""
+    return generate_resource_id("sgn", 12)
 
 class User(Base):
     __tablename__ = "users"
@@ -39,8 +67,8 @@ class User(Base):
     # Internal primary key for sorting and relationships
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # Business key - globally unique, opaque account identifier
-    account_id = Column(String(13), unique=True, nullable=False, index=True, default=generate_account_id)
+    # Business key - globally unique, numeric account identifier
+    account_id = Column(String(12), unique=True, nullable=False, index=True, default=generate_account_id)
     
     # User credentials and profile
     email = Column(String(255), unique=True, nullable=False, index=True)
@@ -82,17 +110,18 @@ class Project(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    project_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    project_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_project_id)
     
     # Project details
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     
     # Ownership - uses account_id for business relationships
-    owner_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=False, index=True)
+    owner_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
     
-    # Status
+    # Status and flags
     status = Column(String(20), default="active", nullable=False)  # active, archived
+    is_default = Column(Boolean, default=False, nullable=False)  # Default project that cannot be deleted
     
     # Audit timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -101,6 +130,7 @@ class Project(Base):
     # Relationships
     owner = relationship("User", back_populates="projects", foreign_keys=[owner_account_id])
     sandboxes = relationship("Sandbox", back_populates="project", foreign_keys="Sandbox.project_id")
+    # api_keys = relationship("ApiKey", foreign_keys="ApiKey.project_id")  # REMOVE
     
     # Constraints
     __table_args__ = (
@@ -113,8 +143,8 @@ class Template(Base):
     # Internal primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # Business identifier
-    template_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    # Business identifier (map template_id to id for the response)
+    template_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_template_id)
     
     # Template details
     name = Column(String(255), nullable=False)
@@ -122,14 +152,14 @@ class Template(Base):
     category = Column(String(100), nullable=False)
     language = Column(String(100), nullable=False)
     
-    # Resource requirements
+    # Resource requirements (map min_cpu_required to cpu_spec, min_memory_required to memory_spec)
     min_cpu_required = Column(Float, nullable=False, default=1.0)  # Minimum CPU requirement
     min_memory_required = Column(Float, nullable=False, default=1.0)  # Minimum Memory requirement in GB
     
     # Visibility and ownership
     is_official = Column(Boolean, nullable=False, default=False)  # Official templates (admin-managed)
     is_public = Column(Boolean, nullable=False, default=False)  # Public templates
-    owner_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=True, index=True)  # NULL for official templates
+    owner_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=True, index=True)  # NULL for official templates
     
     # Repository and metadata
     repository_url = Column(String(500), nullable=False)
@@ -141,6 +171,28 @@ class Template(Base):
     
     # Relationships
     owner = relationship("User", back_populates="private_templates", foreign_keys=[owner_account_id])
+    
+    # Properties to map database fields to response schema fields
+    @property
+    def cpu_spec(self):
+        return self.min_cpu_required
+    
+    @cpu_spec.setter
+    def cpu_spec(self, value):
+        self.min_cpu_required = value
+    
+    @property
+    def memory_spec(self):
+        return self.min_memory_required
+    
+    @memory_spec.setter
+    def memory_spec(self, value):
+        self.min_memory_required = value
+    
+    @property
+    def owner_id(self):
+        # Return the user's ID from the relationship if owner exists
+        return self.owner.id if self.owner else None
     
     # Constraints
     __table_args__ = (
@@ -154,10 +206,10 @@ class ApiKey(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier (the actual API key)
-    api_key = Column(String(40), unique=True, nullable=False, index=True, default=generate_api_key)
+    api_key = Column(String(50), unique=True, nullable=False, index=True, default=generate_api_key)
     
     # Ownership - uses account_id for business relationships
-    user_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=False, index=True)
+    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
     
     # Key details
     name = Column(String(255), nullable=False)
@@ -166,10 +218,8 @@ class ApiKey(Base):
     # Security - store only the hash, not the plaintext
     key_hash = Column(String(64), nullable=False)  # SHA-256 hash
     
-    # Permissions and status
-    permissions = Column(JSON, nullable=True)
+    # Status - simplified to just active/inactive
     is_active = Column(Boolean, default=True, nullable=False)
-    expires_in_days = Column(Integer, nullable=True)
     
     # Activity tracking
     last_used_at = Column(DateTime, nullable=True)
@@ -180,6 +230,7 @@ class ApiKey(Base):
     
     # Relationships
     user = relationship("User", back_populates="api_keys", foreign_keys=[user_account_id])
+    # project = relationship("Project", foreign_keys=[project_id])  # REMOVE
     
     # Constraints
     __table_args__ = (
@@ -193,10 +244,10 @@ class Notification(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    notification_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    notification_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_notification_id)
     
     # Ownership - uses account_id for business relationships
-    user_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=False, index=True)
+    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
     
     # Notification content
     title = Column(String(255), nullable=False)
@@ -223,16 +274,16 @@ class Sandbox(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    sandbox_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    sandbox_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_sandbox_id)
     
     # Sandbox details
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     
     # Relationships - all use business keys
-    template_id = Column(String(36), ForeignKey("templates.template_id"), nullable=False, index=True)
-    owner_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=False, index=True)
-    project_id = Column(String(36), ForeignKey("projects.project_id"), nullable=True, index=True)
+    template_id = Column(String(25), ForeignKey("templates.template_id"), nullable=False, index=True)
+    owner_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    project_id = Column(String(25), ForeignKey("projects.project_id"), nullable=True, index=True)
     
     # Configuration
     cpu_spec = Column(Float, nullable=False, default=1.0)  # 1-8 vCPU
@@ -241,8 +292,6 @@ class Sandbox(Base):
     
     # Status and lifecycle
     status = Column(String(20), nullable=False, default="created")  # created, starting, running, stopped, timeout, recycled
-    region = Column(String(20), nullable=False)
-    visibility = Column(String(20), nullable=False, default="private")
     
     # Internal snapshot management
     latest_snapshot_id = Column(String(255), nullable=True)  # Internal snapshot ID
@@ -275,11 +324,11 @@ class SandboxUsage(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    usage_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    usage_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_usage_id)
     
     # Relationships - all use business keys
-    sandbox_id = Column(String(36), ForeignKey("sandboxes.sandbox_id"), nullable=False, index=True)
-    user_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=False, index=True)
+    sandbox_id = Column(String(25), ForeignKey("sandboxes.sandbox_id"), nullable=False, index=True)
+    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
     
     # Usage tracking
     start_time = Column(DateTime, nullable=False, index=True)
@@ -307,7 +356,7 @@ class SandboxMetrics(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    metric_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    metric_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_metric_id)
     
     # Relationship - uses business key
     sandbox_id = Column(String(36), ForeignKey("sandboxes.sandbox_id"), nullable=False, index=True)
@@ -333,12 +382,12 @@ class BillingRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    billing_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    billing_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_billing_id)
     
     # Relationships - all use business keys
-    user_account_id = Column(String(13), ForeignKey("users.account_id"), nullable=False, index=True)
-    project_id = Column(String(36), ForeignKey("projects.project_id"), nullable=True, index=True)
-    sandbox_id = Column(String(36), ForeignKey("sandboxes.sandbox_id"), nullable=True, index=True)
+    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    project_id = Column(String(25), ForeignKey("projects.project_id"), nullable=True, index=True)
+    sandbox_id = Column(String(25), ForeignKey("sandboxes.sandbox_id"), nullable=True, index=True)
     
     # Billing details
     billing_date = Column(DateTime, nullable=False, index=True)
@@ -363,7 +412,7 @@ class PendingSignup(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Business identifier
-    signup_id = Column(String(36), unique=True, nullable=False, index=True, default=generate_uuid)
+    signup_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_signup_id)
     
     # Signup details
     email = Column(String(255), nullable=False, index=True)

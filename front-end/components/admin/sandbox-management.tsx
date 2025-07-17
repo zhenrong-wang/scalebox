@@ -28,9 +28,7 @@ export function SandboxManagement() {
 
   const [filters, setFilters] = useState<SandboxFilters>({
     status: [],
-    framework: [],
     region: [],
-    visibility: [],
     user: "",
     dateRange: { from: null, to: null },
     search: "",
@@ -57,12 +55,8 @@ export function SandboxManagement() {
     const filtered = sandboxes.filter((sb) => {
       // Status filter
       if (filters.status.length && !filters.status.includes(sb.status)) return false
-      // Framework filter
-      if (filters.framework.length && !filters.framework.includes(sb.framework)) return false
       // Region filter
       if (filters.region.length && !filters.region.includes(sb.region)) return false
-      // Visibility filter
-      if (filters.visibility.length && !filters.visibility.includes(sb.visibility)) return false
       // User filter
       if (filters.user && !sb.userName.toLowerCase().includes(filters.user.toLowerCase())) return false
       // Date range filter
@@ -71,8 +65,7 @@ export function SandboxManagement() {
       // Search filter
       if (searchTerm.trim() && !(
         sb.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sb.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sb.framework.toLowerCase().includes(searchTerm.toLowerCase())
+        sb.userName.toLowerCase().includes(searchTerm.toLowerCase())
       )) return false
       return true
     })
@@ -114,17 +107,17 @@ export function SandboxManagement() {
     const total = filteredSandboxes.length
     const running = filteredSandboxes.filter((sb) => sb.status === "running").length
     const stopped = filteredSandboxes.filter((sb) => sb.status === "stopped").length
-    const errored = filteredSandboxes.filter((sb) => sb.status === "error").length
-    const deleted = filteredSandboxes.filter((sb) => sb.status === "deleted").length
+    const timeout = filteredSandboxes.filter((sb) => sb.status === "timeout").length
+    const archived = filteredSandboxes.filter((sb) => sb.status === "archived").length
     const totalCost = filteredSandboxes.reduce((sum, sb) => sum + (sb.cost?.totalCost || 0), 0)
     const avgCpu = filteredSandboxes.length ? Math.round(filteredSandboxes.reduce((sum, sb) => sum + (sb.resources?.cpu || 0), 0) / filteredSandboxes.length) : 0
     const avgMemory = filteredSandboxes.length ? Math.round(filteredSandboxes.reduce((sum, sb) => sum + (sb.resources?.memory || 0), 0) / filteredSandboxes.length) : 0
-    return { total, running, stopped, errored, deleted, totalCost, avgCpu, avgMemory }
+    return { total, running, stopped, timeout, archived, totalCost, avgCpu, avgMemory }
   }, [filteredSandboxes])
 
-  const handleSandboxAction = async (sandboxId: string, action: "start" | "stop" | "delete") => {
+  const handleSandboxAction = async (sandboxId: string, action: "start" | "stop") => {
     try {
-      await SandboxService.adminSandboxAction(sandboxId, action)
+      await SandboxService.adminActionOnSandbox(sandboxId, action)
     // Refresh sandboxes
       const updatedSandboxes = await SandboxService.getAllSandboxes()
     setSandboxes(updatedSandboxes)
@@ -137,28 +130,12 @@ export function SandboxManagement() {
     const colors = {
       running: "bg-green-100 text-green-800 border-green-200",
       stopped: "bg-gray-100 text-gray-800 border-gray-200",
-      deleted: "bg-red-100 text-red-800 border-red-200",
-      error: "bg-red-100 text-red-800 border-red-200",
+      archived: "bg-red-100 text-red-800 border-red-200",
+      starting: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      timeout: "bg-orange-100 text-orange-800 border-orange-200",
     }
 
     return <Badge className={colors[status]}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
-  }
-
-  const getFrameworkBadge = (framework: string) => {
-    const colors = {
-      React: "bg-blue-100 text-blue-800 border-blue-200",
-      Vue: "bg-green-100 text-green-800 border-green-200",
-      Angular: "bg-red-100 text-red-800 border-red-200",
-      "Node.js": "bg-yellow-100 text-yellow-800 border-yellow-200",
-      Python: "bg-purple-100 text-purple-800 border-purple-200",
-      "Next.js": "bg-gray-100 text-gray-800 border-gray-200",
-    }
-
-    return (
-      <Badge className={colors[framework as keyof typeof colors] || "bg-gray-100 text-gray-800 border-gray-200"}>
-        {framework}
-      </Badge>
-    )
   }
 
   const formatCurrency = (amount: number) => {
@@ -302,7 +279,6 @@ export function SandboxManagement() {
           <ResizableTable
             defaultColumnWidths={{
               name: 200,
-              framework: 120,
               status: 100,
               user: 150,
               resources: 150,
@@ -314,7 +290,6 @@ export function SandboxManagement() {
             <TableHeader>
               <TableRow>
                 <ResizableTableHead columnId="name" defaultWidth={200}>{t("admin.name")}</ResizableTableHead>
-                <ResizableTableHead columnId="framework" defaultWidth={120}>{t("admin.framework")}</ResizableTableHead>
                 <ResizableTableHead columnId="status" defaultWidth={100}>{t("admin.status")}</ResizableTableHead>
                 <ResizableTableHead columnId="user" defaultWidth={150}>{t("admin.user")}</ResizableTableHead>
                 <ResizableTableHead columnId="resources" defaultWidth={150}>{t("admin.resources")}</ResizableTableHead>
@@ -334,7 +309,6 @@ export function SandboxManagement() {
                       </div>
                     </div>
                   </ResizableTableCell>
-                  <ResizableTableCell>{getFrameworkBadge(sandbox.framework)}</ResizableTableCell>
                   <ResizableTableCell>{getStatusBadge(sandbox.status)}</ResizableTableCell>
                   <ResizableTableCell>
                     <div>
@@ -391,11 +365,7 @@ export function SandboxManagement() {
                           <Square className="h-4 w-4" />
                         </Button>
                       )}
-                      {sandbox.status !== "deleted" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleSandboxAction(sandbox.id, "delete")}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+
                     </div>
                   </ResizableTableCell>
                 </TableRow>

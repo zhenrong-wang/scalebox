@@ -10,6 +10,9 @@ import {
 } from "lucide-react"
 import type { Sandbox } from "../../types/sandbox"
 import { useLanguage } from "../../contexts/language-context"
+import { useEffect, useState } from "react"
+import { templateService, Template } from "../../services/template-service"
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
 
 interface SandboxDetailsModalProps {
   sandbox: Sandbox
@@ -37,6 +40,23 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
 
 
   const { t } = useLanguage()
+  const [template, setTemplate] = useState<Template | null>(null)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+
+  useEffect(() => {
+    if (isOpen && sandbox?.template_id) {
+      templateService.getTemplate(sandbox.template_id)
+        .then(tpl => {
+          setTemplate(tpl)
+          setTemplateError(null)
+        })
+        .catch(err => {
+          setTemplate(null)
+          setTemplateError(t("sandbox.templateDeleted") || "The template used to create this sandbox has been deleted.")
+        })
+    }
+  }, [isOpen, sandbox?.template_id])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -60,10 +80,6 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
                   <div className="font-medium">{sandbox.name}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">{t("admin.framework")}</div>
-                  <div className="font-medium">{sandbox.framework}</div>
-                </div>
-                <div>
                   <div className="text-xs text-muted-foreground">{t("admin.status")}</div>
                   <div className="font-medium">{t(`admin.status.${sandbox.status}`) || sandbox.status}</div>
                 </div>
@@ -72,12 +88,12 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
                   <div className="font-medium">{sandbox.userName}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">{t("admin.region")}</div>
-                  <div className="font-medium">{sandbox.region}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("admin.visibility")}</div>
-                  <div className="font-medium">{t(`admin.visibility.${sandbox.visibility}`) || sandbox.visibility}</div>
+                  <div className="text-xs text-muted-foreground">{t("admin.template")}</div>
+                  <div className="font-medium">
+                    <button className="underline text-blue-600 hover:text-blue-800" onClick={() => setShowTemplateDialog(true)}>
+                      {template ? template.name : t("sandbox.deletedTemplate")}
+                    </button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -122,6 +138,33 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
           </Card>
         </div>
       </DialogContent>
+      {/* Template Details Dialog */}
+      <AlertDialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {templateError ? t("sandbox.deletedTemplate") : template?.name}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            {templateError ? (
+              <span className="text-destructive">{templateError}</span>
+            ) : (
+              <>
+                <span>{template?.description}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.language")}: {template?.language}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.category")}: {template?.category}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.cpu")}: {template?.cpu_spec}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.ram")}: {template?.memory_spec} GB</span>
+                {/* Add more fields as needed */}
+              </>
+            )}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("action.close") || "Close"}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

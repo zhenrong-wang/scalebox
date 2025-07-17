@@ -2,13 +2,9 @@ interface ApiKey {
   id: number;
   key_id: string;
   name: string;
-  description?: string; // New description field
+  description?: string;
   prefix: string;
-  permissions: { read: true; write: boolean };
   is_active: boolean;
-  expires_in_days?: number; // Changed from expires_at to expires_in_days
-  remaining_days?: number; // Calculated remaining days
-  is_expired?: boolean; // Whether the key is expired
   last_used_at?: string;
   created_at: string;
   user_email?: string; // for admin
@@ -16,22 +12,12 @@ interface ApiKey {
 
 interface CreateApiKeyRequest {
   name: string;
-  description?: string; // New description field
-  can_write: boolean;
-  expires_in_days?: number; // Changed from expires_at to expires_in_days
+  description?: string;
 }
 
 interface UpdateApiKeyRequest {
   name?: string;
-  description?: string; // New description field
-  can_write?: boolean;
-  expires_in_days?: number; // Allow updating expiration
-}
-
-interface ExtendApiKeyRequest {
-  extend_by_days?: number; // Extend by specific days
-  extend_by_months?: number; // Extend by specific months
-  make_permanent?: boolean; // Make the key permanent
+  description?: string;
 }
 
 interface ApiKeyUsage {
@@ -64,7 +50,7 @@ export class ApiKeyService {
   }
 
   static async createApiKey(request: CreateApiKeyRequest): Promise<{ message: string; api_key: string; key_id: string; prefix: string }> {
-    const response = await fetch(`${this.API_BASE}/api-keys/`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/`, {
       method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(request),
@@ -79,7 +65,7 @@ export class ApiKeyService {
   }
 
   static async listApiKeys(): Promise<ApiKey[]> {
-    const response = await fetch(`${this.API_BASE}/api-keys/`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/`, {
       headers: this.getAuthHeaders(),
     });
 
@@ -92,7 +78,7 @@ export class ApiKeyService {
   }
 
   static async getApiKey(keyId: string): Promise<ApiKey> {
-    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}`, {
       headers: this.getAuthHeaders(),
     });
 
@@ -105,7 +91,7 @@ export class ApiKeyService {
   }
 
   static async updateApiKey(keyId: string, request: UpdateApiKeyRequest): Promise<ApiKey> {
-    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}`, {
       method: "PUT",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(request),
@@ -120,7 +106,7 @@ export class ApiKeyService {
   }
 
   static async deleteApiKey(keyId: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}`, {
       method: "DELETE",
       headers: this.getAuthHeaders(),
     });
@@ -134,7 +120,7 @@ export class ApiKeyService {
   }
 
   static async toggleApiKeyStatus(keyId: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}/toggle`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}/toggle`, {
       method: "POST",
       headers: this.getAuthHeaders(),
     });
@@ -147,23 +133,10 @@ export class ApiKeyService {
     return await response.json();
   }
 
-  static async extendApiKeyExpiration(keyId: string, request: ExtendApiKeyRequest): Promise<{ message: string }> {
-    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}/extend`, {
-      method: "POST",
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(request),
-    });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to extend API key expiration");
-    }
-
-    return await response.json();
-  }
 
   static async getApiKeyUsage(keyId: string, limit: number = 100): Promise<ApiKeyUsage[]> {
-    const response = await fetch(`${this.API_BASE}/api-keys/${keyId}/usage?limit=${limit}`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}/usage?limit=${limit}`, {
       headers: this.getAuthHeaders(),
     });
 
@@ -177,7 +150,7 @@ export class ApiKeyService {
 
   // Admin endpoints
   static async getAllApiKeys(): Promise<ApiKey[]> {
-    const response = await fetch(`${this.API_BASE}/api-keys/admin/all`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/admin/all`, {
       headers: this.getAuthHeaders(),
     });
 
@@ -190,7 +163,7 @@ export class ApiKeyService {
   }
 
   static async getApiKeyStats(): Promise<ApiKeyStats> {
-    const response = await fetch(`${this.API_BASE}/api-keys/admin/stats`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/admin/stats`, {
       headers: this.getAuthHeaders(),
     });
 
@@ -203,7 +176,7 @@ export class ApiKeyService {
   }
 
   static async adminApiKeyAction(keyId: string, action: "enable" | "disable" | "delete", reason?: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.API_BASE}/api-keys/admin/${keyId}/action`, {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/admin/${keyId}/action`, {
       method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ action, reason }),
@@ -221,44 +194,10 @@ export class ApiKeyService {
     return apiKey.substring(0, 16) + "...";
   }
 
-  static isExpired(expiresInDays?: number, createdAt?: string): boolean {
-    if (!expiresInDays || !createdAt) return false;
-    const created = new Date(createdAt);
-    const expirationDate = new Date(created.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
-    return new Date() > expirationDate;
-  }
-
-  static getDaysUntilExpiration(expiresInDays?: number, createdAt?: string): number | null {
-    if (!expiresInDays || !createdAt) return null;
-    const created = new Date(createdAt);
-    const expirationDate = new Date(created.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
-    const now = new Date();
-    const diffTime = expirationDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  }
-
   static getStatusBadge(apiKey: ApiKey): { text: string; variant: "default" | "secondary" | "destructive" | "outline" } {
     if (!apiKey.is_active) {
-      return { text: "Inactive", variant: "destructive" };
-    }
-    if (this.isExpired(apiKey.expires_in_days, apiKey.created_at)) {
-      return { text: "Expired", variant: "destructive" };
+      return { text: "Disabled", variant: "destructive" };
     }
     return { text: "Active", variant: "default" };
-  }
-
-  static getPermissionsText(permissions: { read: true; write: boolean }, t?: (key: string, params?: any) => string): string {
-    if (permissions.write) return t ? (t("apiKey.readWrite") || "Read & Write") : "Read & Write";
-    return t ? (t("apiKey.readOnly") || "Read Only") : "Read Only";
-  }
-
-  static getExpirationText(expiresInDays?: number, createdAt?: string, t?: (key: string, params?: any) => string): string {
-    if (!expiresInDays) return t ? (t("apiKey.permanent") || "Permanent") : "Permanent";
-    const daysLeft = this.getDaysUntilExpiration(expiresInDays, createdAt);
-    if (daysLeft === null) return t ? (t("apiKey.permanent") || "Permanent") : "Permanent";
-    if (daysLeft === 0) return t ? (t("apiKey.expiresToday") || "Expires today") : "Expires today";
-    if (daysLeft < 0) return t ? (t("apiKey.expired") || "Expired") : "Expired";
-    return t ? (t("apiKey.expiresIn", { days: daysLeft }) || `Expires in ${daysLeft} days`) : `Expires in ${daysLeft} days`;
   }
 } 

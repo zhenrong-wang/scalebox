@@ -15,7 +15,7 @@ import { TermsModal } from "@/components/ui/terms-modal"
 // import type { CheckedState } from "@/components/ui/checkbox"
 import { useLanguage } from "../contexts/language-context"
 import { LanguageToggle } from "./language-toggle"
-import { UserService } from "../services/user-service";
+import { UserService } from "../services/user-service"
 
 interface SignUpPageProps {
   onSignUp: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>
@@ -65,6 +65,8 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
       captchaRef.current?.regenerate()
     }
   }))
+
+
 
   const validateName = (name: string) => {
     if (!name.trim()) return t("signup.fullName.required")

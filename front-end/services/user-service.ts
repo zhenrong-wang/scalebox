@@ -18,7 +18,7 @@ export class UserService {
   static API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   static async signup({ name, email, password }: { name: string; email: string; password: string }) {
-    const res = await fetch(`${this.API_BASE}/users/signup`, {
+    const res = await fetch(`${this.API_BASE}/api/users/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
@@ -27,7 +27,7 @@ export class UserService {
   }
 
   static async signin(email: string, password: string) {
-    const res = await fetch(`${this.API_BASE}/users/signin`, {
+    const res = await fetch(`${this.API_BASE}/api/users/signin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -42,7 +42,7 @@ export class UserService {
   }
 
   static async resendVerification(email: string) {
-    const res = await fetch(`${this.API_BASE}/users/resend-verification`, {
+    const res = await fetch(`${this.API_BASE}/api/users/resend-verification`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -51,7 +51,7 @@ export class UserService {
   }
 
   static async verifyEmail(code: string, email: string) {
-    const res = await fetch(`${this.API_BASE}/users/verify-email`, {
+    const res = await fetch(`${this.API_BASE}/api/users/verify-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: code }),
@@ -60,7 +60,7 @@ export class UserService {
   }
 
   static async resetPassword(email: string) {
-    const res = await fetch(`${this.API_BASE}/users/reset-password`, {
+    const res = await fetch(`${this.API_BASE}/api/users/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -69,7 +69,7 @@ export class UserService {
   }
 
   static async resetPasswordConfirm(token: string, newPassword: string) {
-    const res = await fetch(`${this.API_BASE}/users/reset-password/confirm`, {
+    const res = await fetch(`${this.API_BASE}/api/users/reset-password/confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, new_password: newPassword }),
@@ -78,7 +78,7 @@ export class UserService {
   }
 
   static async validateResetToken(token: string) {
-    const res = await fetch(`${this.API_BASE}/users/reset-password/validate/${token}`, {
+    const res = await fetch(`${this.API_BASE}/api/users/reset-password/validate/${token}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
@@ -86,7 +86,7 @@ export class UserService {
   }
 
   static async cleanupFailedSignup(email: string) {
-    const res = await fetch(`${this.API_BASE}/users/cleanup-failed-signup?email=${encodeURIComponent(email)}`, {
+    const res = await fetch(`${this.API_BASE}/api/users/cleanup-failed-signup?email=${encodeURIComponent(email)}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
     });
@@ -101,7 +101,7 @@ export class UserService {
   static async getCurrentUser() {
     const token = localStorage.getItem("auth-token");
     if (!token) return null;
-    const res = await fetch(`${this.API_BASE}/users/me`, {
+    const res = await fetch(`${this.API_BASE}/api/users/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;

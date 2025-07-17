@@ -48,7 +48,7 @@ class TemplateUpdate(BaseModel):
         return value
 
 class TemplateResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     
     id: str
     name: str
@@ -87,17 +87,41 @@ class ProjectResponse(BaseModel):
     description: Optional[str]
     owner_account_id: str
     status: str
+    is_default: bool
     created_at: datetime
     updated_at: datetime
     
     # Computed fields (will be set to defaults)
     sandbox_count: int = 0
-    api_key_count: int = 0
     total_spent: float = 0.0
 
 class ProjectListResponse(BaseModel):
     projects: List[ProjectResponse]
     total: int
+
+# Sandbox schemas
+class SandboxResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: str
+    name: str
+    description: Optional[str]
+    status: str
+    user_account_id: str
+    user_name: str
+    user_email: str
+    project_id: Optional[str]
+    project_name: Optional[str]
+    template_id: Optional[str]
+    template_name: Optional[str]
+    resources: Dict[str, float]
+    cpu_spec: Optional[float]
+    memory_spec: Optional[float]
+    cost: Dict[str, float]
+    created_at: datetime
+    updated_at: datetime
+    last_accessed_at: Optional[datetime]
+    uptime: int
 
 class NotificationType(str, Enum):
     INFO = "info"

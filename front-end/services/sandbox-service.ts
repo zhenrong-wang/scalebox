@@ -34,7 +34,6 @@ export class SandboxService {
   // Get all sandboxes for the current user
   static async listSandboxes(params?: {
     status?: string
-    framework?: string
     region?: string
     visibility?: string
     project_id?: string
@@ -54,7 +53,7 @@ export class SandboxService {
         })
       }
 
-      const response = await fetch(`${API_BASE_URL}/sandboxes/?${queryParams}`, {
+      const response = await fetch(`${API_BASE_URL}/api/sandboxes/?${queryParams}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       })
@@ -73,15 +72,15 @@ export class SandboxService {
     total_sandboxes: number
     running_sandboxes: number
     stopped_sandboxes: number
-    error_sandboxes: number
-    deleted_sandboxes: number
+    timeout_sandboxes: number
+    archived_sandboxes: number
     total_cost: number
     avg_cpu_usage: number
     avg_memory_usage: number
     total_uptime_hours: number
   }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/sandboxes/stats`, {
+      const response = await fetch(`${API_BASE_URL}/api/sandboxes/stats`, {
         method: 'GET',
         headers: getAuthHeaders(),
       })
@@ -94,8 +93,8 @@ export class SandboxService {
         total_sandboxes: 0,
         running_sandboxes: 0,
         stopped_sandboxes: 0,
-        error_sandboxes: 0,
-        deleted_sandboxes: 0,
+        timeout_sandboxes: 0,
+        archived_sandboxes: 0,
         total_cost: 0,
         avg_cpu_usage: 0,
         avg_memory_usage: 0,
@@ -108,12 +107,11 @@ export class SandboxService {
   static async createSandbox(sandboxData: {
     name: string
     description?: string
-    framework: string
     region: string
     visibility?: 'public' | 'private'
     project_id?: string
   }): Promise<Sandbox> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/`, {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(sandboxData),
@@ -125,7 +123,7 @@ export class SandboxService {
 
   // Get a specific sandbox
   static async getSandbox(sandboxId: string): Promise<Sandbox> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/${sandboxId}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     })
@@ -138,11 +136,11 @@ export class SandboxService {
   static async updateSandbox(sandboxId: string, updateData: {
     name?: string
     description?: string
-    status?: 'running' | 'stopped' | 'error' | 'deleted'
+    status?: 'running' | 'stopped' | 'timeout' | 'archived'
     visibility?: 'public' | 'private'
     project_id?: string
   }): Promise<Sandbox> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/${sandboxId}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(updateData),
@@ -152,29 +150,9 @@ export class SandboxService {
     return this.mapApiResponseToSandbox(data)
   }
 
-  // Recycle a sandbox
-  static async recycleSandbox(sandboxId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}/recycle`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    })
-
-    await handleResponse(response)
-  }
-
-  // Start a sandbox
-  static async startSandbox(sandboxId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}/start`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    })
-
-    await handleResponse(response)
-  }
-
   // Stop a sandbox
   static async stopSandbox(sandboxId: string): Promise<{ cost_increment: number }> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}/stop`, {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/${sandboxId}/stop`, {
       method: 'POST',
       headers: getAuthHeaders(),
     })
@@ -182,13 +160,31 @@ export class SandboxService {
     return handleResponse(response)
   }
 
-  // Admin: Get all sandboxes (admin only)
+  // Start a sandbox
+  static async startSandbox(sandboxId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/${sandboxId}/start`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    })
+
+    await handleResponse(response)
+  }
+
+  // Switch sandbox to a different project
+  static async switchSandboxProject(sandboxId: string, projectId: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/${sandboxId}/switch-project`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ project_id: projectId }),
+    })
+
+    return handleResponse(response)
+  }
+
+  // Admin endpoints
   static async getAllSandboxes(params?: {
     status?: string
-    framework?: string
-    region?: string
-    visibility?: string
-    user_account_id?: string
+    owner_account_id?: string
     project_id?: string
     search?: string
     sort_by?: string
@@ -196,16 +192,96 @@ export class SandboxService {
     limit?: number
     offset?: number
   }): Promise<Sandbox[]> {
-    const queryParams = new URLSearchParams()
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          queryParams.append(key, value.toString())
-        }
+    try {
+      const queryParams = new URLSearchParams()
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryParams.append(key, value.toString())
+          }
+        })
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/sandboxes/admin/all?${queryParams}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      })
+
+      const data = await handleResponse(response)
+      return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+    } catch (error) {
+      console.error('Failed to fetch all sandboxes:', error)
+      return []
+    }
+  }
+
+  // Get admin sandbox statistics
+  static async getAdminSandboxStats(): Promise<{
+    total_sandboxes: number
+    running_sandboxes: number
+    stopped_sandboxes: number
+    timeout_sandboxes: number
+    archived_sandboxes: number
+    total_cost: number
+    avg_cpu_usage: number
+    avg_memory_usage: number
+    total_uptime_hours: number
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sandboxes/admin/stats`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      })
+
+      return handleResponse(response)
+    } catch (error) {
+      console.error('Failed to fetch admin sandbox stats:', error)
+      return {
+        total_sandboxes: 0,
+        running_sandboxes: 0,
+        stopped_sandboxes: 0,
+        timeout_sandboxes: 0,
+        archived_sandboxes: 0,
+        total_cost: 0,
+        avg_cpu_usage: 0,
+        avg_memory_usage: 0,
+        total_uptime_hours: 0,
+      }
+    }
+  }
+
+  // Admin action on sandbox
+  static async adminActionOnSandbox(sandboxId: string, action: 'start' | 'stop' | 'archive'): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/admin/${sandboxId}/action`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ action }),
+    })
+
+    await handleResponse(response)
+  }
+
+  // Get sandbox metrics
+  static async getSandboxMetrics(sandboxId: string, params: { start_date?: string; end_date?: string } = {}): Promise<any> {
+    const queryParams = new URLSearchParams(params as Record<string, string>)
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/${sandboxId}/metrics?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    })
+
+    return handleResponse(response)
+  }
+
+  // Search sandboxes
+  static async searchSandboxes(query: string, filters?: { status?: string; region?: string }): Promise<Sandbox[]> {
+    const queryParams = new URLSearchParams({ search: query })
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value)
       })
     }
 
-    const response = await fetch(`${API_BASE_URL}/sandboxes/admin/all?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/api/sandboxes/?${queryParams}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     })
@@ -214,67 +290,12 @@ export class SandboxService {
     return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
   }
 
-  // Admin: Get sandbox statistics (admin only)
-  static async getAdminSandboxStats(): Promise<{
-    total_sandboxes: number
-    running_sandboxes: number
-    stopped_sandboxes: number
-    error_sandboxes: number
-    deleted_sandboxes: number
-    total_cost: number
-    avg_cpu_usage: number
-    avg_memory_usage: number
-    total_uptime_hours: number
-  }> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/admin/stats`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    })
-
-    return handleResponse(response)
-  }
-
-  // Admin: Perform action on sandbox (admin only)
-  static async adminSandboxAction(
-    sandboxId: string, 
-    action: 'start' | 'stop' | 'delete', 
-    reason?: string
-  ): Promise<{
-    message: string
-    sandbox_id: string
-    action: string
-    reason?: string
-    user_email: string
-  }> {
-    const response = await fetch(`${API_BASE_URL}/sandboxes/admin/${sandboxId}/action`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ action, reason }),
-    })
-
-    return handleResponse(response)
-  }
-
-  // Fetch metrics for a sandbox
-  static async getSandboxMetrics(sandboxId: string, metricType: 'cpu' | 'memory' | 'storage', start?: string, end?: string): Promise<Array<{ timestamp: string, value: number }>> {
-    const params = new URLSearchParams()
-    params.append('type', metricType)
-    if (start) params.append('start', start)
-    if (end) params.append('end', end)
-    const response = await fetch(`${API_BASE_URL}/sandboxes/${sandboxId}/metrics?${params.toString()}`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    })
-    const data = await handleResponse(response)
-    return data.metrics
-  }
-
   // Get all sandboxes for a specific project
   static async getSandboxesByProject(projectId: string): Promise<Sandbox[]> {
     try {
       const queryParams = new URLSearchParams()
       queryParams.append('project_id', projectId)
-      const response = await fetch(`${API_BASE_URL}/sandboxes/?${queryParams}`, {
+      const response = await fetch(`${API_BASE_URL}/api/sandboxes/?${queryParams}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       })
@@ -292,13 +313,16 @@ export class SandboxService {
       id: apiData.id,
       name: apiData.name,
       description: apiData.description || '',
-      framework: apiData.framework,
       status: apiData.status,
       user_account_id: apiData.user_account_id,
       userName: apiData.user_name,
       userEmail: apiData.user_email,
       region: apiData.region,
       visibility: apiData.visibility,
+      template_id: apiData.template_id || '',
+      template_name: apiData.template_name || '',
+      project_id: apiData.project_id || '',
+      project_name: apiData.project_name || '',
       resources: {
         cpu: apiData.resources.cpu || 0,
         memory: apiData.resources.memory || 0,
@@ -336,8 +360,7 @@ export class SandboxService {
   }
 
   static deleteSandboxLegacy(id: string): void {
-    // This method is deprecated, use the async version instead
-    console.warn('deleteSandboxLegacy() is deprecated. Use recycleSandbox(id) instead.')
+    console.warn('deleteSandboxLegacy() is deprecated. Sandbox deletion is not supported.')
   }
 
   // Utility methods for UI
@@ -345,8 +368,9 @@ export class SandboxService {
     const variants = {
       running: "default",
       stopped: "secondary",
-      deleted: "destructive",
-      error: "destructive",
+      archived: "destructive",
+      starting: "default",
+      timeout: "destructive",
     } as const
 
     return {

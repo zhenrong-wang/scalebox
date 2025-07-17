@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { PageLayout, PageHeader, SummaryCard } from "@/components/ui/page-layout"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
@@ -96,7 +97,7 @@ export function TemplatesPage() {
       console.error('Failed to fetch templates:', error)
       toast({
         title: "Error",
-        description: t('common.failed_to_load'),
+        description: t('templates.failed_to_load'),
         variant: "destructive",
       })
     } finally {
@@ -158,7 +159,7 @@ export function TemplatesPage() {
     if (!newTemplate.name || !newTemplate.category || !newTemplate.language || !newTemplate.repository_url) {
       toast({
         title: "Error",
-        description: t('common.fill_required_fields') || 'Please fill in all required fields',
+        description: t('templates.fill_required_fields') || 'Please fill in all required fields',
         variant: "destructive",
       });
       return;
@@ -169,6 +170,7 @@ export function TemplatesPage() {
         ...newTemplate,
         cpu_spec: newTemplate.cpu_spec,
         memory_spec: newTemplate.memory_spec,
+        is_public: false, // Regular users can only create private templates
       });
       setIsCreateDialogOpen(false)
       setNewTemplate({
@@ -185,13 +187,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('common.created_successfully') || 'Template created successfully',
+        description: t('templates.created_successfully') || 'Template created successfully',
       })
     } catch (error) {
       console.error('Error creating template:', error)
       toast({
         title: "Error",
-        description: t('common.create_error') || 'Failed to create template',
+        description: t('templates.create_error') || 'Failed to create template',
         variant: "destructive",
       })
     }
@@ -219,7 +221,9 @@ export function TemplatesPage() {
     try {
       const templateData = {
         ...editTemplate,
-        tags: editTemplate.tags?.filter(tag => tag.trim()) || []
+        tags: editTemplate.tags?.filter(tag => tag.trim()) || [],
+        // Regular users cannot change public status - preserve original value
+        is_public: editDialog.template?.is_public || false
       }
       
       await templateService.updateTemplate(editDialog.template.id, templateData)
@@ -227,13 +231,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('common.updated_successfully') || 'Template updated successfully',
+        description: t('templates.updated_successfully') || 'Template updated successfully',
       })
     } catch (error) {
       console.error('Failed to update template:', error)
       toast({
         title: "Error",
-        description: t('common.failed_to_update') || 'Failed to update template',
+        description: t('templates.failed_to_update') || 'Failed to update template',
         variant: "destructive",
       })
     }
@@ -245,13 +249,14 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('common.deleted_successfully'),
+        description: t('templates.deleted_successfully'),
       })
     } catch (error) {
       console.error('Failed to delete template:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete template'
       toast({
         title: "Error",
-        description: t('common.failed_to_delete'),
+        description: errorMessage,
         variant: "destructive",
       })
     }
@@ -262,13 +267,13 @@ export function TemplatesPage() {
       // TODO: Implement template usage logic
       toast({
         title: "Success",
-        description: t('common.usage_initiated') || 'Template usage initiated',
+        description: t('templates.usage_initiated') || 'Template usage initiated',
       })
     } catch (error) {
       console.error('Failed to use template:', error)
       toast({
         title: "Error",
-        description: t('common.failed_to_use') || 'Failed to use template',
+        description: t('templates.failed_to_use') || 'Failed to use template',
         variant: "destructive",
       })
     }
@@ -285,7 +290,7 @@ export function TemplatesPage() {
       console.error('Failed to view template:', error)
       toast({
         title: "Error",
-        description: t('common.failed_to_view') || 'Failed to view template details',
+        description: t('templates.failed_to_view') || 'Failed to view template details',
         variant: "destructive",
       })
     }
@@ -319,13 +324,13 @@ export function TemplatesPage() {
       fetchTemplates()
       toast({
         title: "Success",
-        description: t('common.batch_deleted'),
+        description: t('templates.batch_deleted'),
       })
     } catch (error) {
       console.error('Failed to delete templates:', error)
       toast({
         title: "Error",
-        description: t('common.failed_to_delete_some'),
+        description: t('templates.failed_to_delete_some'),
         variant: "destructive",
       })
     }
@@ -342,17 +347,17 @@ export function TemplatesPage() {
   
   const summaryCards = [
     {
-      title: t('common.total') || 'Total Templates',
+      title: t('templates.total') || 'Total Templates',
       value: templates.length,
       icon: <Copy className="h-4 w-4 text-muted-foreground" />
     },
     {
-      title: t('common.public') || 'Public Templates',
+      title: t('templates.public') || 'Public Templates',
       value: publicTemplates.length,
       icon: <Globe className="h-4 w-4 text-muted-foreground" />
     },
     {
-      title: t('common.private') || 'Private Templates',
+      title: t('templates.private') || 'Private Templates',
       value: privateTemplates.length,
       icon: <Lock className="h-4 w-4 text-muted-foreground" />
     }
@@ -364,11 +369,11 @@ export function TemplatesPage() {
   return (
     <PageLayout
       header={{
-        description: t('common.manage_browse_templates') || 'Manage and browse templates for your sandboxes',
+        description: t('templates.description') || 'Create and manage development environment templates',
         children: (
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            {t('common.create')}
+            {t('templates.create')}
           </Button>
         )
       }}
@@ -380,7 +385,7 @@ export function TemplatesPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder={t('common.search_placeholder')}
+              placeholder={t('templates.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -389,10 +394,10 @@ export function TemplatesPage() {
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t('common.filter_category')} />
+            <SelectValue placeholder={t('templates.filter_category')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('common.all_categories')}</SelectItem>
+            <SelectItem value="all">{t('templates.all_categories')}</SelectItem>
             {categories.map(category => (
               <SelectItem key={category} value={category}>{category}</SelectItem>
             ))}
@@ -400,10 +405,10 @@ export function TemplatesPage() {
         </Select>
         <Select value={languageFilter} onValueChange={setLanguageFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t('common.filter_language')} />
+            <SelectValue placeholder={t('templates.filter_language')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('common.all_languages')}</SelectItem>
+            <SelectItem value="all">{t('templates.all_languages')}</SelectItem>
             {languages.map(language => (
               <SelectItem key={language} value={language}>{language}</SelectItem>
             ))}
@@ -411,12 +416,12 @@ export function TemplatesPage() {
         </Select>
         <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t('common.filter_visibility')} />
+            <SelectValue placeholder={t('templates.filter_type')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('common.all_visibility')}</SelectItem>
-            <SelectItem value="public">{t('common.public_only')}</SelectItem>
-            <SelectItem value="private">{t('common.private_only')}</SelectItem>
+            <SelectItem value="all">{t('templates.all_types')}</SelectItem>
+            <SelectItem value="public">{t('templates.public')}</SelectItem>
+            <SelectItem value="private">{t('templates.private')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -424,24 +429,24 @@ export function TemplatesPage() {
       {/* Batch Actions */}
       {selectedTemplates.length > 0 && (
         <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
-          <span className="text-sm">{tReplace(t('common.items_selected'), { count: selectedTemplates.length })}</span>
+          <span className="text-sm">{tReplace(t('templates.templates_selected'), { count: selectedTemplates.length })}</span>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm">
                 <Trash2 className="h-4 w-4 mr-2" />
-                {t('common.delete_selected')}
+                {t('templates.delete_selected')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{t('common.delete_items')}</AlertDialogTitle>
+                <AlertDialogTitle>{t('templates.delete_templates')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {tReplace(t('common.delete_confirmation'), { count: selectedTemplates.length })}
+                  {tReplace(t('templates.delete_confirmation'), { count: selectedTemplates.length })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleBatchDelete}>{t('common.delete')}</AlertDialogAction>
+                <AlertDialogCancel>{t('action.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBatchDelete}>{t('action.delete')}</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -459,8 +464,8 @@ export function TemplatesPage() {
             <ResizableTable
               defaultColumnWidths={{
                 checkbox: 48,
-                id: 80,
-                name: 180,
+                name: 200,
+                description: 250,
                 cpu: 100,
                 memory: 100,
                 created: 120,
@@ -477,40 +482,60 @@ export function TemplatesPage() {
                       onCheckedChange={handleSelectAll}
                     />
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="id" defaultWidth={80}>ID</ResizableTableHead>
-                  <ResizableTableHead columnId="name" defaultWidth={180}>
+                  <ResizableTableHead columnId="name" defaultWidth={200}>
                     <Button variant="ghost" onClick={() => handleSort("name")} className="h-auto p-0 group">
-                      {t('common.name')} {getSortIcon("name")}
+                      {t('templates.name')} {getSortIcon("name")}
                     </Button>
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="description" defaultWidth={250}>
+                    {t('table.description') || 'Description'}
                   </ResizableTableHead>
                   <ResizableTableHead columnId="cpu" defaultWidth={100}>
-                    <Button variant="ghost" onClick={() => handleSort("cpu_spec")} className="h-auto p-0 group">
-                      <div className="flex items-center gap-1">
-                        <Cpu className="h-4 w-4" />
-                        {getSortIcon("cpu_spec")}
-                      </div>
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" onClick={() => handleSort("cpu_spec")} className="h-auto p-0 group">
+                            <div className="flex items-center gap-1">
+                              <Cpu className="h-4 w-4" />
+                              {t('table.cpu')} {getSortIcon("cpu_spec")}
+                            </div>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t('templates.minimum_cpu_requirement')}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="memory" defaultWidth={100}>
-                    <Button variant="ghost" onClick={() => handleSort("memory_spec")} className="h-auto p-0 group">
-                      <div className="flex items-center gap-1">
-                        <HardDrive className="h-4 w-4" />
-                        {getSortIcon("memory_spec")}
-                      </div>
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" onClick={() => handleSort("memory_spec")} className="h-auto p-0 group">
+                            <div className="flex items-center gap-1">
+                              <HardDrive className="h-4 w-4" />
+                              {t('table.memory')} {getSortIcon("memory_spec")}
+                            </div>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t('templates.minimum_memory_requirement')}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="created" defaultWidth={120}>
                     <Button variant="ghost" onClick={() => handleSort("created_at")} className="h-auto p-0 group">
-                      {t('common.created')} {getSortIcon("created_at")}
+                      {t('templates.created')} {getSortIcon("created_at")}
                     </Button>
                   </ResizableTableHead>
                   <ResizableTableHead columnId="updated" defaultWidth={120}>
                     <Button variant="ghost" onClick={() => handleSort("updated_at")} className="h-auto p-0 group">
-                      {t('common.updated')} {getSortIcon("updated_at")}
+                      {t('templates.updated')} {getSortIcon("updated_at")}
                     </Button>
                   </ResizableTableHead>
-                  <ResizableTableHead columnId="visibility" defaultWidth={100}>Visibility</ResizableTableHead>
-                  <ResizableTableHead columnId="actions" defaultWidth={80}>Actions</ResizableTableHead>
+                  <ResizableTableHead columnId="visibility" defaultWidth={100}>{t('table.visibility')}</ResizableTableHead>
+                  <ResizableTableHead columnId="actions" defaultWidth={80}>{t('templates.actions')}</ResizableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -524,18 +549,14 @@ export function TemplatesPage() {
                       />
                     </ResizableTableCell>
                     <ResizableTableCell>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {template.id.slice(0, 8)}...
+                      <div>
+                        <div className="font-medium">{template.name}</div>
+                        <div className="text-sm text-muted-foreground">{template.id}</div>
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
-                      <div>
-                        <div className="font-medium">{template.name}</div>
-                        {template.description && (
-                          <div className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                            {template.description}
-                          </div>
-                        )}
+                      <div className="text-sm text-muted-foreground truncate" title={template.description || ''}>
+                        {template.description || '-'}
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
@@ -584,22 +605,22 @@ export function TemplatesPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleUseTemplate(template)}>
                             <Play className="mr-2 h-4 w-4" />
-                            {t('common.use') || 'Use Template'}
+                            {t('templates.use')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleViewTemplate(template)}>
                             <Eye className="mr-2 h-4 w-4" />
-                            {t('common.view_details') || 'View Details'}
+                            {t('action.viewDetails')}
                           </DropdownMenuItem>
                           {templateService.canEdit(template, currentUser.id, currentUser.role === 'admin') && (
                             <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              {t('common.edit')}
+                              {t('action.edit')}
                             </DropdownMenuItem>
                           )}
                           {templateService.canDelete(template, currentUser.id, currentUser.role === 'admin') && (
                             <DropdownMenuItem onClick={() => handleDeleteTemplate(template)}>
                               <Trash2 className="mr-2 h-4 w-4" />
-                              {t('common.delete')}
+                              {t('action.delete')}
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
@@ -617,11 +638,11 @@ export function TemplatesPage() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t('common.create_new')}</DialogTitle>
+            <DialogTitle>{t('templates.create_new')}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">{t('common.name')}</Label>
+              <Label htmlFor="name">{t('templates.name')}</Label>
               <Input
                 id="name"
                 value={newTemplate.name}
@@ -629,7 +650,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">{t('common.category')}</Label>
+              <Label htmlFor="category">{t('templates.category')}</Label>
               <Input
                 id="category"
                 value={newTemplate.category}
@@ -637,7 +658,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="language">{t('common.language')}</Label>
+              <Label htmlFor="language">{t('templates.language')}</Label>
               <Input
                 id="language"
                 value={newTemplate.language}
@@ -645,7 +666,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cpu">{t('common.cpu_spec')}</Label>
+              <Label htmlFor="cpu">{t('templates.cpu_spec')}</Label>
               <Input
                 id="cpu"
                 type="number"
@@ -657,7 +678,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="memory">{t('common.memory_spec')}</Label>
+              <Label htmlFor="memory">{t('templates.memory_spec')}</Label>
               <Select value={newTemplate.memory_spec.toString()} onValueChange={(value) => setNewTemplate({ ...newTemplate, memory_spec: parseFloat(value) })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -672,7 +693,7 @@ export function TemplatesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="repository_url">{t('common.repository_url')}</Label>
+              <Label htmlFor="repository_url">{t('templates.repository_url')}</Label>
               <Input
                 id="repository_url"
                 value={newTemplate.repository_url}
@@ -680,7 +701,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tags">{t('common.tags')}</Label>
+              <Label htmlFor="tags">{t('templates.tags')}</Label>
               <Input
                 id="tags"
                 placeholder="tag1, tag2, tag3"
@@ -692,28 +713,21 @@ export function TemplatesPage() {
               />
             </div>
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="description">{t('common.description')}</Label>
+              <Label htmlFor="description">{t('templates.description_field')}</Label>
               <Textarea
                 id="description"
                 value={newTemplate.description}
                 onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
               />
             </div>
-            <div className="col-span-2 flex items-center space-x-2">
-              <Checkbox
-                id="is_public"
-                checked={newTemplate.is_public}
-                onCheckedChange={(checked) => setNewTemplate({ ...newTemplate, is_public: checked as boolean })}
-              />
-              <Label htmlFor="is_public">{t('common.make_public')}</Label>
-            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              {t('common.cancel')}
+              {t('action.cancel')}
             </Button>
             <Button onClick={handleCreateTemplate}>
-              {t('common.create')}
+              {t('templates.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -723,11 +737,11 @@ export function TemplatesPage() {
       <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, template: editDialog.template })}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t('common.edit_template')}</DialogTitle>
+            <DialogTitle>{t('templates.edit_template')}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">{t('common.name')}</Label>
+              <Label htmlFor="edit-name">{t('templates.name')}</Label>
               <Input
                 id="edit-name"
                 value={editTemplate.name}
@@ -735,7 +749,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-category">{t('common.category')}</Label>
+              <Label htmlFor="edit-category">{t('templates.category')}</Label>
               <Input
                 id="edit-category"
                 value={editTemplate.category}
@@ -743,7 +757,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-language">{t('common.language')}</Label>
+              <Label htmlFor="edit-language">{t('templates.language')}</Label>
               <Input
                 id="edit-language"
                 value={editTemplate.language}
@@ -751,7 +765,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-cpu">{t('common.cpu_spec')}</Label>
+              <Label htmlFor="edit-cpu">{t('templates.cpu_spec')}</Label>
               <Input
                 id="edit-cpu"
                 type="number"
@@ -763,7 +777,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-memory">{t('common.memory_spec')}</Label>
+              <Label htmlFor="edit-memory">{t('templates.memory_spec')}</Label>
               <Select value={editTemplate.memory_spec.toString()} onValueChange={(value) => setEditTemplate({ ...editTemplate, memory_spec: parseFloat(value) })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -778,7 +792,7 @@ export function TemplatesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-repository_url">{t('common.repository_url')}</Label>
+              <Label htmlFor="edit-repository_url">{t('templates.repository_url')}</Label>
               <Input
                 id="edit-repository_url"
                 value={editTemplate.repository_url}
@@ -786,7 +800,7 @@ export function TemplatesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-tags">{t('common.tags')}</Label>
+              <Label htmlFor="edit-tags">{t('templates.tags')}</Label>
               <Input
                 id="edit-tags"
                 placeholder="tag1, tag2, tag3"
@@ -798,28 +812,21 @@ export function TemplatesPage() {
               />
             </div>
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="edit-description">{t('common.description')}</Label>
+              <Label htmlFor="edit-description">{t('templates.description_field')}</Label>
               <Textarea
                 id="edit-description"
                 value={editTemplate.description}
                 onChange={(e) => setEditTemplate({ ...editTemplate, description: e.target.value })}
               />
             </div>
-            <div className="col-span-2 flex items-center space-x-2">
-              <Checkbox
-                id="edit-is-public"
-                checked={editTemplate.is_public}
-                onCheckedChange={(checked) => setEditTemplate({ ...editTemplate, is_public: checked as boolean })}
-              />
-              <Label htmlFor="edit-is-public">{t('common.make_public')}</Label>
-            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog({ open: false, template: null })}>
-              {t('common.cancel')}
+              {t('action.cancel')}
             </Button>
             <Button onClick={handleUpdateTemplate}>
-              {t('common.save')}
+              {t('templates.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

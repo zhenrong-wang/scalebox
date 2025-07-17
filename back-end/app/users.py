@@ -20,7 +20,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .database import get_db
 from .models import User, PendingSignup
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(tags=["users"])
 
 class SignupRequest(BaseModel):
     email: EmailStr

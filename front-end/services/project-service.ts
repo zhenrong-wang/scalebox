@@ -1,5 +1,7 @@
 // API base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Import Sandbox type
+import type { Sandbox } from '../types/sandbox'
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -28,6 +30,7 @@ export interface Project {
   api_key_count: number;
   total_spent: number;
   status: 'active' | 'archived';
+  is_default: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -109,5 +112,38 @@ export class ProjectService {
 
   async activateProject(id: string): Promise<Project> {
     return this.updateProject(id, { status: 'active' });
+  }
+
+  // Sandbox management methods
+  async getProjectSandboxes(projectId: string, skip: number = 0, limit: number = 50, status?: string): Promise<Sandbox[]> {
+    const params = new URLSearchParams();
+    params.append('skip', skip.toString());
+    params.append('limit', limit.toString());
+    if (status) params.append('status', status);
+
+    const response = await fetch(`${this.baseUrl}/${projectId}/sandboxes?${params.toString()}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    return handleResponse(response);
+  }
+
+  async evictSandboxFromProject(projectId: string, sandboxId: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseUrl}/${projectId}/sandboxes/${sandboxId}/evict`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    return handleResponse(response);
+  }
+
+  async addSandboxToProject(projectId: string, sandboxId: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseUrl}/${projectId}/sandboxes/${sandboxId}/add`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    return handleResponse(response);
   }
 } 

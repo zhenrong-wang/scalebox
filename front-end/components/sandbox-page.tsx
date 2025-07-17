@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Play, Square, Trash2, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check, Search, Filter } from "lucide-react"
+import { Play, Square, Trash2, Plus, Activity, Cpu, HardDrive, Clock, DollarSign, Calendar, X, Check, Search, Filter, ArrowRightLeft } from "lucide-react"
 
 import { SortIndicator } from "@/components/ui/sort-indicator"
 import { Button } from "@/components/ui/button"
@@ -14,15 +14,19 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts"
 import { useLanguage } from "../contexts/language-context"
 import { SandboxService } from "../services/sandbox-service"
 import type { Sandbox, SandboxStats } from "../types/sandbox"
 import { Label } from "@/components/ui/label"
 import { PageLayout } from "@/components/ui/page-layout"
 import { SearchFilters } from "@/components/ui/search-filters"
+import { templateService, Template } from "../services/template-service"
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
+import { ProjectService, Project } from "../services/project-service"
 
-type SortField = "name" | "framework" | "status" | "createdAt" | "uptime"
+type SortField = "name" | "project_name" | "status" | "createdAt" | "updatedAt" | "uptime"
 type SortOrder = "asc" | "desc"
 
 export function SandboxPage() {
@@ -35,37 +39,33 @@ export function SandboxPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [dateRange, setDateRange] = useState<{ from: string | null, to: string | null }>({ from: null, to: null })
-  const [activeTab, setActiveTab] = useState<"active" | "recycled">("active")
+  const [activeTab, setActiveTab] = useState<"active" | "archived">("active")
   
   // Confirmation dialogs
-  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
-    isOpen: false,
-    sandboxId: null,
-    isBatch: false
-  })
   const [stopDialog, setStopDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
     isOpen: false,
     sandboxId: null,
     isBatch: false
   })
+
   const [startDialog, setStartDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
     isOpen: false,
     sandboxId: null,
     isBatch: false
   })
 
-  const [metricsDialog, setMetricsDialog] = useState<{ open: boolean, sandbox: Sandbox | null }>({ open: false, sandbox: null })
+  const [metricsDialog, setMetricsDialog] = useState<{ open: boolean, sandbox: Sandbox | null }>({
+    open: false,
+    sandbox: null
+  })
   const [metricsType, setMetricsType] = useState<'cpu' | 'memory' | 'storage'>('cpu')
   const [metricsData, setMetricsData] = useState<Array<{ timestamp: string, value: number }>>([])
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsRange, setMetricsRange] = useState<{ start: string | null, end: string | null }>({ start: null, end: null })
-
-  // Add state for permanently delete dialog
-  const [permanentDeleteDialog, setPermanentDeleteDialog] = useState<{ isOpen: boolean, sandboxId: string | null, isBatch: boolean }>({
-    isOpen: false,
-    sandboxId: null,
-    isBatch: false
-  })
+  const [templateDialog, setTemplateDialog] = useState<{ open: boolean, template: Template | null, error: string | null }>({ open: false, template: null, error: null })
+  const [projectSwitchDialog, setProjectSwitchDialog] = useState<{ open: boolean, sandbox: Sandbox | null }>({ open: false, sandbox: null })
+  const [availableProjects, setAvailableProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
 
   const { t } = useLanguage()
 
@@ -93,8 +93,8 @@ export function SandboxPage() {
         total: data.total_sandboxes,
         running: data.running_sandboxes,
         stopped: data.stopped_sandboxes,
-        recycled: data.recycled_sandboxes,
-        error: data.error_sandboxes,
+        timeout: data.timeout_sandboxes,
+        archived: data.archived_sandboxes,
         totalCost: data.total_cost,
         avgCpuUsage: data.avg_cpu_usage,
         avgMemoryUsage: data.avg_memory_usage,
@@ -129,16 +129,6 @@ export function SandboxPage() {
     }
   }
 
-  const handleRecycleSandbox = async (sandboxId: string) => {
-    try {
-      await SandboxService.recycleSandbox(sandboxId)
-      await loadSandboxes()
-      await loadStats()
-    } catch (error) {
-      console.error('Failed to recycle sandbox:', error)
-    }
-  }
-
   const handleBatchStart = async () => {
     try {
       const promises = Array.from(selectedSandboxes).map(id => 
@@ -167,68 +157,6 @@ export function SandboxPage() {
     }
   }
 
-  const handleBatchRecycle = async () => {
-    try {
-      const promises = Array.from(selectedSandboxes).map(id => 
-        SandboxService.recycleSandbox(id)
-      )
-      await Promise.all(promises)
-      await loadSandboxes()
-      await loadStats()
-      setSelectedSandboxes(new Set())
-    } catch (error) {
-      console.error('Failed to recycle sandboxes:', error)
-    }
-  }
-
-  // Get permanently deleted sandbox IDs from localStorage
-  const getPermanentlyDeletedIds = (): Set<string> => {
-    const stored = localStorage.getItem('permanently_deleted_sandboxes')
-    return stored ? new Set(JSON.parse(stored)) : new Set()
-  }
-
-  // Store permanently deleted sandbox IDs in localStorage
-  const storePermanentlyDeletedId = (sandboxId: string) => {
-    const deletedIds = getPermanentlyDeletedIds()
-    deletedIds.add(sandboxId)
-    localStorage.setItem('permanently_deleted_sandboxes', JSON.stringify(Array.from(deletedIds)))
-  }
-
-  const handlePermanentDelete = async (sandboxId: string) => {
-    try {
-      // Store the ID in localStorage so it won't appear after refresh
-      storePermanentlyDeletedId(sandboxId)
-      // Force a re-render to update summary cards
-      setSandboxes(prev => [...prev])
-      // Remove from frontend state
-      setSandboxes(prev => prev.filter(s => s.id !== sandboxId))
-      setSelectedSandboxes(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(sandboxId)
-        return newSet
-      })
-    } catch (error) {
-      console.error('Failed to permanently delete sandbox:', error)
-    }
-  }
-
-  const handleBatchPermanentDelete = async () => {
-    try {
-      // Store all selected IDs in localStorage
-      const deletedIds = getPermanentlyDeletedIds()
-      selectedSandboxes.forEach(id => deletedIds.add(id))
-      localStorage.setItem('permanently_deleted_sandboxes', JSON.stringify(Array.from(deletedIds)))
-      
-      // Force a re-render to update summary cards
-      setSandboxes(prev => [...prev])
-      // Remove from frontend state
-      setSandboxes(prev => prev.filter(s => !selectedSandboxes.has(s.id)))
-      setSelectedSandboxes(new Set())
-    } catch (error) {
-      console.error('Failed to permanently delete sandboxes:', error)
-    }
-  }
-
   const formatUptime = (uptimeMinutes: number): string => {
     if (uptimeMinutes === 0) return "0m"
     const hours = Math.floor(uptimeMinutes / 60)
@@ -247,15 +175,17 @@ export function SandboxPage() {
     const variants = {
       running: "default",
       stopped: "secondary",
-      recycled: "destructive",
-      error: "destructive",
+      archived: "destructive",
+      starting: "default",
+      timeout: "destructive",
     } as const
 
     const statusTranslations = {
       running: t("table.running") || "Running",
       stopped: t("table.stopped") || "Stopped",
-      recycled: t("table.recycled") || "Recycled",
-      error: t("table.error") || "Error",
+      archived: t("table.archived") || "Archived",
+      starting: t("table.starting") || "Starting",
+      timeout: t("table.timeout") || "Timeout",
     }
 
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
@@ -300,14 +230,8 @@ export function SandboxPage() {
   }
 
   const filteredSandboxes = sandboxes.filter(sandbox => {
-    // Filter out permanently deleted sandboxes
-    const permanentlyDeletedIds = getPermanentlyDeletedIds()
-    if (permanentlyDeletedIds.has(sandbox.id)) {
-      return false
-    }
-    
-    // First filter by active/recycled tab
-    const matchesTab = activeTab === "active" ? sandbox.status !== "recycled" : sandbox.status === "recycled"
+    // First filter by active/archived tab
+    const matchesTab = activeTab === "active" ? sandbox.status !== "archived" : sandbox.status === "archived"
     
     // Then apply other filters
     const matchesSearch = sandbox.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -320,32 +244,26 @@ export function SandboxPage() {
     const aValue = a[sortField]
     const bValue = b[sortField]
     
-    if (typeof aValue === "string" && typeof bValue === "string") {
-      return sortOrder === "asc" 
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue)
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortOrder === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
     }
     
-    if (typeof aValue === "number" && typeof bValue === "number") {
-      return sortOrder === "asc" ? aValue - bValue : bValue - aValue
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue
     }
     
     return 0
   })
 
-  // Filter out permanently deleted sandboxes
-  const permanentlyDeletedIds = getPermanentlyDeletedIds()
-  const activeSandboxes = sandboxes.filter(s => !permanentlyDeletedIds.has(s.id))
-  
   // Calculate stats from actual sandbox data
-  const totalSandboxes = activeSandboxes.length
-  const runningSandboxes = activeSandboxes.filter(s => s.status === "running").length
-  const stoppedSandboxes = activeSandboxes.filter(s => s.status === "stopped").length
-  const errorSandboxes = activeSandboxes.filter(s => s.status === "error").length
-  const recycledSandboxes = activeSandboxes.filter(s => s.status === "recycled").length
+  const totalSandboxes = sandboxes.length
+  const runningSandboxes = sandboxes.filter(s => s.status === "running").length
+  const stoppedSandboxes = sandboxes.filter(s => s.status === "stopped").length
+  const timeoutSandboxes = sandboxes.filter(s => s.status === "timeout").length
+  const archivedSandboxes = sandboxes.filter(s => s.status === "archived").length
   
   // Calculate average CPU and memory usage from active sandboxes
-  const runningSandboxesWithMetrics = activeSandboxes.filter(s => s.status === "running" && s.resources)
+  const runningSandboxesWithMetrics = sandboxes.filter(s => s.status === "running" && s.resources)
   const avgCpuUsage = runningSandboxesWithMetrics.length > 0 
     ? runningSandboxesWithMetrics.reduce((sum, s) => sum + (s.resources.cpu || 0), 0) / runningSandboxesWithMetrics.length
     : 0
@@ -354,7 +272,7 @@ export function SandboxPage() {
     : 0
   
   // Calculate total cost from active sandboxes
-  const totalCost = activeSandboxes.reduce((sum, s) => sum + (s.cost.totalCost || 0), 0)
+  const totalCost = sandboxes.reduce((sum, s) => sum + (s.cost.totalCost || 0), 0)
   
   // Prepare summary cards data based on actual sandbox data
   const summaryCards = [
@@ -459,12 +377,25 @@ export function SandboxPage() {
   const fetchMetrics = async (sandboxId: string, type: 'cpu' | 'memory' | 'storage', start: string | null, end: string | null) => {
     setMetricsLoading(true)
     try {
-      const data = await SandboxService.getSandboxMetrics(sandboxId, type, start || undefined, end || undefined)
+      const params: { start_date?: string; end_date?: string } = {}
+      if (start) params.start_date = start
+      if (end) params.end_date = end
+      const data = await SandboxService.getSandboxMetrics(sandboxId, params)
       setMetricsData(data)
     } catch (e) {
       setMetricsData([])
     } finally {
       setMetricsLoading(false)
+    }
+  }
+
+  // Handler to open template dialog
+  const handleOpenTemplateDialog = async (template_id: string) => {
+    try {
+      const tpl = await templateService.getTemplate(template_id)
+      setTemplateDialog({ open: true, template: tpl, error: null })
+    } catch (err) {
+      setTemplateDialog({ open: true, template: null, error: t("sandbox.templateDeleted") || "The template used to create this sandbox has been deleted." })
     }
   }
 
@@ -508,11 +439,10 @@ export function SandboxPage() {
                 <>
                   <SelectItem value="running">{t("table.running") || "Running"}</SelectItem>
                   <SelectItem value="stopped">{t("table.stopped") || "Stopped"}</SelectItem>
-                  <SelectItem value="error">{t("table.error") || "Error"}</SelectItem>
                 </>
               ) : (
                 <>
-                  <SelectItem value="recycled">{t("table.recycled") || "Recycled"}</SelectItem>
+                  <SelectItem value="archived">{t("table.archived") || "Archived"}</SelectItem>
                 </>
               )}
                 </SelectContent>
@@ -567,17 +497,17 @@ export function SandboxPage() {
             </div>
           </div>
 
-      {/* Tabs for Active/Deleted Sandboxes */}
+      {/* Tabs for Active/Archived Sandboxes */}
       <Tabs value={activeTab} onValueChange={(value) => {
-        setActiveTab(value as "active" | "recycled")
+        setActiveTab(value as "active" | "archived")
         setStatusFilter("all") // Reset status filter when switching tabs
       }}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="active">
-            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "recycled" && !getPermanentlyDeletedIds().has(s.id)).length})
+            {t("table.active") || "Active"} ({sandboxes.filter(s => s.status !== "archived").length})
           </TabsTrigger>
-          <TabsTrigger value="recycled">
-            {t("table.deleted") || "Deleted"} ({sandboxes.filter(s => s.status === "recycled" && !getPermanentlyDeletedIds().has(s.id)).length})
+          <TabsTrigger value="archived">
+            {t("table.archived") || "Archived"} ({sandboxes.filter(s => s.status === "archived").length})
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -613,25 +543,8 @@ export function SandboxPage() {
                   <Square className="h-4 w-4 mr-1" />
                   {t("table.stopSelected") || "Stop Selected"}
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  {t("table.deleteSelected") || "Delete Selected"}
-                </Button>
                   </>
-                ) : (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setPermanentDeleteDialog({ isOpen: true, sandboxId: null, isBatch: true })}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    {t("action.permanentlyDelete") || "Permanently Delete Selected"}
-                  </Button>
-                )}
+                ) : null}
               </div>
             </div>
           </CardContent>
@@ -656,10 +569,10 @@ export function SandboxPage() {
                 </>
               ) : (
                 <>
-                  <p>{t("sandbox.noDeletedSandboxes") || "No deleted sandboxes found."}</p>
-                  <p className="text-sm mt-2">
-                    {t("sandbox.noDeletedSandboxesDesc") || "Deleted sandboxes will appear here for permanent deletion."}
-                  </p>
+                  <p>{t("sandbox.noArchivedSandboxes") || "No archived sandboxes found."}</p>
+              <p className="text-sm mt-2">
+                {t("sandbox.noArchivedSandboxesDesc") || "Archived sandboxes will appear here for viewing."}
+              </p>
                 </>
               )}
             </div>
@@ -668,12 +581,13 @@ export function SandboxPage() {
               defaultColumnWidths={{
                 checkbox: 48,
                 name: 200,
-                framework: 120,
                 status: 100,
                 cpu: 100,
                 memory: 100,
                 uptime: 100,
                 created: 120,
+                template: 180,
+                ...(activeTab === "archived" && { archivedAt: 120 }),
                 actions: 150
               }}
             >
@@ -697,14 +611,14 @@ export function SandboxPage() {
                     </div>
                   </ResizableTableHead>
                   <ResizableTableHead 
-                    columnId="framework"
-                    defaultWidth={120}
+                    columnId="project"
+                    defaultWidth={150}
                     className="cursor-pointer group"
-                    onClick={() => handleSort("framework")}
+                    onClick={() => handleSort("project_name")}
                   >
                     <div className="flex items-center gap-1">
-                      {t("table.framework") || "Framework"}
-                      {getSortIcon("framework")}
+                      {t("table.project") || "Project"}
+                      {getSortIcon("project_name")}
                     </div>
                   </ResizableTableHead>
                   <ResizableTableHead 
@@ -754,6 +668,23 @@ export function SandboxPage() {
                       {getSortIcon("createdAt")}
                     </div>
                   </ResizableTableHead>
+                  <ResizableTableHead columnId="template" defaultWidth={180}>
+                    {t("sandbox.template") || "Template"}
+                  </ResizableTableHead>
+                  {activeTab === "archived" && (
+                    <ResizableTableHead 
+                      columnId="archivedAt"
+                      defaultWidth={120}
+                      className="cursor-pointer group"
+                      onClick={() => handleSort("updatedAt")}
+                    >
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {t("table.archived") || "Archived"}
+                        {getSortIcon("updatedAt")}
+                      </div>
+                    </ResizableTableHead>
+                  )}
                   <ResizableTableHead columnId="actions" defaultWidth={150}>
                     {t("table.actions") || "Actions"}
                   </ResizableTableHead>
@@ -772,10 +703,15 @@ export function SandboxPage() {
                       <div>
                         <div className="font-medium">{sandbox.name}</div>
                         <div className="text-sm text-muted-foreground">{sandbox.id}</div>
+                        {sandbox.status === "archived" && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {t("table.readOnly") || "Read-only"}
+                          </div>
+                        )}
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
-                      <Badge variant="outline">{sandbox.framework}</Badge>
+                      {sandbox.project_name || t("sandbox.noProject") || "No Project"}
                     </ResizableTableCell>
                     <ResizableTableCell>
                       {getStatusBadge(sandbox.status)}
@@ -785,6 +721,18 @@ export function SandboxPage() {
                     <ResizableTableCell>{formatUptime(sandbox.uptime)}</ResizableTableCell>
                     <ResizableTableCell>{formatDate(sandbox.createdAt)}</ResizableTableCell>
                     <ResizableTableCell>
+                      <button className="underline text-blue-600 hover:text-blue-800" onClick={() => handleOpenTemplateDialog(sandbox.template_id)}>
+                        {sandbox.template_id ? (sandbox.template_name || t("sandbox.loadingTemplate") || "Loading...") : t("sandbox.deletedTemplate")}
+                      </button>
+                    </ResizableTableCell>
+                    {activeTab === "archived" && (
+                      <ResizableTableCell>
+                        <div className="text-sm text-muted-foreground">
+                          {t("table.archived") || "Archived"}: {formatDate(sandbox.updatedAt)}
+                        </div>
+                      </ResizableTableCell>
+                    )}
+                    <ResizableTableCell>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
@@ -793,42 +741,54 @@ export function SandboxPage() {
                         >
                           <Activity className="h-4 w-4" />
                         </Button>
-                        {activeTab === "active" ? (
+                        {activeTab === "active" && (
                           <>
-                        {sandbox.status === "stopped" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                          >
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {sandbox.status === "running" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                          >
-                            <Square className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                              onClick={() => setDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                        >
-                              <Trash2 className="h-4 w-4" />
-                        </Button>
+                            {sandbox.status === "stopped" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStartDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {sandbox.status === "running" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStopDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
+                              >
+                                <Square className="h-4 w-4" />
+                              </Button>
+                            )}
                           </>
-                        ) : (
-                        <Button
-                            variant="destructive"
-                          size="sm"
-                            onClick={() => setPermanentDeleteDialog({ isOpen: true, sandboxId: sandbox.id, isBatch: false })}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        )}
+                        {sandbox.status !== "archived" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setProjectSwitchDialog({ open: true, sandbox: { ...sandbox, project_id: "" } })
+                                  setProjectsLoading(true)
+                                  new ProjectService().getProjects().then(res => {
+                                    setAvailableProjects(res.projects.filter(p => p.project_id !== sandbox.project_id))
+                                    setProjectsLoading(false)
+                                  }).catch(error => {
+                                    console.error("Error loading projects:", error)
+                                    setAvailableProjects([])
+                                    setProjectsLoading(false)
+                                  })
+                                }}
+                              >
+                                <ArrowRightLeft className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{t("action.switchProject") || "Switch Project"}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </ResizableTableCell>
@@ -841,38 +801,6 @@ export function SandboxPage() {
       </Card>
 
       {/* Confirmation Dialogs */}
-      <Dialog open={deleteDialog.isOpen} onOpenChange={(open) => !open && setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("table.confirmDelete") || "Confirm Delete"}</DialogTitle>
-            <DialogDescription>
-              {deleteDialog.isBatch 
-                ? t("table.confirmDeleteMessage", { count: String(selectedSandboxes.size), plural: selectedSandboxes.size > 1 ? 'es' : '' }) || `Are you sure you want to delete ${selectedSandboxes.size} sandbox${selectedSandboxes.size > 1 ? 'es' : ''}? This action cannot be undone.`
-                : t("table.confirmDeleteMessage", { count: "1", plural: "" }) || "Are you sure you want to delete this sandbox? This action cannot be undone."
-              }
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
-              {t("action.cancel") || "Cancel"}
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={async () => {
-                if (deleteDialog.isBatch) {
-                  await handleBatchRecycle()
-                } else if (deleteDialog.sandboxId) {
-                  await handleRecycleSandbox(deleteDialog.sandboxId)
-                }
-                setDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })
-              }}
-            >
-              {t("action.delete") || "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={stopDialog.isOpen} onOpenChange={(open) => !open && setStopDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
         <DialogContent>
           <DialogHeader>
@@ -970,43 +898,96 @@ export function SandboxPage() {
                 <LineChart data={metricsData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                   <XAxis dataKey="timestamp" tickFormatter={v => new Date(v).toLocaleString()} minTickGap={40} />
                   <YAxis />
-                  <Tooltip labelFormatter={v => new Date(v).toLocaleString()} />
+                  <ChartTooltip labelFormatter={(v: any) => new Date(v).toLocaleString()} />
                   <Line type="monotone" dataKey="value" stroke="#8884d8" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             )}
           </div>
+          <DialogFooter>
+            <Button onClick={() => setMetricsDialog({ open: false, sandbox: null })}>
+              {t("action.close") || "Close"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Permanent Delete Dialog */}
-      <Dialog open={permanentDeleteDialog.isOpen} onOpenChange={(open) => !open && setPermanentDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+      <AlertDialog open={templateDialog.open} onOpenChange={open => setTemplateDialog({ open, template: null, error: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {templateDialog.error ? t("sandbox.deletedTemplate") : templateDialog.template?.name}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            {templateDialog.error ? (
+              <span className="text-destructive">{templateDialog.error}</span>
+            ) : (
+              <>
+                <span>{templateDialog.template?.description}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.language")}: {templateDialog.template?.language}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.category")}: {templateDialog.template?.category}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.cpu")}: {templateDialog.template?.cpu_spec}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.ram")}: {templateDialog.template?.memory_spec} GB</span>
+              </>
+            )}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("action.close") || "Close"}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={projectSwitchDialog.open} onOpenChange={open => setProjectSwitchDialog({ open, sandbox: null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("action.permanentlyDelete") || "Permanently Delete"}</DialogTitle>
-            <DialogDescription>
-              {permanentDeleteDialog.isBatch 
-                ? t("sandbox.permanentlyDeleteBatchWarning") || "This will permanently delete all selected sandboxes from the frontend. They will still be retained in the backend for billing purposes."
-                : t("sandbox.permanentlyDeleteWarning") || "This will permanently delete this sandbox from the frontend. It will still be retained in the backend for billing purposes."
-              }
-            </DialogDescription>
+            <DialogTitle>{t("action.switchProject") || "Switch Project"}</DialogTitle>
           </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Select
+                value={projectSwitchDialog.sandbox?.project_id || ""}
+                onValueChange={val => {
+                  if (projectSwitchDialog.sandbox) {
+                    setProjectSwitchDialog({ ...projectSwitchDialog, sandbox: { ...projectSwitchDialog.sandbox, project_id: val } })
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t("project.selectProject") || "Select a project"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectsLoading ? (
+                    <SelectItem value="loading" disabled>{t("project.loadingProjects") || "Loading projects..."}</SelectItem>
+                  ) : availableProjects.length === 0 ? (
+                    <SelectItem value="no-projects" disabled>{t("project.noProjectsAvailable") || "No other projects available"}</SelectItem>
+                  ) : (
+                    availableProjects.map(project => (
+                      <SelectItem key={project.project_id} value={project.project_id}>{project.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPermanentDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })}>
+            <Button
+              variant="outline"
+              onClick={() => setProjectSwitchDialog({ open: false, sandbox: null })}
+            >
               {t("action.cancel") || "Cancel"}
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              disabled={projectsLoading || !projectSwitchDialog.sandbox || !projectSwitchDialog.sandbox.project_id || availableProjects.length === 0}
               onClick={async () => {
-                if (permanentDeleteDialog.isBatch) {
-                  await handleBatchPermanentDelete()
-                } else if (permanentDeleteDialog.sandboxId) {
-                  await handlePermanentDelete(permanentDeleteDialog.sandboxId)
-                }
-                setPermanentDeleteDialog({ isOpen: false, sandboxId: null, isBatch: false })
+                if (!projectSwitchDialog.sandbox || availableProjects.length === 0) return
+                await SandboxService.switchSandboxProject(projectSwitchDialog.sandbox.id, projectSwitchDialog.sandbox.project_id)
+                setProjectSwitchDialog({ open: false, sandbox: null })
+                setLoading(true)
+                await loadSandboxes()
               }}
             >
-              {t("action.permanentlyDelete") || "Permanently Delete"}
+              {t("action.confirm") || "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

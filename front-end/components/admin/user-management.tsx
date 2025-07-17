@@ -338,7 +338,7 @@ export function UserManagement() {
             <ResizableTable
               defaultColumnWidths={{
                 name: 200,
-                accountId: 120,
+                accountId: 150,
                 email: 200,
                 role: 100,
                 status: 100,
@@ -352,7 +352,7 @@ export function UserManagement() {
               <TableHeader>
                 <TableRow>
                   <ResizableTableHead columnId="name" defaultWidth={200}>{t("table.name")}</ResizableTableHead>
-                  <ResizableTableHead columnId="accountId" defaultWidth={120}>Account ID</ResizableTableHead>
+                  <ResizableTableHead columnId="accountId" defaultWidth={150}>Account ID</ResizableTableHead>
                   <ResizableTableHead columnId="email" defaultWidth={200}>{t("table.email")}</ResizableTableHead>
                   <ResizableTableHead columnId="role" defaultWidth={100}>{t("table.role")}</ResizableTableHead>
                   <ResizableTableHead columnId="status" defaultWidth={100}>{t("table.status")}</ResizableTableHead>
@@ -377,8 +377,8 @@ export function UserManagement() {
                       </div>
                     </ResizableTableCell>
                         <ResizableTableCell>
-                          <div className="text-sm font-mono text-muted-foreground">
-                            {user.account_id ? user.account_id.substring(0, 8) + '...' : '-'}
+                          <div className="text-sm font-mono text-muted-foreground truncate" title={user.account_id || '-'}>
+                            {user.account_id || '-'}
                           </div>
                         </ResizableTableCell>
                     <ResizableTableCell>

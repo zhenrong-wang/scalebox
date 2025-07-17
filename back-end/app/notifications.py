@@ -15,7 +15,7 @@ class BulkNotificationRequest(BaseModel):
     notification_ids: List[str]
 
 
-router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+router = APIRouter(tags=["notifications"])
 
 
 @router.get("/", response_model=NotificationListResponse)

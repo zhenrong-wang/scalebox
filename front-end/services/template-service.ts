@@ -13,6 +13,14 @@ const getAuthHeaders = () => {
 // Helper function to handle API responses
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
+    // Handle authentication errors specifically
+    if (response.status === 401) {
+      // Clear invalid token and redirect to login
+      localStorage.removeItem('auth-token')
+      window.location.href = '/login'
+      throw new Error('Authentication required. Please log in again.')
+    }
+    
     const errorData = await response.json().catch(() => ({}))
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
   }
@@ -180,14 +188,14 @@ export class TemplateService {
 
   canEdit(template: Template, currentUserId?: number, isAdmin?: boolean): boolean {
     if (isAdmin) return true;
-    if (template.is_official) return false;
-    return template.owner_id === currentUserId;
+    if (template.is_official || template.is_public) return false; // Public templates cannot be edited by regular users
+    return template.owner_id === currentUserId; // Only private templates can be edited by their owners
   }
 
   canDelete(template: Template, currentUserId?: number, isAdmin?: boolean): boolean {
     if (isAdmin) return true;
-    if (template.is_official) return false;
-    return template.owner_id === currentUserId;
+    if (template.is_official || template.is_public) return false; // Public templates cannot be deleted by regular users
+    return template.owner_id === currentUserId; // Only private templates can be deleted by their owners
   }
 
   canUse(template: Template, currentUserId?: number, isAdmin?: boolean): boolean {

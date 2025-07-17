@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from app.models import User, Base
+from app.models import User, Template, Base
 from config import settings
 import datetime
 import random
@@ -14,10 +14,7 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Sample data
-frameworks = ["React", "Vue", "Angular", "Node.js", "Python", "Next.js", "Django", "Flask", "Express", "Laravel"]
-regions = ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "ap-northeast-1"]
-statuses = ["running", "stopped", "error"]
-visibilities = ["public", "private"]
+statuses = ["starting", "running", "stopped", "timeout", "archived"]
 
 def create_sample_sandboxes():
     Base.metadata.create_all(bind=engine)
@@ -30,7 +27,13 @@ def create_sample_sandboxes():
             print("No users found. Please create users first.")
             return
         
-        print(f"Found {len(users)} users. Creating sample sandboxes...")
+        # Get all templates
+        templates = db.query(Template).all()
+        if not templates:
+            print("No templates found. Please create templates first.")
+            return
+        
+        print(f"Found {len(users)} users and {len(templates)} templates. Creating sample sandboxes...")
         
         # Create sample sandboxes for each user
         for user in users:
@@ -39,10 +42,8 @@ def create_sample_sandboxes():
             
             for i in range(num_sandboxes):
                 # Random data
-                framework = random.choice(frameworks)
-                region = random.choice(regions)
+                template = random.choice(templates)
                 status = random.choice(statuses)
-                visibility = random.choice(visibilities)
                 
                 # Random resource usage
                 cpu_usage = random.uniform(0, 100) if status == "running" else 0
@@ -62,37 +63,38 @@ def create_sample_sandboxes():
                 
                 # Use raw SQL to insert with the correct schema
                 sandbox_data = {
-                    'id': str(uuid.uuid4()),
-                    'name': f"{framework} Development Environment {i+1}",
-                    'description': f"Sample {framework} development environment for {user.email}",
-                    'framework': framework,
-                    'status': status,
-                    'user_id': user.account_id,
-                    'region': region,
-                    'visibility': visibility,
+                    'sandbox_id': str(uuid.uuid4()),
+                    'name': f"{template.name} Development Environment {i+1}",
+                    'description': f"Sample {template.name} development environment for {user.email}",
+                    'template_id': template.template_id,
+                    'owner_account_id': user.account_id,
                     'project_id': None,
-                    'cpu_usage': cpu_usage,
-                    'memory_usage': memory_usage,
-                    'storage_usage': storage_usage,
-                    'bandwidth_usage': bandwidth_usage,
-                    'hourly_rate': hourly_rate,
-                    'total_cost': total_cost,
+                    'cpu_spec': template.min_cpu_required,
+                    'memory_spec': template.min_memory_required,
+                    'max_running_seconds': 86400,
+                    'status': status,
+                    'latest_snapshot_id': None,
+                    'snapshot_expires_at': None,
                     'created_at': created_at,
                     'updated_at': updated_at,
-                    'last_accessed_at': last_accessed_at,
-                    'started_at': started_at
+                    'started_at': started_at,
+                    'stopped_at': None,
+                    'timeout_at': None,
+                    'recycled_at': None
                 }
                 
                 # Insert using raw SQL to match database schema
                 insert_sql = text("""
                 INSERT INTO sandboxes (
-                    id, name, description, framework, status, user_id, region, visibility, project_id,
-                    cpu_usage, memory_usage, storage_usage, bandwidth_usage, hourly_rate, total_cost,
-                    created_at, updated_at, last_accessed_at, started_at
+                    sandbox_id, name, description, template_id, owner_account_id, project_id,
+                    cpu_spec, memory_spec, max_running_seconds, status,
+                    latest_snapshot_id, snapshot_expires_at, created_at, updated_at, started_at,
+                    stopped_at, timeout_at, recycled_at
                 ) VALUES (
-                    :id, :name, :description, :framework, :status, :user_id, :region, :visibility, :project_id,
-                    :cpu_usage, :memory_usage, :storage_usage, :bandwidth_usage, :hourly_rate, :total_cost,
-                    :created_at, :updated_at, :last_accessed_at, :started_at
+                    :sandbox_id, :name, :description, :template_id, :owner_account_id, :project_id,
+                    :cpu_spec, :memory_spec, :max_running_seconds, :status,
+                    :latest_snapshot_id, :snapshot_expires_at, :created_at, :updated_at, :started_at,
+                    :stopped_at, :timeout_at, :recycled_at
                 )
                 """)
                 
@@ -106,13 +108,13 @@ def create_sample_sandboxes():
         total_sandboxes = db.execute(text("SELECT COUNT(*) FROM sandboxes")).scalar()
         running_sandboxes = db.execute(text("SELECT COUNT(*) FROM sandboxes WHERE status = 'running'")).scalar()
         stopped_sandboxes = db.execute(text("SELECT COUNT(*) FROM sandboxes WHERE status = 'stopped'")).scalar()
-        error_sandboxes = db.execute(text("SELECT COUNT(*) FROM sandboxes WHERE status = 'error'")).scalar()
+        archived_sandboxes = db.execute(text("SELECT COUNT(*) FROM sandboxes WHERE status = 'archived'")).scalar()
         
         print(f"\nSummary:")
         print(f"Total sandboxes: {total_sandboxes}")
         print(f"Running: {running_sandboxes}")
         print(f"Stopped: {stopped_sandboxes}")
-        print(f"Error: {error_sandboxes}")
+        print(f"Archived: {archived_sandboxes}")
         
     except Exception as e:
         print(f"Error creating sample sandboxes: {e}")

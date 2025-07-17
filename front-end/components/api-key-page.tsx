@@ -21,15 +21,12 @@ import { PageLayout } from "@/components/ui/page-layout"
 // Extended interface to include the full API key for display
 interface ApiKeyWithFullKey extends ApiKey {
   full_key?: string; // The full API key for display
-  remaining_days?: number; // Calculated remaining days
-  is_expired?: boolean; // Whether the key is expired
 }
 
 export function ApiKeyPage() {
   const [apiKeys, setApiKeys] = useState<ApiKeyWithFullKey[]>([])
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [newKeyName, setNewKeyName] = useState("")
-  const [newKeyWrite, setNewKeyWrite] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -37,7 +34,6 @@ export function ApiKeyPage() {
   const [success, setSuccess] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [dialogError, setDialogError] = useState<string>("")
-  const [newKeyExpiresIn, setNewKeyExpiresIn] = useState<string>("30"); // default 30 days
   const [newKeyDescription, setNewKeyDescription] = useState("");
   
 
@@ -72,20 +68,7 @@ export function ApiKeyPage() {
     isLoading: false,
   })
 
-  // Extend expiration state
-  const [extendDialog, setExtendDialog] = useState<{
-    isOpen: boolean
-    keyId: string
-    keyName: string
-    isLoading: boolean
-    extendByDays: string
-  }>({
-    isOpen: false,
-    keyId: "",
-    keyName: "",
-    isLoading: false,
-    extendByDays: "30",
-  })
+
 
   const { t } = useLanguage()
 
@@ -179,52 +162,7 @@ export function ApiKeyPage() {
     })
   }
 
-  const openExtendDialog = (keyId: string, keyName: string) => {
-    setExtendDialog({
-      isOpen: true,
-      keyId,
-      keyName,
-      isLoading: false,
-      extendByDays: "30",
-    })
-  }
 
-  const closeExtendDialog = () => {
-    setExtendDialog({
-      isOpen: false,
-      keyId: "",
-      keyName: "",
-      isLoading: false,
-      extendByDays: "30",
-    })
-  }
-
-  const confirmExtendKey = async () => {
-    setExtendDialog((prev) => ({ ...prev, isLoading: true }))
-    setError("")
-    setSuccess("")
-    
-    try {
-      const request: any = {}
-      
-      if (extendDialog.extendByDays && extendDialog.extendByDays !== "permanent") {
-        request.extend_by_days = parseInt(extendDialog.extendByDays)
-      } else if (extendDialog.extendByDays === "permanent") {
-        request.make_permanent = true
-      }
-      
-      await ApiKeyService.extendApiKeyExpiration(extendDialog.keyId, request)
-      
-      setSuccess(t("apiKey.expirationExtended") || "API key expiration extended successfully!")
-      closeExtendDialog()
-      fetchApiKeys() // Refresh the list to show updated expiration
-    } catch (e: unknown) {
-      const error = e as Error;
-      setError(error.message || "Failed to extend API key expiration")
-    } finally {
-      setExtendDialog((prev) => ({ ...prev, isLoading: false }))
-    }
-  }
 
   const confirmDisableKey = async () => {
     setDisableDialog((prev) => ({ ...prev, isLoading: true }))
@@ -266,19 +204,19 @@ export function ApiKeyPage() {
     }
     setLoading(true);
     try {
-      const expires_in_days = newKeyExpiresIn === "permanent" ? undefined : parseInt(newKeyExpiresIn, 10);
-      const res = await ApiKeyService.createApiKey({ name: newKeyName, description: newKeyDescription, can_write: newKeyWrite, expires_in_days });
+      const res = await ApiKeyService.createApiKey({ 
+        name: newKeyName, 
+        description: newKeyDescription
+      });
       
       // Add the new key to the list with the full key for display
       const newKey: ApiKeyWithFullKey = {
         id: 0, // Will be set by the backend
         key_id: res.key_id,
-      name: newKeyName,
+        name: newKeyName,
         description: newKeyDescription,
         prefix: res.prefix,
-        permissions: { read: true, write: newKeyWrite },
         is_active: true,
-        expires_in_days,
         created_at: new Date().toISOString(),
         full_key: res.api_key // Store the full key for persistent display
       };
@@ -288,9 +226,7 @@ export function ApiKeyPage() {
       setIsDialogOpen(false);
       setDialogError("");
       setNewKeyName("");
-      setNewKeyWrite(true);
       setNewKeyDescription("");
-      setNewKeyExpiresIn("30");
     } catch (e: unknown) {
       const error = e as Error;
       // Check if it's a duplicate name error and use the translated message
@@ -343,8 +279,6 @@ export function ApiKeyPage() {
               setDialogError("");
               setNewKeyName("");
               setNewKeyDescription("");
-              setNewKeyExpiresIn("30");
-              setNewKeyWrite(true);
             }
           }}>
             <DialogTrigger asChild>
@@ -376,32 +310,6 @@ export function ApiKeyPage() {
                     onChange={(e) => setNewKeyDescription(e.target.value)}
                     placeholder={t("apiKey.keyDescription") || "Enter description"}
                   />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked readOnly disabled className="mr-1" />
-                  <Label>{t("apiKey.readOnly") || "Read Only"}</Label>
-                  <input
-                    type="checkbox"
-                    checked={newKeyWrite}
-                    onChange={e => setNewKeyWrite(e.target.checked)}
-                    className="ml-4 mr-1"
-                  />
-                  <Label>{t("apiKey.readWrite") || "Read & Write"}</Label>
-                </div>
-                <div>
-                  <Label htmlFor="expiresIn">{t("apiKey.expirationPeriod") || "Expiration Period"}</Label>
-                  <Select value={newKeyExpiresIn} onValueChange={setNewKeyExpiresIn}>
-                    <SelectTrigger id="expiresIn">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 {t("apiKey.days") || "days"}</SelectItem>
-                      <SelectItem value="60">60 {t("apiKey.days") || "days"}</SelectItem>
-                      <SelectItem value="90">90 {t("apiKey.days") || "days"}</SelectItem>
-                      <SelectItem value="180">180 {t("apiKey.days") || "days"}</SelectItem>
-                      <SelectItem value="permanent">{t("apiKey.permanent") || "Permanent"}</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
                 <Button onClick={createNewKey} className="w-full" disabled={apiKeys.length >= 5 || !newKeyName.trim()}>
                   {t("apiKey.createKey") || "Create Key"}
@@ -450,8 +358,6 @@ export function ApiKeyPage() {
               name: 120,
               description: 120,
               status: 80,
-              expiration: 100,
-              permissions: 100,
               keyValue: 200,
               created: 100,
               actions: 120
@@ -462,8 +368,6 @@ export function ApiKeyPage() {
                 <ResizableTableHead columnId="name" defaultWidth={140}>{t("table.name") || "Name"}</ResizableTableHead>
                 <ResizableTableHead columnId="description" defaultWidth={150}>{t("table.description") || "Description"}</ResizableTableHead>
                 <ResizableTableHead columnId="status" defaultWidth={90}>{t("table.status") || "Status"}</ResizableTableHead>
-                <ResizableTableHead columnId="expiration" defaultWidth={120}>{t("apiKey.expiration") || "Expiration"}</ResizableTableHead>
-                <ResizableTableHead columnId="permissions" defaultWidth={110}>{t("table.permissions") || "Permissions"}</ResizableTableHead>
                 <ResizableTableHead columnId="keyValue" defaultWidth={320}>{t("apiKey.keyValue") || "Key Value"}</ResizableTableHead>
                 <ResizableTableHead columnId="created" defaultWidth={110}>{t("table.created") || "Created"}</ResizableTableHead>
                 <ResizableTableHead columnId="actions" defaultWidth={140}>{t("table.actions") || "Actions"}</ResizableTableHead>
@@ -477,55 +381,9 @@ export function ApiKeyPage() {
                   </ResizableTableCell>
                   <ResizableTableCell className="break-words">{apiKey.description || "-"}</ResizableTableCell>
                   <ResizableTableCell>
-                    <Badge variant={
-                      apiKey.is_expired ? "destructive" : 
-                      apiKey.is_active ? "default" : "secondary"
-                    }>
-                      {apiKey.is_expired ? (t("apiKey.expired") || "Expired") : 
-                       apiKey.is_active ? (t("table.active") || "Active") : (t("table.disabled") || "Disabled")}
+                    <Badge variant={apiKey.is_active ? "default" : "secondary"}>
+                      {apiKey.is_active ? (t("table.active") || "Active") : (t("table.disabled") || "Disabled")}
                     </Badge>
-                  </ResizableTableCell>
-                  <ResizableTableCell>
-                    <div className="flex flex-col gap-1">
-                      {apiKey.is_expired ? (
-                        <Badge variant="destructive" className="w-fit">
-                          {t("apiKey.expired") || "Expired"}
-                        </Badge>
-                      ) : apiKey.expires_in_days === null || apiKey.expires_in_days === undefined ? (
-                        <Badge variant="outline" className="w-fit">
-                          {t("apiKey.permanent") || "Permanent"}
-                        </Badge>
-                      ) : apiKey.remaining_days !== undefined ? (
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant={
-                              apiKey.remaining_days <= 7 ? "destructive" : 
-                              apiKey.remaining_days <= 30 ? "secondary" : 
-                              "outline"
-                            }
-                            className="w-fit"
-                          >
-                            {apiKey.remaining_days} {t("apiKey.days") || "days"}
-                          </Badge>
-                          {apiKey.remaining_days <= 7 && (
-                            <span className="text-xs text-red-600">
-                              {t("apiKey.expiresSoon") || "Expires soon!"}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className="w-fit">
-                          {t("apiKey.permanent") || "Permanent"}
-                        </Badge>
-                      )}
-                    </div>
-                  </ResizableTableCell>
-                  <ResizableTableCell>
-                    <div className="break-words">
-                      <Badge variant="outline">
-                        {apiKey.permissions.write ? (t("apiKey.readWrite") || "Read & Write") : (t("apiKey.readOnly") || "Read Only")}
-                      </Badge>
-                    </div>
                   </ResizableTableCell>
                   <ResizableTableCell>
                     <div className="flex items-center gap-2">
@@ -560,32 +418,14 @@ export function ApiKeyPage() {
                   <ResizableTableCell>
                     <div className="flex items-center gap-1">
                       <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openExtendDialog(apiKey.key_id, apiKey.name)}
-                          disabled={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined}
-                          className="h-8 w-8 p-0"
-                          title={apiKey.expires_in_days === null || apiKey.expires_in_days === undefined
-                            ? (t("apiKey.cannotExtendPermanent") || "Cannot extend permanent keys")
-                            : (t("apiKey.extendKey") || "Extend expiration")
-                          }
-                        >
-                          <Clock className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="relative">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleToggleKeyStatus(apiKey.key_id)}
-                          disabled={apiKey.is_expired}
                           className="h-8 w-8 p-0"
-                          title={apiKey.is_expired
-                            ? (t("apiKey.cannotEnableExpired") || "Cannot enable expired keys")
-                            : apiKey.is_active 
-                              ? (t("apiKey.disableKey") || "Disable key") 
-                              : (t("apiKey.enableKey") || "Enable key")
+                          title={apiKey.is_active 
+                            ? (t("apiKey.disableKey") || "Disable key") 
+                            : (t("apiKey.enableKey") || "Enable key")
                           }
                       >
                         {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
@@ -638,42 +478,7 @@ export function ApiKeyPage() {
         warningMessage={t("apiKey.disableWarning") || "Disabling this API key will immediately stop all applications and services using it. This may cause service interruptions."}
       />
 
-      {/* Extend Expiration Dialog */}
-      <Dialog open={extendDialog.isOpen} onOpenChange={closeExtendDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("apiKey.extendExpiration") || "Extend API Key Expiration"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="extend-days">{t("apiKey.extendByDays") || "Extend by days"}</Label>
-              <Select value={extendDialog.extendByDays} onValueChange={(value) => setExtendDialog(prev => ({ ...prev, extendByDays: value }))}>
-                <SelectTrigger id="extend-days">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 {t("apiKey.days") || "days"}</SelectItem>
-                  <SelectItem value="60">60 {t("apiKey.days") || "days"}</SelectItem>
-                  <SelectItem value="90">90 {t("apiKey.days") || "days"}</SelectItem>
-                  <SelectItem value="180">180 {t("apiKey.days") || "days"}</SelectItem>
-                  <SelectItem value="permanent">{t("apiKey.permanent") || "Permanent"}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={closeExtendDialog}>
-                {t("action.cancel") || "Cancel"}
-              </Button>
-              <Button 
-                onClick={confirmExtendKey} 
-                disabled={extendDialog.isLoading || !extendDialog.extendByDays}
-              >
-                {extendDialog.isLoading ? (t("action.loading") || "Loading...") : (t("apiKey.extend") || "Extend")}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
       
 
     </PageLayout>

@@ -21,39 +21,30 @@ import jwt
 from config import settings
 from .database import get_db
 from .models import Base, User, Sandbox, SandboxUsage, SandboxMetrics
+from .projects import Project
 from .users import verify_admin_token
+from .schemas import SandboxResponse
 from datetime import datetime
 
 
-router = APIRouter(prefix="/sandboxes", tags=["sandboxes"])
+router = APIRouter(tags=["sandboxes"])
 
 
 # Enums
 class SandboxStatus(str, Enum):
-    CREATED = "created"
     STARTING = "starting"
     RUNNING = "running"
     STOPPED = "stopped"
-    ERROR = "error"
-    DELETED = "deleted"
     TIMEOUT = "timeout"
-    RECYCLED = "recycled"
-
-
-class SandboxVisibility(str, Enum):
-    PUBLIC = "public"
-    PRIVATE = "private"
+    ARCHIVED = "archived"
 
 
 # Pydantic models for API requests/responses
 class SandboxCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
-    framework: str = Field(..., max_length=50)
-    region: str = Field(..., max_length=20)
     cpu_spec: float = Field(..., ge=1.0, le=8.0)  # 1-8 vCPU
-    memory_spec: float = Field(..., ge=0.5, le=16.0)  # 0.5, 1, 2, 4, 8, 16 GB
-    visibility: SandboxVisibility = SandboxVisibility.PRIVATE
+    memory_spec: float = Field(..., ge=0.5, le=16.0)  # 0.5-16 GB
     project_id: Optional[str] = None
 
 
@@ -61,38 +52,14 @@ class SandboxUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     status: Optional[SandboxStatus] = None
-    visibility: Optional[SandboxVisibility] = None
     project_id: Optional[str] = None
 
 
-class SandboxResponse(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    framework: str
-    status: SandboxStatus
-    user_id: str
-    user_name: str
-    user_email: str
-    region: str
-    visibility: SandboxVisibility
-    project_id: Optional[str]
-    project_name: Optional[str]
-    resources: Dict[str, Any]
-    cost: Dict[str, float]
-    created_at: datetime
-    updated_at: datetime
-    last_accessed_at: Optional[datetime]
-    uptime: int  # minutes
-    cpu_spec: Optional[float] = None
-    memory_spec: Optional[float] = None
+
 
 
 class SandboxFilters(BaseModel):
     status: Optional[List[SandboxStatus]] = None
-    framework: Optional[List[str]] = None
-    region: Optional[List[str]] = None
-    visibility: Optional[List[SandboxVisibility]] = None
     user_id: Optional[str] = None
     project_id: Optional[str] = None
     date_from: Optional[datetime] = None
@@ -104,17 +71,16 @@ class SandboxStats(BaseModel):
     total_sandboxes: int
     running_sandboxes: int
     stopped_sandboxes: int
-    error_sandboxes: int
-    recycled_sandboxes: int
+    timeout_sandboxes: int
+    archived_sandboxes: int
     total_cost: float
     avg_cpu_usage: float
     avg_memory_usage: float
     total_uptime_hours: float
 
 
-
-
-
+class SwitchProjectRequest(BaseModel):
+    project_id: str
 
 
 # Helper functions
@@ -174,12 +140,6 @@ def get_sandbox_status_value(status):
     return status
 
 
-def get_sandbox_visibility_value(visibility):
-    if isinstance(visibility, Enum):
-        return visibility.value
-    return visibility
-
-
 # Helper function to safely get datetime values
 def safe_datetime(val, default=None):
     """Safely extract datetime value from SQLAlchemy attribute"""
@@ -196,9 +156,6 @@ def list_sandboxes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     status: Optional[SandboxStatus] = Query(None),
-    framework: Optional[str] = Query(None),
-    region: Optional[str] = Query(None),
-    visibility: Optional[SandboxVisibility] = Query(None),
     project_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     sort_by: str = Query("created_at"),
@@ -212,13 +169,6 @@ def list_sandboxes(
     # Apply filters
     if status:
         query = query.filter(Sandbox.status == status.value)
-    # Framework filter removed since framework is not in the model
-    # if framework:
-    #     query = query.filter(Sandbox.framework == framework)
-    if region:
-        query = query.filter(Sandbox.region == region)
-    if visibility:
-        query = query.filter(Sandbox.visibility == visibility.value)
     if project_id:
         query = query.filter(Sandbox.project_id == project_id)
     if search:
@@ -236,15 +186,6 @@ def list_sandboxes(
     elif sort_by == "status":
         query = query.order_by(
             Sandbox.status.desc() if sort_order == "desc" else Sandbox.status.asc()
-        )
-    # Framework sorting removed since framework is not in the model
-    # elif sort_by == "framework":
-    #     query = query.order_by(
-    #         Sandbox.framework.desc() if sort_order == "desc" else Sandbox.framework.asc()
-    #     )
-    elif sort_by == "region":
-        query = query.order_by(
-            Sandbox.region.desc() if sort_order == "desc" else Sandbox.region.asc()
         )
     else:  # created_at
         query = query.order_by(
@@ -275,23 +216,33 @@ def list_sandboxes(
             else str(current_user.email.split('@')[0])
         )
 
+        # Get project info
+        project_name = None
+        if getattr(sandbox, 'project_id', None) is not None:
+            project = db.query(Project).filter(Project.project_id == sandbox.project_id).first()
+            project_name = str(project.name) if project is not None else None
+
+        # Get template info
+        template_name = None
+        if getattr(sandbox, 'template_id', None) is not None:
+            from .templates import Template
+            template = db.query(Template).filter(Template.template_id == sandbox.template_id).first()
+            template_name = str(template.name) if template is not None else None
+
         result.append(SandboxResponse(
             id=str(getattr(sandbox, 'sandbox_id', '')),
             name=str(getattr(sandbox, 'name', '')),
             description=str(getattr(sandbox, 'description', ''))
             if getattr(sandbox, 'description', None) is not None else None,
-            framework="python",  # Default framework since it's not in the model
             status=SandboxStatus(str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value))),
-            user_id=str(getattr(sandbox, 'owner_account_id', '')),
+            user_account_id=str(getattr(sandbox, 'owner_account_id', '')),
             user_name=user_name,
             user_email=str(current_user.email),
-            region=str(getattr(sandbox, 'region', '')),
-            visibility=SandboxVisibility(
-                str(getattr(sandbox, 'visibility', SandboxVisibility.PRIVATE.value))
-            ),
             project_id=str(getattr(sandbox, 'project_id', ''))
             if getattr(sandbox, 'project_id', None) is not None else None,
-            project_name=None,  # TODO: Add project name lookup
+            project_name=project_name,
+            template_id=str(getattr(sandbox, 'template_id', '')) if getattr(sandbox, 'template_id', None) is not None else None,
+            template_name=template_name,
             resources={
                 "cpu": 0.0,
                 "memory": 0.0,
@@ -319,9 +270,7 @@ def get_sandbox_stats(
     db: Session = Depends(get_db)
 ):
     """Get sandbox statistics for the current user."""
-    user_sandboxes = db.query(Sandbox).filter(
-        Sandbox.owner_account_id == current_user.account_id
-    ).all()
+    user_sandboxes = db.query(Sandbox).filter(Sandbox.owner_account_id == current_user.account_id).all()
 
     total_sandboxes = len(user_sandboxes)
     running_sandboxes = len([
@@ -332,13 +281,13 @@ def get_sandbox_stats(
         s for s in user_sandboxes
         if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.STOPPED.value
     ])
-    error_sandboxes = len([
+    timeout_sandboxes = len([
         s for s in user_sandboxes
-        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ERROR.value
+        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.TIMEOUT.value
     ])
-    recycled_sandboxes = len([
+    archived_sandboxes = len([
         s for s in user_sandboxes
-        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RECYCLED.value
+        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ARCHIVED.value
     ])
 
     total_cost = float(sum(float(getattr(s, 'total_cost', 0.0)) for s in user_sandboxes))
@@ -350,6 +299,7 @@ def get_sandbox_stats(
         float(sum(float(getattr(s, 'memory_usage', 0.0)) for s in user_sandboxes) / total_sandboxes)
         if total_sandboxes > 0 else 0.0
     )
+
     total_uptime_hours = float(
         sum(calculate_uptime(getattr(s, 'started_at', None)) for s in user_sandboxes) / 60
     )
@@ -358,8 +308,8 @@ def get_sandbox_stats(
         total_sandboxes=total_sandboxes,
         running_sandboxes=running_sandboxes,
         stopped_sandboxes=stopped_sandboxes,
-        error_sandboxes=error_sandboxes,
-        recycled_sandboxes=recycled_sandboxes,
+        timeout_sandboxes=timeout_sandboxes,
+        archived_sandboxes=archived_sandboxes,
         total_cost=total_cost,
         avg_cpu_usage=avg_cpu_usage,
         avg_memory_usage=avg_memory_usage,
@@ -378,13 +328,12 @@ def create_sandbox(
     new_sandbox = Sandbox(
         name=sandbox_data.name,
         description=sandbox_data.description,
-        framework=sandbox_data.framework,
+        template_id="default-template-id",  # TODO: Get from request or use default
         status=SandboxStatus.STOPPED,
         owner_account_id=current_user.account_id,
-        region=sandbox_data.region,
-        visibility=sandbox_data.visibility,
         project_id=sandbox_data.project_id,
-        hourly_rate=0.10  # Default hourly rate
+        cpu_spec=sandbox_data.cpu_spec,
+        memory_spec=sandbox_data.memory_spec
     )
 
     db.add(new_sandbox)
@@ -410,25 +359,33 @@ def create_sandbox(
         else str(current_user.email.split('@')[0])
     )
 
+    # Get template info
+    template_name = None
+    if new_sandbox.template_id is not None:
+        from .templates import Template
+        template = db.query(Template).filter(Template.template_id == new_sandbox.template_id).first()
+        template_name = str(template.name) if template is not None else None
+
     return SandboxResponse(
-        id=str(new_sandbox.id),
+        id=str(new_sandbox.sandbox_id),
         name=str(new_sandbox.name),
         description=str(new_sandbox.description) if new_sandbox.description is not None else None,
-        framework=str(new_sandbox.framework),
         status=SandboxStatus(new_sandbox.status),
-        user_id=str(new_sandbox.user_id),
+        user_account_id=str(new_sandbox.owner_account_id),
         user_name=user_name,
         user_email=str(current_user.email),
-        region=str(new_sandbox.region),
-        visibility=SandboxVisibility(new_sandbox.visibility),
         project_id=str(new_sandbox.project_id) if new_sandbox.project_id is not None else None,
         project_name=None,
+        template_id=str(new_sandbox.template_id) if new_sandbox.template_id is not None else None,
+        template_name=template_name,
         resources=get_sandbox_resources(new_sandbox),
         cost=get_sandbox_cost(new_sandbox),
         created_at=created_at_val,
         updated_at=updated_at_val,
         last_accessed_at=last_accessed_at_val,
-        uptime=uptime
+        uptime=uptime,
+        cpu_spec=getattr(new_sandbox, 'cpu_spec', None),
+        memory_spec=getattr(new_sandbox, 'memory_spec', None)
     )
 
 
@@ -440,7 +397,7 @@ def get_sandbox(
 ):
     """Get a specific sandbox by ID."""
     sandbox = db.query(Sandbox).filter(
-        Sandbox.id == sandbox_id,
+        Sandbox.sandbox_id == sandbox_id,
         Sandbox.owner_account_id == current_user.account_id
     ).first()
 
@@ -465,23 +422,33 @@ def get_sandbox(
         else str(current_user.email.split('@')[0])
     )
 
+    # Get project info
+    project_name = None
+    if getattr(sandbox, 'project_id', None) is not None:
+        project = db.query(Project).filter(Project.project_id == sandbox.project_id).first()
+        project_name = str(project.name) if project is not None else None
+
+    # Get template info
+    template_name = None
+    if getattr(sandbox, 'template_id', None) is not None:
+        from .templates import Template
+        template = db.query(Template).filter(Template.template_id == sandbox.template_id).first()
+        template_name = str(template.name) if template is not None else None
+
     return SandboxResponse(
-        id=str(getattr(sandbox, 'id', '')),
+        id=str(getattr(sandbox, 'sandbox_id', '')),
         name=str(getattr(sandbox, 'name', '')),
         description=str(getattr(sandbox, 'description', ''))
         if getattr(sandbox, 'description', None) is not None else None,
-        framework=str(getattr(sandbox, 'framework', '')),
         status=SandboxStatus(str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value))),
-        user_id=str(getattr(sandbox, 'user_id', '')),
+        user_account_id=str(getattr(sandbox, 'owner_account_id', '')),
         user_name=user_name,
         user_email=str(current_user.email),
-        region=str(getattr(sandbox, 'region', '')),
-        visibility=SandboxVisibility(
-            str(getattr(sandbox, 'visibility', SandboxVisibility.PRIVATE.value))
-        ),
         project_id=str(getattr(sandbox, 'project_id', ''))
         if getattr(sandbox, 'project_id', None) is not None else None,
-        project_name=None,  # TODO: Add project name lookup
+        project_name=project_name,
+        template_id=str(getattr(sandbox, 'template_id', '')) if getattr(sandbox, 'template_id', None) is not None else None,
+        template_name=template_name,
         resources=get_sandbox_resources(sandbox),
         cost=get_sandbox_cost(sandbox),
         created_at=created_at_val,
@@ -502,7 +469,7 @@ def update_sandbox(
 ):
     """Update a sandbox."""
     sandbox = db.query(Sandbox).filter(
-        Sandbox.id == sandbox_id,
+        Sandbox.sandbox_id == sandbox_id,
         Sandbox.owner_account_id == current_user.account_id
     ).first()
 
@@ -516,8 +483,6 @@ def update_sandbox(
         setattr(sandbox, 'description', sandbox_data.description)
     if sandbox_data.status is not None:
         setattr(sandbox, 'status', sandbox_data.status.value)
-    if sandbox_data.visibility is not None:
-        setattr(sandbox, 'visibility', sandbox_data.visibility.value)
     if sandbox_data.project_id is not None:
         setattr(sandbox, 'project_id', sandbox_data.project_id)
 
@@ -542,53 +507,67 @@ def update_sandbox(
         else str(current_user.email.split('@')[0])
     )
 
+    # Get project info
+    project_name = None
+    if sandbox.project_id is not None:
+        project = db.query(Project).filter(Project.project_id == sandbox.project_id).first()
+        project_name = str(project.name) if project is not None else None
+
+    # Get template info
+    template_name = None
+    if sandbox.template_id is not None:
+        from .templates import Template
+        template = db.query(Template).filter(Template.template_id == sandbox.template_id).first()
+        template_name = str(template.name) if template is not None else None
+
     return SandboxResponse(
-        id=str(sandbox.id),
+        id=str(sandbox.sandbox_id),
         name=str(sandbox.name),
         description=str(sandbox.description) if sandbox.description is not None else None,
-        framework=str(sandbox.framework),
         status=SandboxStatus(sandbox.status),
-        user_id=str(sandbox.user_id),
+        user_account_id=str(sandbox.owner_account_id),
         user_name=user_name,
         user_email=str(current_user.email),
-        region=str(sandbox.region),
-        visibility=SandboxVisibility(sandbox.visibility),
         project_id=str(sandbox.project_id) if sandbox.project_id is not None else None,
-        project_name=None,
+        project_name=project_name,
+        template_id=str(sandbox.template_id) if sandbox.template_id is not None else None,
+        template_name=template_name,
         resources=get_sandbox_resources(sandbox),
         cost=get_sandbox_cost(sandbox),
         created_at=created_at_val,
         updated_at=updated_at_val,
         last_accessed_at=last_accessed_at_val,
-        uptime=uptime
+        uptime=uptime,
+        cpu_spec=getattr(sandbox, 'cpu_spec', None),
+        memory_spec=getattr(sandbox, 'memory_spec', None)
     )
 
 
-@router.post("/{sandbox_id}/recycle")
-def recycle_sandbox(
+@router.post("/{sandbox_id}/archive")
+def archive_sandbox(
     sandbox_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Recycle a sandbox - marks it as recycled for later cleanup."""
+    """Archive a sandbox - marks it as archived for retention of metrics and usage data."""
     sandbox = db.query(Sandbox).filter(
-        Sandbox.id == sandbox_id,
+        Sandbox.sandbox_id == sandbox_id,
         Sandbox.owner_account_id == current_user.account_id
     ).first()
 
     if not sandbox:
         raise HTTPException(status_code=404, detail="Sandbox not found")
 
-    # Cannot recycle an already recycled sandbox
-    if str(sandbox.status) == SandboxStatus.RECYCLED.value:
-        raise HTTPException(status_code=400, detail="Sandbox is already recycled")
+    # Cannot archive an already archived sandbox
+    if str(sandbox.status) == SandboxStatus.ARCHIVED.value:
+        raise HTTPException(status_code=400, detail="Sandbox is already archived")
 
-    # Mark as recycled and set recycled timestamp
-    setattr(sandbox, 'status', SandboxStatus.RECYCLED.value)
-    setattr(sandbox, 'recycled_at', datetime.utcnow())
+    # Mark as archived and set archived timestamp
+    setattr(sandbox, 'status', SandboxStatus.ARCHIVED.value)
+    setattr(sandbox, 'archived_at', datetime.utcnow())
     db.commit()
 
-    return {"message": "Sandbox recycled successfully"}
+    return {"message": "Sandbox archived successfully"}
 
 
 @router.post("/{sandbox_id}/start")
@@ -599,7 +578,7 @@ def start_sandbox(
 ):
     """Start a sandbox."""
     sandbox = db.query(Sandbox).filter(
-        Sandbox.id == sandbox_id,
+        Sandbox.sandbox_id == sandbox_id,
         Sandbox.owner_account_id == current_user.account_id
     ).first()
 
@@ -609,8 +588,8 @@ def start_sandbox(
     if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RUNNING.value:
         raise HTTPException(status_code=400, detail="Sandbox is already running")
 
-    if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.DELETED.value:
-        raise HTTPException(status_code=400, detail="Cannot start a deleted sandbox")
+    if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ARCHIVED.value:
+        raise HTTPException(status_code=400, detail="Cannot start an archived sandbox")
 
     # Update status and timestamps
     setattr(sandbox, 'status', SandboxStatus.RUNNING.value)
@@ -629,7 +608,7 @@ def stop_sandbox(
 ):
     """Stop a sandbox."""
     sandbox = db.query(Sandbox).filter(
-        Sandbox.id == sandbox_id,
+        Sandbox.sandbox_id == sandbox_id,
         Sandbox.owner_account_id == current_user.account_id
     ).first()
 
@@ -639,8 +618,8 @@ def stop_sandbox(
     if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.STOPPED.value:
         raise HTTPException(status_code=400, detail="Sandbox is already stopped")
 
-    if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.DELETED.value:
-        raise HTTPException(status_code=400, detail="Cannot stop a deleted sandbox")
+    if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ARCHIVED.value:
+        raise HTTPException(status_code=400, detail="Cannot stop an archived sandbox")
 
     # Calculate cost before stopping
     started_at_val = safe_datetime(getattr(sandbox, 'started_at', None))
@@ -695,9 +674,6 @@ def get_all_sandboxes_admin(
     admin_user: User = Depends(verify_admin_token),
     db: Session = Depends(get_db),
     status: Optional[SandboxStatus] = Query(None),
-    framework: Optional[str] = Query(None),
-    region: Optional[str] = Query(None),
-    visibility: Optional[SandboxVisibility] = Query(None),
     user_id: Optional[str] = Query(None),
     project_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -712,12 +688,6 @@ def get_all_sandboxes_admin(
     # Apply filters
     if status:
         query = query.filter(Sandbox.status == status.value)
-    if framework:
-        query = query.filter(Sandbox.framework == framework)
-    if region:
-        query = query.filter(Sandbox.region == region)
-    if visibility:
-        query = query.filter(Sandbox.visibility == visibility.value)
     if user_id:
         query = query.filter(Sandbox.owner_account_id == user_id)
     if project_id:
@@ -737,15 +707,6 @@ def get_all_sandboxes_admin(
     elif sort_by == "status":
         query = query.order_by(
             Sandbox.status.desc() if sort_order == "desc" else Sandbox.status.asc()
-        )
-    # Framework sorting removed since framework is not in the model
-    # elif sort_by == "framework":
-    #     query = query.order_by(
-    #         Sandbox.framework.desc() if sort_order == "desc" else Sandbox.framework.asc()
-    #     )
-    elif sort_by == "region":
-        query = query.order_by(
-            Sandbox.region.desc() if sort_order == "desc" else Sandbox.region.asc()
         )
     else:  # created_at
         query = query.order_by(
@@ -777,25 +738,39 @@ def get_all_sandboxes_admin(
         )
         last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
+        # Get project info
+        project_name = None
+        if sandbox.project_id is not None:
+            project = db.query(Project).filter(Project.project_id == sandbox.project_id).first()
+            project_name = str(project.name) if project is not None else None
+
+        # Get template info
+        template_name = None
+        if sandbox.template_id is not None:
+            from .templates import Template
+            template = db.query(Template).filter(Template.template_id == sandbox.template_id).first()
+            template_name = str(template.name) if template is not None else None
+
         result.append(SandboxResponse(
-            id=str(sandbox.id),
+            id=str(sandbox.sandbox_id),
             name=str(sandbox.name),
             description=str(sandbox.description) if sandbox.description is not None else None,
-            framework=str(sandbox.framework),
             status=SandboxStatus(sandbox.status),
-            user_id=str(sandbox.owner_account_id),
+            user_account_id=str(sandbox.owner_account_id),
             user_name=str(user_name),
             user_email=str(user_email),
-            region=str(sandbox.region),
-            visibility=SandboxVisibility(sandbox.visibility),
             project_id=str(sandbox.project_id) if sandbox.project_id is not None else None,
-            project_name=None,
+            project_name=project_name,
+            template_id=str(sandbox.template_id) if sandbox.template_id is not None else None,
+            template_name=template_name,
             resources=get_sandbox_resources(sandbox),
             cost=get_sandbox_cost(sandbox),
             created_at=created_at_val,
             updated_at=updated_at_val,
             last_accessed_at=last_accessed_at_val,
-            uptime=uptime
+            uptime=uptime,
+            cpu_spec=getattr(sandbox, 'cpu_spec', None),
+            memory_spec=getattr(sandbox, 'memory_spec', None)
         ))
 
     return result
@@ -818,13 +793,13 @@ def get_admin_sandbox_stats(
         s for s in all_sandboxes
         if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.STOPPED.value
     ])
-    error_sandboxes = len([
+    timeout_sandboxes = len([
         s for s in all_sandboxes
-        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ERROR.value
+        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.TIMEOUT.value
     ])
-    recycled_sandboxes = len([
+    archived_sandboxes = len([
         s for s in all_sandboxes
-        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RECYCLED.value
+        if str(getattr(s, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.ARCHIVED.value
     ])
 
     total_cost = float(sum(float(getattr(s, 'total_cost', 0.0)) for s in all_sandboxes))
@@ -845,8 +820,8 @@ def get_admin_sandbox_stats(
         total_sandboxes=total_sandboxes,
         running_sandboxes=running_sandboxes,
         stopped_sandboxes=stopped_sandboxes,
-        error_sandboxes=error_sandboxes,
-        recycled_sandboxes=recycled_sandboxes,
+        timeout_sandboxes=timeout_sandboxes,
+        archived_sandboxes=archived_sandboxes,
         total_cost=total_cost,
         avg_cpu_usage=avg_cpu_usage,
         avg_memory_usage=avg_memory_usage,
@@ -863,7 +838,7 @@ def admin_sandbox_action(
     db: Session = Depends(get_db)
 ):
     """Admin endpoint to perform actions on sandboxes."""
-    sandbox = db.query(Sandbox).filter(Sandbox.id == sandbox_id).first()
+    sandbox = db.query(Sandbox).filter(Sandbox.sandbox_id == sandbox_id).first()
 
     if not sandbox:
         raise HTTPException(status_code=404, detail="Sandbox not found")
@@ -890,12 +865,57 @@ def admin_sandbox_action(
         setattr(sandbox, 'last_accessed_at', datetime.utcnow())
         setattr(sandbox, 'started_at', None)
         message = "Sandbox stopped by admin"
-    elif action == "delete":
-        setattr(sandbox, 'status', SandboxStatus.DELETED.value)
-        message = "Sandbox deleted by admin"
+    elif action == "archive":
+        setattr(sandbox, 'status', SandboxStatus.ARCHIVED.value)
+        setattr(sandbox, 'archived_at', datetime.utcnow())
+        message = "Sandbox archived by admin"
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
     db.commit()
 
     return {"message": message, "reason": reason}
+
+@router.post("/{sandbox_id}/switch-project")
+def switch_sandbox_project(
+    sandbox_id: str,
+    req: SwitchProjectRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Switch a sandbox to a different project."""
+    # Find the sandbox
+    sandbox = db.query(Sandbox).filter(
+        Sandbox.sandbox_id == sandbox_id,
+        Sandbox.owner_account_id == current_user.account_id
+    ).first()
+
+    if not sandbox:
+        raise HTTPException(status_code=404, detail="Sandbox not found")
+
+    # Prevent switching archived sandboxes
+    if str(sandbox.status) == SandboxStatus.ARCHIVED.value:
+        raise HTTPException(status_code=400, detail="Cannot switch archived sandboxes between projects")
+
+    # Verify the target project exists and user has access
+    from .projects import Project
+    project = db.query(Project).filter(
+        Project.project_id == req.project_id,
+        Project.owner_account_id == current_user.account_id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Target project not found")
+
+    # Check if sandbox is already in this project
+    if str(sandbox.project_id) == req.project_id:
+        raise HTTPException(status_code=400, detail="Sandbox is already in this project")
+    
+    # Move sandbox to the new project
+    setattr(sandbox, 'project_id', req.project_id)
+    setattr(sandbox, 'updated_at', datetime.utcnow())
+
+    db.commit()
+    db.refresh(sandbox)
+
+    return {"message": f"Sandbox '{sandbox.name}' moved to project '{project.name}'"}
