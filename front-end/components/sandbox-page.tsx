@@ -925,8 +925,8 @@ export function SandboxPage() {
             ) : (
               <>
                 <span>{templateDialog.template?.description}</span>
-                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.language")}: {templateDialog.template?.language}</span>
-                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.category")}: {templateDialog.template?.category}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("templates.language") || "Language"}: {t('language.' + templateDialog.template?.language) !== 'language.' + templateDialog.template?.language ? t('language.' + templateDialog.template?.language) : templateDialog.template?.language}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("templates.category") || "Category"}: {t('category.' + templateDialog.template?.category) !== 'category.' + templateDialog.template?.category ? t('category.' + templateDialog.template?.category) : templateDialog.template?.category}</span>
                 <span className="mt-2 text-xs text-muted-foreground block">{t("admin.cpu")}: {templateDialog.template?.cpu_spec}</span>
                 <span className="mt-2 text-xs text-muted-foreground block">{t("admin.ram")}: {templateDialog.template?.memory_spec} GB</span>
               </>

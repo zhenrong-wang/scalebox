@@ -152,8 +152,8 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
             ) : (
               <>
                 <span>{template?.description}</span>
-                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.language")}: {template?.language}</span>
-                <span className="mt-2 text-xs text-muted-foreground block">{t("admin.category")}: {template?.category}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("templates.language") || "Language"}: {t('language.' + template?.language) !== 'language.' + template?.language ? t('language.' + template?.language) : template?.language}</span>
+                <span className="mt-2 text-xs text-muted-foreground block">{t("templates.category") || "Category"}: {t('category.' + template?.category) !== 'category.' + template?.category ? t('category.' + template?.category) : template?.category}</span>
                 <span className="mt-2 text-xs text-muted-foreground block">{t("admin.cpu")}: {template?.cpu_spec}</span>
                 <span className="mt-2 text-xs text-muted-foreground block">{t("admin.ram")}: {template?.memory_spec} GB</span>
                 {/* Add more fields as needed */}

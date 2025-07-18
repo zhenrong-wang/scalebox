@@ -524,6 +524,12 @@ export function TemplatesPage() {
                       </Tooltip>
                     </TooltipProvider>
                   </ResizableTableHead>
+                  <ResizableTableHead columnId="category" defaultWidth={120}>
+                    {t('templates.category') || 'Category'}
+                  </ResizableTableHead>
+                  <ResizableTableHead columnId="language" defaultWidth={120}>
+                    {t('templates.language') || 'Language'}
+                  </ResizableTableHead>
                   <ResizableTableHead columnId="created" defaultWidth={120}>
                     <Button variant="ghost" onClick={() => handleSort("created_at")} className="h-auto p-0 group">
                       {t('templates.created')} {getSortIcon("created_at")}
@@ -569,6 +575,16 @@ export function TemplatesPage() {
                       <div className="flex items-center gap-1">
                         <HardDrive className="h-3 w-3 text-muted-foreground" />
                         <span className="text-sm">{template.memory_spec}GB</span>
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="text-sm text-muted-foreground truncate" title={template.category || ''}>
+                        {t('category.' + template.category) !== 'category.' + template.category ? t('category.' + template.category) : template.category}
+                      </div>
+                    </ResizableTableCell>
+                    <ResizableTableCell>
+                      <div className="text-sm text-muted-foreground truncate" title={template.language || ''}>
+                        {t('language.' + template.language) !== 'language.' + template.language ? t('language.' + template.language) : template.language}
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
