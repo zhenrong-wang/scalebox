@@ -306,6 +306,13 @@ async def list_project_sandboxes(
         # Get project name
         project_name = project.name if project else "Unknown Project"
         
+        # Get template info
+        template_name = None
+        if getattr(sandbox, 'template_id', None) is not None:
+            from .templates import Template
+            template = db.query(Template).filter(Template.template_id == sandbox.template_id).first()
+            template_name = str(template.name) if template is not None else None
+        
         # Calculate uptime
         started_at_val = safe_datetime(getattr(sandbox, 'started_at', None))
         uptime = calculate_uptime(started_at_val)
@@ -321,6 +328,7 @@ async def list_project_sandboxes(
             "project_id": str(sandbox.project_id) if sandbox.project_id is not None else None,
             "project_name": str(project_name),
             "template_id": str(sandbox.template_id) if sandbox.template_id is not None else None,
+            "template_name": template_name,
             "resources": {
                 "cpu": float(getattr(sandbox, 'cpu_usage', 0) or 0),
                 "memory": float(getattr(sandbox, 'memory_usage', 0) or 0),
