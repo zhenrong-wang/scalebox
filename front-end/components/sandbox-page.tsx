@@ -25,6 +25,9 @@ import { SearchFilters } from "@/components/ui/search-filters"
 import { templateService, Template } from "../services/template-service"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
 import { ProjectService, Project } from "../services/project-service"
+import { CopyButton } from "@/components/ui/copy-button"
+import { EditableName } from "@/components/ui/editable-name"
+import { useToast } from "@/hooks/use-toast"
 
 type SortField = "name" | "project_name" | "status" | "createdAt" | "updatedAt" | "uptime"
 type SortOrder = "asc" | "desc"
@@ -701,8 +704,28 @@ export function SandboxPage() {
                     </ResizableTableCell>
                     <ResizableTableCell>
                       <div>
-                        <div className="font-medium">{sandbox.name}</div>
-                        <div className="text-sm text-muted-foreground">{sandbox.id}</div>
+                        <EditableName
+                          value={sandbox.name}
+                          onSave={async (newName) => {
+                            await SandboxService.updateSandbox(sandbox.id, { name: newName });
+                            setLoading(true);
+                            loadSandboxes();
+                            loadStats();
+                          }}
+                          placeholder={t("sandbox.editNamePlaceholder") || "Edit name"}
+                          className="font-medium"
+                          resourceType="sandbox"
+                          onValidateDuplicate={(newName, currentName) => {
+                            if (newName.toLowerCase() === currentName.toLowerCase()) {
+                              return false; // Not a duplicate if it's the same name
+                            }
+                            return sandboxes.some(s => s.name.toLowerCase() === newName.toLowerCase());
+                          }}
+                        />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span className="font-mono">{sandbox.id}</span>
+                          <CopyButton value={sandbox.id} size="sm" variant="ghost" />
+                        </div>
                         {sandbox.status === "archived" && (
                           <div className="text-xs text-muted-foreground mt-1">
                             {t("table.readOnly") || "Read-only"}

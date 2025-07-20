@@ -24,6 +24,8 @@ from .models import Base, User, Sandbox, SandboxUsage, SandboxMetrics
 from .projects import Project
 from .users import verify_admin_token
 from .schemas import SandboxResponse
+from .auth import get_current_user_required
+from .api_keys import get_user_sandboxes_query, check_sandbox_access
 from datetime import datetime
 
 
@@ -84,23 +86,6 @@ class SwitchProjectRequest(BaseModel):
 
 
 # Helper functions
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
-    db: Session = Depends(get_db)
-) -> User:
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-        user_id = int(payload.get("sub"))
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-
 def calculate_uptime(started_at: Optional[datetime]) -> int:
     if not started_at:
         return 0
@@ -153,7 +138,7 @@ def safe_datetime(val, default=None):
 # API Endpoints
 @router.get("/", response_model=List[SandboxResponse])
 def list_sandboxes(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db),
     status: Optional[SandboxStatus] = Query(None),
     project_id: Optional[str] = Query(None),
@@ -164,7 +149,7 @@ def list_sandboxes(
     offset: int = Query(0, ge=0)
 ):
     """List sandboxes for the current user with filtering and pagination."""
-    query = db.query(Sandbox).filter(Sandbox.owner_account_id == current_user.account_id)
+    query = get_user_sandboxes_query(current_user, db)
 
     # Apply filters
     if status:
@@ -235,7 +220,7 @@ def list_sandboxes(
             description=str(getattr(sandbox, 'description', ''))
             if getattr(sandbox, 'description', None) is not None else None,
             status=SandboxStatus(str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value))),
-            user_account_id=str(getattr(sandbox, 'owner_account_id', '')),
+            user_account_id=str(getattr(sandbox, 'owner_user_id', '')),
             user_name=user_name,
             user_email=str(current_user.email),
             project_id=str(getattr(sandbox, 'project_id', ''))
@@ -266,11 +251,11 @@ def list_sandboxes(
 
 @router.get("/stats", response_model=SandboxStats)
 def get_sandbox_stats(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Get sandbox statistics for the current user."""
-    user_sandboxes = db.query(Sandbox).filter(Sandbox.owner_account_id == current_user.account_id).all()
+    user_sandboxes = db.query(Sandbox).filter(Sandbox.owner_user_id == current_user.user_id).all()
 
     total_sandboxes = len(user_sandboxes)
     running_sandboxes = len([
@@ -320,25 +305,55 @@ def get_sandbox_stats(
 @router.post("/", response_model=SandboxResponse)
 def create_sandbox(
     sandbox_data: SandboxCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Create a new sandbox for the current user."""
+    # Validate name length (2-100 characters)
+    if len(sandbox_data.name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Sandbox name must be at least 2 characters")
+    if len(sandbox_data.name.strip()) > 100:
+        raise HTTPException(status_code=400, detail="Sandbox name must be 100 characters or less")
+    
+    # Check for duplicate name per owner
+    existing_sandbox = db.query(Sandbox).filter(
+        Sandbox.name == sandbox_data.name.strip(),
+        Sandbox.owner_user_id == current_user.user_id
+    ).first()
+    if existing_sandbox:
+        raise HTTPException(status_code=400, detail="A sandbox with this name already exists")
+    
     # Create new sandbox
     new_sandbox = Sandbox(
-        name=sandbox_data.name,
+        name=sandbox_data.name.strip(),
         description=sandbox_data.description,
         template_id="default-template-id",  # TODO: Get from request or use default
         status=SandboxStatus.STOPPED,
-        owner_account_id=current_user.account_id,
+        owner_user_id=current_user.user_id,
         project_id=sandbox_data.project_id,
         cpu_spec=sandbox_data.cpu_spec,
         memory_spec=sandbox_data.memory_spec
     )
 
-    db.add(new_sandbox)
-    db.commit()
-    db.refresh(new_sandbox)
+    try:
+        db.add(new_sandbox)
+        db.commit()
+        db.refresh(new_sandbox)
+    except Exception as e:
+        db.rollback()
+        # Check if it's a duplicate name error from database constraint
+        error_str = str(e).lower()
+        if "unique_sandbox_name_per_owner" in error_str or "duplicate" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="A sandbox with this name already exists"
+            )
+        else:
+            # Re-raise other database errors
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create sandbox. Please try again."
+            )
 
     # Return response
     started_at_val = safe_datetime(getattr(new_sandbox, 'started_at', None))
@@ -371,7 +386,7 @@ def create_sandbox(
         name=str(new_sandbox.name),
         description=str(new_sandbox.description) if new_sandbox.description is not None else None,
         status=SandboxStatus(new_sandbox.status),
-        user_account_id=str(new_sandbox.owner_account_id),
+        user_account_id=str(new_sandbox.owner_user_id),
         user_name=user_name,
         user_email=str(current_user.email),
         project_id=str(new_sandbox.project_id) if new_sandbox.project_id is not None else None,
@@ -392,17 +407,18 @@ def create_sandbox(
 @router.get("/{sandbox_id}", response_model=SandboxResponse)
 def get_sandbox(
     sandbox_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
-    """Get a specific sandbox by ID."""
-    sandbox = db.query(Sandbox).filter(
-        Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
-    ).first()
+    """Get a specific sandbox by ID based on permissions."""
+    sandbox = db.query(Sandbox).filter(Sandbox.sandbox_id == sandbox_id).first()
 
     if not sandbox:
         raise HTTPException(status_code=404, detail="Sandbox not found")
+
+    # Check permissions
+    if not check_sandbox_access(current_user, sandbox):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     started_at_val = safe_datetime(getattr(sandbox, 'started_at', None))
     uptime = calculate_uptime(started_at_val)
@@ -441,7 +457,7 @@ def get_sandbox(
         description=str(getattr(sandbox, 'description', ''))
         if getattr(sandbox, 'description', None) is not None else None,
         status=SandboxStatus(str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value))),
-        user_account_id=str(getattr(sandbox, 'owner_account_id', '')),
+        user_account_id=str(getattr(sandbox, 'owner_user_id', '')),
         user_name=user_name,
         user_email=str(current_user.email),
         project_id=str(getattr(sandbox, 'project_id', ''))
@@ -464,21 +480,38 @@ def get_sandbox(
 def update_sandbox(
     sandbox_id: str,
     sandbox_data: SandboxUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Update a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
+        Sandbox.owner_user_id == current_user.user_id
     ).first()
 
     if not sandbox:
         raise HTTPException(status_code=404, detail="Sandbox not found")
 
+    # Validate name if being updated
+    if sandbox_data.name is not None:
+        # Validate name length (2-100 characters)
+        if len(sandbox_data.name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Sandbox name must be at least 2 characters")
+        if len(sandbox_data.name.strip()) > 100:
+            raise HTTPException(status_code=400, detail="Sandbox name must be 100 characters or less")
+        
+        # Check for duplicate name per owner (excluding current sandbox)
+        existing_sandbox = db.query(Sandbox).filter(
+            Sandbox.name == sandbox_data.name.strip(),
+            Sandbox.owner_user_id == current_user.user_id,
+            Sandbox.sandbox_id != sandbox_id
+        ).first()
+        if existing_sandbox:
+            raise HTTPException(status_code=400, detail="A sandbox with this name already exists")
+
     # Update fields if provided
     if sandbox_data.name is not None:
-        setattr(sandbox, 'name', sandbox_data.name)
+        setattr(sandbox, 'name', sandbox_data.name.strip())
     if sandbox_data.description is not None:
         setattr(sandbox, 'description', sandbox_data.description)
     if sandbox_data.status is not None:
@@ -486,8 +519,24 @@ def update_sandbox(
     if sandbox_data.project_id is not None:
         setattr(sandbox, 'project_id', sandbox_data.project_id)
 
-    db.commit()
-    db.refresh(sandbox)
+    try:
+        db.commit()
+        db.refresh(sandbox)
+    except Exception as e:
+        db.rollback()
+        # Check if it's a duplicate name error from database constraint
+        error_str = str(e).lower()
+        if "unique_sandbox_name_per_owner" in error_str or "duplicate" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="A sandbox with this name already exists"
+            )
+        else:
+            # Re-raise other database errors
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update sandbox. Please try again."
+            )
 
     started_at_val = safe_datetime(getattr(sandbox, 'started_at', None))
     uptime = calculate_uptime(started_at_val)
@@ -525,7 +574,7 @@ def update_sandbox(
         name=str(sandbox.name),
         description=str(sandbox.description) if sandbox.description is not None else None,
         status=SandboxStatus(sandbox.status),
-        user_account_id=str(sandbox.owner_account_id),
+        user_account_id=str(sandbox.owner_user_id),
         user_name=user_name,
         user_email=str(current_user.email),
         project_id=str(sandbox.project_id) if sandbox.project_id is not None else None,
@@ -546,13 +595,13 @@ def update_sandbox(
 @router.post("/{sandbox_id}/archive")
 def archive_sandbox(
     sandbox_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Archive a sandbox - marks it as archived for retention of metrics and usage data."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
+        Sandbox.owner_user_id == current_user.user_id
     ).first()
 
     if not sandbox:
@@ -573,13 +622,13 @@ def archive_sandbox(
 @router.post("/{sandbox_id}/start")
 def start_sandbox(
     sandbox_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Start a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
+        Sandbox.owner_user_id == current_user.user_id
     ).first()
 
     if not sandbox:
@@ -603,13 +652,13 @@ def start_sandbox(
 @router.post("/{sandbox_id}/stop")
 def stop_sandbox(
     sandbox_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Stop a sandbox."""
     sandbox = db.query(Sandbox).filter(
         Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
+        Sandbox.owner_user_id == current_user.user_id
     ).first()
 
     if not sandbox:
@@ -689,7 +738,7 @@ def get_all_sandboxes_admin(
     if status:
         query = query.filter(Sandbox.status == status.value)
     if user_id:
-        query = query.filter(Sandbox.owner_account_id == user_id)
+        query = query.filter(Sandbox.owner_user_id == user_id)
     if project_id:
         query = query.filter(Sandbox.project_id == project_id)
     if search:
@@ -720,7 +769,7 @@ def get_all_sandboxes_admin(
     result = []
     for sandbox in sandboxes:
         # Get user info
-        user = db.query(User).filter(User.account_id == sandbox.owner_account_id).first()
+        user = db.query(User).filter(User.user_id == sandbox.owner_user_id).first()
         user_name = (
             user.full_name or user.username or user.email.split('@')[0]
             if user is not None else "Unknown"
@@ -756,7 +805,7 @@ def get_all_sandboxes_admin(
             name=str(sandbox.name),
             description=str(sandbox.description) if sandbox.description is not None else None,
             status=SandboxStatus(sandbox.status),
-            user_account_id=str(sandbox.owner_account_id),
+            user_account_id=str(sandbox.owner_user_id),
             user_name=str(user_name),
             user_email=str(user_email),
             project_id=str(sandbox.project_id) if sandbox.project_id is not None else None,
@@ -880,14 +929,14 @@ def admin_sandbox_action(
 def switch_sandbox_project(
     sandbox_id: str,
     req: SwitchProjectRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Switch a sandbox to a different project."""
     # Find the sandbox
     sandbox = db.query(Sandbox).filter(
         Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
+        Sandbox.owner_user_id == current_user.user_id
     ).first()
 
     if not sandbox:
@@ -901,7 +950,7 @@ def switch_sandbox_project(
     from .projects import Project
     project = db.query(Project).filter(
         Project.project_id == req.project_id,
-        Project.owner_account_id == current_user.account_id
+        Project.owner_user_id == current_user.user_id
     ).first()
 
     if not project:

@@ -14,6 +14,15 @@ const getAuthHeaders = () => {
 
 // Helper function to handle API responses
 const handleResponse = async (response: Response) => {
+  if (response.status === 401) {
+    // Clear any existing auth token
+    localStorage.removeItem('auth-token');
+    // Set auth state to signin by dispatching a custom event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth-required'));
+    }
+    throw new Error('Authentication required. Please log in.');
+  }
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
@@ -25,7 +34,7 @@ export interface Project {
   project_id: string;
   name: string;
   description?: string;
-  owner_account_id: string;
+  owner_user_id: string;
   sandbox_count: number;
   api_key_count: number;
   total_spent: number;

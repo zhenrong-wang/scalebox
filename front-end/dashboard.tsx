@@ -24,6 +24,7 @@ import { AdminDashboard } from "./components/admin/admin-dashboard"
 import { ProjectManagement } from "./components/projects/project-management"
 import { AdminBillingAnalytics } from "./components/admin/admin-billing-analytics"
 import { UserManagement } from "./components/admin/user-management"
+import { AccountUserManagement } from "./components/account-user-management"
 import { SystemHealth } from "./components/admin/system-health"
 import { SandboxManagement } from "./components/admin/sandbox-management"
 import { UserService } from "./services/user-service"
@@ -63,7 +64,21 @@ function DashboardContent() {
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (localStorage.getItem("auth-token")) {
         setAuthState("authenticated");
+      }
     }
+  }, []);
+
+  // Listen for auth-required events from API services
+  useEffect(() => {
+    const handleAuthRequired = () => {
+      setAuthState("signin");
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener('auth-required', handleAuthRequired);
+      return () => {
+        window.removeEventListener('auth-required', handleAuthRequired);
+      };
     }
   }, []);
 
@@ -84,15 +99,29 @@ function DashboardContent() {
 
   // Load current user data
   useEffect(() => {
-    if (authState === "authenticated" && typeof window !== "undefined") {
-      const userData = localStorage.getItem("user-data")
-      if (userData) {
-        setCurrentUser(JSON.parse(userData))
+    if (authState === "authenticated") {
+      const loadUserData = async () => {
+        try {
+          console.log("=== LOADING USER DATA ===");
+          const userData = await UserService.getCurrentUser();
+          console.log("User data loaded:", userData);
+          setCurrentUser(userData);
+          
+          console.log("User type determination:");
+          console.log("- userData.role:", userData?.role);
+          console.log("- userData.is_root_user:", userData?.is_root_user);
+        } catch (error) {
+          console.error("Error loading user data:", error);
+          setCurrentUser(null);
+        }
       }
+
+      loadUserData();
     }
-  }, [authState])
+  }, [authState]);
 
   const isAdmin = currentUser?.role === "admin";
+  const isRootUser = currentUser?.is_root_user === true || currentUser?.role === "root-user";
 
   // Set initial page based on user role
   const [currentPage, setCurrentPage] = useState<PageType>(() => {
@@ -105,11 +134,11 @@ function DashboardContent() {
     if (currentUser) {
       if (isAdmin && (currentPage === "projects" || currentPage === "sandboxes")) {
         setCurrentPage("admin")
-      } else if (!isAdmin && (currentPage === "users" || currentPage === "sandbox-management")) {
+      } else if (!isAdmin && !isRootUser && (currentPage === "users" || currentPage === "sandbox-management")) {
         setCurrentPage("projects")
       }
     }
-  }, [currentUser, isAdmin, currentPage])
+  }, [currentUser, isAdmin, isRootUser, currentPage])
 
   const handleSignIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -211,6 +240,10 @@ function DashboardContent() {
     setAuthState("landing")
   }
 
+  const handlePageChange = (page: PageType) => {
+    setCurrentPage(page);
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case "sandboxes":
@@ -245,6 +278,8 @@ function DashboardContent() {
       case "users":
         return isAdmin ? (
           <UserManagement />
+        ) : isRootUser ? (
+          <AccountUserManagement />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <div className="text-lg font-medium mb-2">{t("dashboard.accessDenied")}</div>
@@ -414,12 +449,13 @@ function DashboardContent() {
           >
             <Sidebar
               currentPage={currentPage}
-              onPageChange={setCurrentPage}
+              onPageChange={handlePageChange}
               isCollapsed={isCollapsed}
               onToggleCollapse={toggleCollapse}
               sidebarWidth={sidebarWidth}
               onLogout={handleLogout}
               isAdmin={isAdmin}
+              isRootUser={isRootUser}
             />
 
             {/* Resize Handle */}

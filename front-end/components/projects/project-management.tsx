@@ -20,6 +20,9 @@ import { ProjectService, Project } from "../../services/project-service"
 import type { Sandbox } from "../../types/sandbox"
 import { SandboxService } from "../../services/sandbox-service"
 import { toast } from "sonner"
+import { CopyButton } from "@/components/ui/copy-button"
+import { EditableDescription } from "@/components/ui/editable-description"
+import { EditableName } from "@/components/ui/editable-name"
 
 export function ProjectManagement() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -38,6 +41,7 @@ export function ProjectManagement() {
   const [selectedSandboxesForNewProject, setSelectedSandboxesForNewProject] = useState<Set<string>>(new Set())
   const [defaultProjectSandboxesLoading, setDefaultProjectSandboxesLoading] = useState(false)
   const [editDialog, setEditDialog] = useState<{ open: boolean; project: Project | null }>({ open: false, project: null })
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; project: Project | null }>({ open: false, project: null })
   const [editProject, setEditProject] = useState({
     name: "",
     description: "",
@@ -198,6 +202,49 @@ export function ProjectManagement() {
     setEditDialog({ open: true, project })
   }
 
+  const updateProjectDescription = async (projectId: string, newDescription: string) => {
+    try {
+      const updatedProject = await projectService.updateProject(projectId, {
+        description: newDescription
+      });
+      
+      setProjects(projects.map(project => 
+        project.project_id === projectId ? updatedProject : project
+      ));
+      
+      toast.success(t("project.editSuccess") || "Project updated successfully");
+    } catch (error) {
+      console.error("Error updating project description:", error);
+      toast.error(t("project.editError") || "Failed to update project");
+      throw error; // Re-throw to keep editing mode active
+    }
+  };
+
+  const updateProjectName = async (projectId: string, newName: string) => {
+    try {
+      const updatedProject = await projectService.updateProject(projectId, {
+        name: newName
+      });
+      
+      setProjects(projects.map(project => 
+        project.project_id === projectId ? updatedProject : project
+      ));
+      
+      toast.success(t("project.editSuccess") || "Project updated successfully");
+    } catch (error) {
+      console.error("Error updating project name:", error);
+      toast.error(t("project.editError") || "Failed to update project");
+      throw error; // Re-throw to keep editing mode active
+    }
+  };
+
+  const validateProjectNameDuplicate = (newName: string, currentName: string): boolean => {
+    if (newName.toLowerCase() === currentName.toLowerCase()) {
+      return false // Not a duplicate if it's the same name
+    }
+    return projects.some(project => project.name.toLowerCase() === newName.toLowerCase())
+  };
+
   const loadDefaultProjectSandboxes = async () => {
     console.log("=== LOAD DEFAULT PROJECT SANDBOXES CALLED ===")
     setDefaultProjectSandboxesLoading(true)
@@ -241,13 +288,24 @@ export function ProjectManagement() {
   }
 
   const handleDeleteProject = async (projectId: string) => {
+    const project = projects.find(p => p.project_id === projectId)
+    if (project) {
+      setDeleteDialog({ open: true, project })
+    }
+  }
+
+  const confirmDeleteProject = async () => {
+    if (!deleteDialog.project) return
+    
     try {
-      await projectService.deleteProject(projectId)
-      setProjects(projects.filter((p) => p.project_id !== projectId))
-      toast.success(t("project.deleteSuccess") || "Project deleted successfully");
+      await projectService.deleteProject(deleteDialog.project.project_id)
+      setDeleteDialog({ open: false, project: null })
+      fetchProjects()
+      toast.success(t("project.deleted_successfully") || "Project deleted successfully")
     } catch (error) {
-      console.error("Error deleting project:", error)
-      toast.error(t("project.deleteError") || "Failed to delete project");
+      console.error('Failed to delete project:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete project'
+      toast.error(errorMessage)
     }
   }
 
@@ -529,17 +587,36 @@ export function ProjectManagement() {
                     <ResizableTableCell>
                       <div>
                         <div className="font-medium flex items-center gap-2">
-                          {project.name}
+                          <EditableName
+                          value={project.name}
+                          onSave={(newName) => updateProjectName(project.project_id, newName)}
+                          onValidateDuplicate={validateProjectNameDuplicate}
+                          placeholder={t("project.namePlaceholder") || "Enter project name"}
+                          resourceType="project"
+                          className="text-sm"
+                          disabled={project.is_default}
+                        />
                           {project.is_default && (
                             <Badge variant="outline" className="text-xs">
                               {t("table.default") || "Default"}
                             </Badge>
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground">{project.project_id}</div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span className="font-mono">{project.project_id}</span>
+                          <CopyButton value={project.project_id} size="sm" variant="ghost" />
+                        </div>
                       </div>
                     </ResizableTableCell>
-                    <ResizableTableCell className="break-words">{project.description}</ResizableTableCell>
+                    <ResizableTableCell>
+                      <EditableDescription
+                        value={project.description || ""}
+                        onSave={(newDescription) => updateProjectDescription(project.project_id, newDescription)}
+                        placeholder={t("project.descriptionPlaceholder") || "Enter project description"}
+                        className="text-sm"
+                        disabled={project.is_default}
+                      />
+                    </ResizableTableCell>
                     <ResizableTableCell>
                       {project.sandbox_count}
                     </ResizableTableCell>
@@ -907,6 +984,26 @@ export function ProjectManagement() {
             </Button>
             <Button onClick={() => setSandboxManagementDialog({ open: false, project: null })}>
               {t("action.ok") || "OK"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Dialog */}
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, project: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("project.deleteProject") || "Delete Project"}</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the project "{deleteDialog.project?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog({ open: false, project: null })}>
+              {t("action.cancel") || "Cancel"}
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteProject}>
+              {t("action.delete") || "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -240,14 +240,19 @@ def get_profile(request: Request, db: Session = Depends(get_db), credentials: HT
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Determine the role to return
+    role = "root-user" if getattr(user, 'is_root_user', False) else user.role
+    
     return {
         "id": user.id,
         "account_id": user.account_id,
         "email": user.email,
-        "role": user.role,
+        "role": role,
         "full_name": user.full_name,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
+        "is_root_user": user.is_root_user,
         "created_at": user.created_at,
         "last_login": user.last_login,
         "totalSpent": 0.0,

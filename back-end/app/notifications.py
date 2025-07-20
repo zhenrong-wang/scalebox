@@ -6,7 +6,7 @@ from datetime import datetime
 
 from .database import get_db
 from .models import Notification, User
-from .auth import get_current_user, get_current_admin_user
+from .auth import get_current_user, get_current_admin_user, get_current_user_required
 from .schemas import NotificationResponse, NotificationListResponse, NotificationType
 
 
@@ -24,10 +24,10 @@ async def get_notifications(
     limit: int = 50,
     is_read: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Get user's notifications with optional filtering"""
-    query = db.query(Notification).filter(Notification.user_account_id == current_user.account_id)
+    query = db.query(Notification).filter(Notification.user_id == current_user.user_id)
 
     if is_read is not None:
         query = query.filter(Notification.is_read.is_(is_read))
@@ -35,7 +35,7 @@ async def get_notifications(
     notifications = query.order_by(Notification.created_at.desc()).offset(skip).limit(limit).all()
     total = query.count()
     unread_count = db.query(Notification).filter(
-        Notification.user_account_id == current_user.account_id,
+        Notification.user_id == current_user.user_id,
         Notification.is_read.is_(False)
     ).count()
 
@@ -43,7 +43,7 @@ async def get_notifications(
         notifications=[
             NotificationResponse(
                 id=str(notification.id),
-                user_account_id=str(notification.user_account_id),
+                user_id=str(notification.user_id),
                 title=str(notification.title),
                 message=str(notification.message),
                 type=NotificationType(notification.type),
@@ -61,11 +61,11 @@ async def get_notifications(
 @router.patch("/read-all")
 async def mark_all_notifications_read(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Mark all user's notifications as read"""
     db.query(Notification).filter(
-        Notification.user_account_id == current_user.account_id,
+        Notification.user_id == current_user.user_id,
         Notification.is_read.is_(False)
     ).update({"is_read": True})
 
@@ -77,10 +77,10 @@ async def mark_all_notifications_read(
 @router.delete("/")
 async def delete_all_notifications(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Delete all user's notifications"""
-    db.query(Notification).filter(Notification.user_account_id == current_user.account_id).delete()
+    db.query(Notification).filter(Notification.user_id == current_user.user_id).delete()
     db.commit()
 
     return {"message": "All notifications deleted successfully"}
@@ -90,12 +90,12 @@ async def delete_all_notifications(
 async def bulk_delete_notifications(
     request: BulkNotificationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Delete multiple notifications"""
     notifications = db.query(Notification).filter(
         Notification.id.in_(request.notification_ids),
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).all()
     
     if not notifications:
@@ -113,12 +113,12 @@ async def bulk_delete_notifications(
 async def bulk_mark_notifications_read(
     request: BulkNotificationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Mark multiple notifications as read"""
     notifications = db.query(Notification).filter(
         Notification.id.in_(request.notification_ids),
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).all()
     
     if not notifications:
@@ -136,12 +136,12 @@ async def bulk_mark_notifications_read(
 async def bulk_mark_notifications_unread(
     request: BulkNotificationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Mark multiple notifications as unread"""
     notifications = db.query(Notification).filter(
         Notification.id.in_(request.notification_ids),
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).all()
     
     if not notifications:
@@ -159,12 +159,12 @@ async def bulk_mark_notifications_unread(
 async def get_notification(
     notification_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Get a specific notification"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).first()
 
     if not notification:
@@ -172,7 +172,7 @@ async def get_notification(
 
     return NotificationResponse(
         id=str(notification.id),
-        user_account_id=str(notification.user_account_id),
+        user_id=str(notification.user_id),
         title=str(notification.title),
         message=str(notification.message),
         type=NotificationType(str(notification.type)),
@@ -187,12 +187,12 @@ async def get_notification(
 async def mark_notification_read(
     notification_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Mark a notification as read"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).first()
 
     if not notification:
@@ -208,12 +208,12 @@ async def mark_notification_read(
 async def mark_notification_unread(
     notification_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Mark a notification as unread"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).first()
 
     if not notification:
@@ -229,12 +229,12 @@ async def mark_notification_unread(
 async def delete_notification(
     notification_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
-    """Delete a notification"""
+    """Delete a specific notification"""
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
-        Notification.user_account_id == current_user.account_id
+        Notification.user_id == current_user.user_id
     ).first()
 
     if not notification:
@@ -265,7 +265,7 @@ async def admin_send_notification(
         raise HTTPException(status_code=404, detail="User not found")
 
     notification = Notification(
-        user_account_id=user.account_id,
+        user_id=user.user_id,
         title=title,
         message=message,
         type=notification_type,
@@ -296,7 +296,7 @@ async def admin_broadcast_notification(
     notifications = []
     for user in users:
         notification = Notification(
-            user_account_id=user.account_id,
+            user_id=user.user_id,
             title=title,
             message=message,
             type=notification_type,
@@ -325,11 +325,11 @@ async def admin_get_user_notifications(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    query = db.query(Notification).filter(Notification.user_account_id == user.account_id)
+    query = db.query(Notification).filter(Notification.user_id == user.user_id)
     notifications = query.order_by(Notification.created_at.desc()).offset(skip).limit(limit).all()
     total = query.count()
     unread_count = db.query(Notification).filter(
-        Notification.user_account_id == user.account_id,
+        Notification.user_id == user.user_id,
         Notification.is_read.is_(False)
     ).count()
 
@@ -337,7 +337,7 @@ async def admin_get_user_notifications(
         notifications=[
             NotificationResponse(
                 id=str(notification.id),
-                user_account_id=str(notification.user_account_id),
+                user_id=str(notification.user_id),
                 title=str(notification.title),
                 message=str(notification.message),
                 type=NotificationType(notification.type),
@@ -355,66 +355,41 @@ async def admin_get_user_notifications(
 @router.post("/demo")
 async def create_demo_notifications(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Create demo notifications for testing"""
-    # Check if user already has demo notifications
-    existing_count = db.query(Notification).filter(Notification.user_account_id == current_user.account_id).count()
-    
-    if existing_count > 0:
-        return {"message": "Demo notifications already exist for this user"}
-
+    # Create some demo notifications
     demo_notifications = [
         {
             "title": "Welcome to ScaleBox!",
-            "message": "Your account has been successfully created. Start by creating your first sandbox.",
-            "type": "success",
-            "related_entity_type": "sandbox",
-            "related_entity_id": "demo-sandbox-1"
-        },
-        {
-            "title": "New Template Available",
-            "message": "A new Python development template is now available for your projects.",
+            "message": "Thank you for joining our platform. We're excited to have you on board!",
             "type": "info",
-            "related_entity_type": "template",
-            "related_entity_id": "python-dev-template"
+            "is_read": False
         },
         {
-            "title": "Sandbox Timeout Warning",
-            "message": "Your sandbox 'test-project' will timeout in 30 minutes due to inactivity.",
-            "type": "warning",
-            "related_entity_type": "sandbox",
-            "related_entity_id": "test-project-sandbox"
-        },
-        {
-            "title": "API Key Created",
-            "message": "New API key 'production-key' has been successfully created.",
+            "title": "Sandbox Created",
+            "message": "Your new sandbox 'demo-sandbox-1' has been successfully created.",
             "type": "success",
-            "related_entity_type": "api_key",
-            "related_entity_id": "prod-key-123"
+            "is_read": False
         },
         {
-            "title": "Billing Update",
-            "message": "Your monthly usage has reached 80% of your current plan limit.",
+            "title": "System Maintenance",
+            "message": "Scheduled maintenance will occur on Sunday at 2 AM UTC. Services may be temporarily unavailable.",
             "type": "warning",
-            "related_entity_type": "billing",
-            "related_entity_id": "monthly-usage"
+            "is_read": True
         }
     ]
-
-    notifications = []
-    for demo in demo_notifications:
+    
+    for notification_data in demo_notifications:
         notification = Notification(
-            user_account_id=current_user.account_id,
-            title=demo["title"],
-            message=demo["message"],
-            type=demo["type"],
-            related_entity_type=demo["related_entity_type"],
-            related_entity_id=demo["related_entity_id"]
+            user_id=current_user.user_id,
+            title=notification_data["title"],
+            message=notification_data["message"],
+            type=notification_data["type"],
+            is_read=notification_data["is_read"]
         )
-        notifications.append(notification)
-
-    db.add_all(notifications)
+        db.add(notification)
+    
     db.commit()
-
+    
     return {"message": f"Created {len(demo_notifications)} demo notifications"} 

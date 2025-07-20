@@ -13,6 +13,10 @@ def generate_account_id():
     """Generate a 12-digit numeric account ID"""
     return str(secrets.randbelow(10**12)).zfill(12)
 
+def generate_user_id():
+    """Generate a user ID: usr-xxxxxxxxxxxxxxxxx (21 chars total)"""
+    return generate_resource_id("usr", 17)
+
 def generate_resource_id(prefix: str, length: int = 17) -> str:
     """Generate AWS-style resource ID: prefix-xxxxxxxxxxxxxxxxx (17 chars)"""
     chars = string.ascii_lowercase + string.digits
@@ -37,6 +41,10 @@ def generate_api_key():
     suffix = ''.join(secrets.choice(chars) for _ in range(40))
     return f"sbk-{suffix}"
 
+def generate_api_key_resource_id():
+    """Generate an API key resource ID: key-xxxxxxxxxxxxxxxxx (21 chars total)"""
+    return generate_resource_id("key", 17)
+
 def hash_api_key(api_key: str) -> str:
     """Hash an API key for secure storage"""
     return hashlib.sha256(api_key.encode()).hexdigest()
@@ -58,11 +66,47 @@ def generate_billing_id():
     return generate_resource_id("bil", 12)
 
 def generate_signup_id():
-    """Generate a signup record ID: sgn-xxxxxxxxxxxx"""
-    return generate_resource_id("sgn", 12)
+    """Generate a unique signup ID"""
+    return generate_resource_id("sgn", 22)
 
-class User(Base):
-    __tablename__ = "users"
+def generate_dedicated_signin_url() -> str:
+    """Generate a unique dedicated signin URL for non-root users"""
+    import secrets
+    import string
+    chars = string.ascii_letters + string.digits
+    token = ''.join(secrets.choice(chars) for _ in range(32))
+    return f"signin-{token}"
+
+def generate_initial_password() -> str:
+    """Generate a secure initial password for new users"""
+    import secrets
+    import string
+    # Generate a 12-character password with at least one of each type
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    symbols = "!@#$%^&*"
+    
+    # Ensure at least one of each type
+    password = [
+        secrets.choice(lowercase),
+        secrets.choice(uppercase),
+        secrets.choice(digits),
+        secrets.choice(symbols)
+    ]
+    
+    # Fill the rest with random characters
+    all_chars = lowercase + uppercase + digits + symbols
+    password.extend(secrets.choice(all_chars) for _ in range(8))
+    
+    # Shuffle the password
+    password_list = list(password)
+    secrets.SystemRandom().shuffle(password_list)
+    return ''.join(password_list)
+
+class Account(Base):
+    """Account entity - represents a tenant/organization"""
+    __tablename__ = "accounts"
     
     # Internal primary key for sorting and relationships
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -70,16 +114,55 @@ class User(Base):
     # Business key - globally unique, numeric account identifier
     account_id = Column(String(12), unique=True, nullable=False, index=True, default=generate_account_id)
     
-    # User credentials and profile
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    username = Column(String(100), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(255), nullable=True)
-    role = Column(String(50), default="user", nullable=False)  # user, admin
+    # Account details
+    name = Column(String(255), nullable=False)  # Account/Organization name
+    description = Column(Text, nullable=True)
     
     # Account status
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
+    
+    # Billing and subscription info (for future use)
+    subscription_plan = Column(String(50), default="free", nullable=False)
+    subscription_status = Column(String(50), default="active", nullable=False)
+    
+    # Audit timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    users = relationship("User", back_populates="account", foreign_keys="User.account_id")
+    root_user = relationship("User", foreign_keys="User.account_id", primaryjoin="and_(Account.account_id==User.account_id, User.is_root_user==True)", uselist=False)
+
+class User(Base):
+    """User entity - represents individual users within an account"""
+    __tablename__ = "users"
+    
+    # Internal primary key for sorting and relationships
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Business key - globally unique user identifier
+    user_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_user_id)
+    
+    # Account relationship - each user belongs to exactly one account
+    account_id = Column(String(12), ForeignKey("accounts.account_id"), nullable=False, index=True)
+    
+    # User credentials and profile
+    email = Column(String(255), nullable=False, index=True)
+    username = Column(String(100), nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=True)
+    role = Column(String(50), default="user", nullable=False)  # user, admin
+    
+    # User status within account
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_root_user = Column(Boolean, default=False, nullable=False)  # Root user of the account
+    is_verified = Column(Boolean, default=False, nullable=False)
+    
+    # Multi-user specific fields
+    dedicated_signin_url = Column(String(255), nullable=True, unique=True, index=True)  # Unique signin URL for non-root users
+    is_first_time_login = Column(Boolean, default=True, nullable=False)  # Force password change on first login
+    description = Column(Text, nullable=True)  # User description set by root user
     
     # Authentication tokens
     verification_token = Column(String(255), nullable=True)
@@ -94,14 +177,21 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
-    # Relationships - all use account_id for business logic
-    projects = relationship("Project", back_populates="owner", foreign_keys="Project.owner_account_id")
-    private_templates = relationship("Template", back_populates="owner", foreign_keys="Template.owner_account_id")
-    api_keys = relationship("ApiKey", back_populates="user", foreign_keys="ApiKey.user_account_id")
-    notifications = relationship("Notification", back_populates="user", foreign_keys="Notification.user_account_id")
-    sandboxes = relationship("Sandbox", back_populates="owner", foreign_keys="Sandbox.owner_account_id")
-    billing_records = relationship("BillingRecord", back_populates="user", foreign_keys="BillingRecord.user_account_id")
-    usage_records = relationship("SandboxUsage", foreign_keys="SandboxUsage.user_account_id")
+    # Relationships
+    account = relationship("Account", back_populates="users", foreign_keys=[account_id])
+    projects = relationship("Project", back_populates="owner", foreign_keys="Project.owner_user_id")
+    private_templates = relationship("Template", back_populates="owner", foreign_keys="Template.owner_user_id")
+    api_keys = relationship("ApiKey", back_populates="user", foreign_keys="ApiKey.user_id")
+    notifications = relationship("Notification", back_populates="user", foreign_keys="Notification.user_id")
+    sandboxes = relationship("Sandbox", back_populates="owner", foreign_keys="Sandbox.owner_user_id")
+    billing_records = relationship("BillingRecord", back_populates="user", foreign_keys="BillingRecord.user_id")
+    usage_records = relationship("SandboxUsage", foreign_keys="SandboxUsage.user_id")
+    
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('account_id', 'email', name='unique_email_per_account'),
+        UniqueConstraint('account_id', 'username', name='unique_username_per_account'),
+    )
 
 class Project(Base):
     __tablename__ = "projects"
@@ -116,8 +206,8 @@ class Project(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     
-    # Ownership - uses account_id for business relationships
-    owner_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    # Ownership - each project belongs to exactly one user
+    owner_user_id = Column(String(25), ForeignKey("users.user_id"), nullable=False, index=True)
     
     # Status and flags
     status = Column(String(20), default="active", nullable=False)  # active, archived
@@ -128,13 +218,12 @@ class Project(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    owner = relationship("User", back_populates="projects", foreign_keys=[owner_account_id])
+    owner = relationship("User", back_populates="projects", foreign_keys=[owner_user_id])
     sandboxes = relationship("Sandbox", back_populates="project", foreign_keys="Sandbox.project_id")
-    # api_keys = relationship("ApiKey", foreign_keys="ApiKey.project_id")  # REMOVE
     
     # Constraints
     __table_args__ = (
-        UniqueConstraint('owner_account_id', 'name', name='unique_project_name_per_account'),
+        UniqueConstraint('owner_user_id', 'name', name='unique_project_name_per_user'),
     )
 
 class Template(Base):
@@ -159,7 +248,7 @@ class Template(Base):
     # Visibility and ownership
     is_official = Column(Boolean, nullable=False, default=False)  # Official templates (admin-managed)
     is_public = Column(Boolean, nullable=False, default=False)  # Public templates
-    owner_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=True, index=True)  # NULL for official templates
+    owner_user_id = Column(String(25), ForeignKey("users.user_id"), nullable=True, index=True)  # NULL for official templates
     
     # Repository and metadata
     repository_url = Column(String(500), nullable=False)
@@ -170,7 +259,7 @@ class Template(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    owner = relationship("User", back_populates="private_templates", foreign_keys=[owner_account_id])
+    owner = relationship("User", back_populates="private_templates", foreign_keys=[owner_user_id])
     
     # Properties to map database fields to response schema fields
     @property
@@ -196,7 +285,7 @@ class Template(Base):
     
     # Constraints
     __table_args__ = (
-        UniqueConstraint('owner_account_id', 'name', name='unique_template_name_per_owner'),
+        UniqueConstraint('owner_user_id', 'name', name='unique_template_name_per_owner'),
     )
 
 class ApiKey(Base):
@@ -208,8 +297,11 @@ class ApiKey(Base):
     # Business identifier (the actual API key)
     api_key = Column(String(50), unique=True, nullable=False, index=True, default=generate_api_key)
     
-    # Ownership - uses account_id for business relationships
-    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    # Resource identifier (AWS-style resource ID)
+    key_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_api_key_resource_id)
+    
+    # Ownership - each API key belongs to exactly one user
+    user_id = Column(String(25), ForeignKey("users.user_id"), nullable=False, index=True)
     
     # Key details
     name = Column(String(255), nullable=False)
@@ -229,12 +321,11 @@ class ApiKey(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    user = relationship("User", back_populates="api_keys", foreign_keys=[user_account_id])
-    # project = relationship("Project", foreign_keys=[project_id])  # REMOVE
+    user = relationship("User", back_populates="api_keys", foreign_keys=[user_id])
     
     # Constraints
     __table_args__ = (
-        UniqueConstraint('user_account_id', 'name', name='unique_api_key_name_per_user'),
+        UniqueConstraint('user_id', 'name', name='unique_api_key_name_per_user'),
     )
 
 class Notification(Base):
@@ -246,8 +337,8 @@ class Notification(Base):
     # Business identifier
     notification_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_notification_id)
     
-    # Ownership - uses account_id for business relationships
-    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    # Ownership - each notification belongs to exactly one user
+    user_id = Column(String(25), ForeignKey("users.user_id"), nullable=False, index=True)
     
     # Notification content
     title = Column(String(255), nullable=False)
@@ -265,7 +356,7 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
-    user = relationship("User", back_populates="notifications", foreign_keys=[user_account_id])
+    user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
 class Sandbox(Base):
     __tablename__ = "sandboxes"
@@ -280,10 +371,10 @@ class Sandbox(Base):
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     
-    # Relationships - all use business keys
+    # Relationships - each sandbox belongs to exactly one project and one user
     template_id = Column(String(25), ForeignKey("templates.template_id"), nullable=False, index=True)
-    owner_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
-    project_id = Column(String(25), ForeignKey("projects.project_id"), nullable=True, index=True)
+    owner_user_id = Column(String(25), ForeignKey("users.user_id"), nullable=False, index=True)
+    project_id = Column(String(25), ForeignKey("projects.project_id"), nullable=False, index=True)  # Now required
     
     # Configuration
     cpu_spec = Column(Float, nullable=False, default=1.0)  # 1-8 vCPU
@@ -306,7 +397,7 @@ class Sandbox(Base):
     recycled_at = Column(DateTime, nullable=True)
     
     # Relationships
-    owner = relationship("User", back_populates="sandboxes", foreign_keys=[owner_account_id])
+    owner = relationship("User", back_populates="sandboxes", foreign_keys=[owner_user_id])
     project = relationship("Project", back_populates="sandboxes", foreign_keys=[project_id])
     template = relationship("Template", foreign_keys=[template_id])
     usage_records = relationship("SandboxUsage", back_populates="sandbox", foreign_keys="SandboxUsage.sandbox_id")
@@ -314,7 +405,7 @@ class Sandbox(Base):
     
     # Constraints
     __table_args__ = (
-        UniqueConstraint('owner_account_id', 'name', name='unique_sandbox_name_per_owner'),
+        UniqueConstraint('owner_user_id', 'name', name='unique_sandbox_name_per_owner'),
     )
 
 class SandboxUsage(Base):
@@ -328,7 +419,7 @@ class SandboxUsage(Base):
     
     # Relationships - all use business keys
     sandbox_id = Column(String(25), ForeignKey("sandboxes.sandbox_id"), nullable=False, index=True)
-    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    user_id = Column(String(25), ForeignKey("users.user_id"), nullable=False, index=True)
     
     # Usage tracking
     start_time = Column(DateTime, nullable=False, index=True)
@@ -347,7 +438,7 @@ class SandboxUsage(Base):
     
     # Relationships
     sandbox = relationship("Sandbox", back_populates="usage_records", foreign_keys=[sandbox_id])
-    user = relationship("User", foreign_keys=[user_account_id])
+    user = relationship("User", foreign_keys=[user_id])
 
 class SandboxMetrics(Base):
     __tablename__ = "sandbox_metrics"
@@ -385,7 +476,7 @@ class BillingRecord(Base):
     billing_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_billing_id)
     
     # Relationships - all use business keys
-    user_account_id = Column(String(12), ForeignKey("users.account_id"), nullable=False, index=True)
+    user_id = Column(String(25), ForeignKey("users.user_id"), nullable=False, index=True)
     project_id = Column(String(25), ForeignKey("projects.project_id"), nullable=True, index=True)
     sandbox_id = Column(String(25), ForeignKey("sandboxes.sandbox_id"), nullable=True, index=True)
     
@@ -403,7 +494,7 @@ class BillingRecord(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
-    user = relationship("User", back_populates="billing_records", foreign_keys=[user_account_id])
+    user = relationship("User", back_populates="billing_records", foreign_keys=[user_id])
 
 class PendingSignup(Base):
     __tablename__ = "pending_signups"
@@ -427,35 +518,45 @@ class PendingSignup(Base):
 
 # Comprehensive indexing for performance and data integrity
 # Account-level indexes for multi-tenancy
+Index('idx_account_account_id', Account.account_id)
+Index('idx_account_name', Account.name)
+Index('idx_account_active', Account.is_active)
+Index('idx_account_verified', Account.is_verified)
+
+# User indexes
 Index('idx_user_account_id', User.account_id)
+Index('idx_user_user_id', User.user_id)
 Index('idx_user_email', User.email)
 Index('idx_user_username', User.username)
+Index('idx_user_active', User.is_active)
+Index('idx_user_root_user', User.is_root_user)
+Index('idx_user_verified', User.is_verified)
 
 # Project indexes
-Index('idx_project_owner_account', Project.owner_account_id)
+Index('idx_project_owner_user', Project.owner_user_id)
 Index('idx_project_status', Project.status)
 Index('idx_project_created', Project.created_at)
 
 # Template indexes
-Index('idx_template_owner_account', Template.owner_account_id)
+Index('idx_template_owner_user', Template.owner_user_id)
 Index('idx_template_public', Template.is_public)
 Index('idx_template_official', Template.is_official)
 Index('idx_template_category', Template.category)
 Index('idx_template_language', Template.language)
 
 # API Key indexes
-Index('idx_api_key_user_account', ApiKey.user_account_id)
+Index('idx_api_key_user_id', ApiKey.user_id)
 Index('idx_api_key_active', ApiKey.is_active)
 Index('idx_api_key_last_used', ApiKey.last_used_at)
 
 # Notification indexes
-Index('idx_notification_user_account', Notification.user_account_id)
+Index('idx_notification_user_id', Notification.user_id)
 Index('idx_notification_read', Notification.is_read)
 Index('idx_notification_created', Notification.created_at)
 Index('idx_notification_type', Notification.type)
 
 # Sandbox indexes
-Index('idx_sandbox_owner_account', Sandbox.owner_account_id)
+Index('idx_sandbox_owner_user', Sandbox.owner_user_id)
 Index('idx_sandbox_project', Sandbox.project_id)
 Index('idx_sandbox_template', Sandbox.template_id)
 Index('idx_sandbox_status', Sandbox.status)
@@ -464,8 +565,8 @@ Index('idx_sandbox_started', Sandbox.started_at)
 Index('idx_sandbox_stopped', Sandbox.stopped_at)
 
 # Usage indexes
+Index('idx_usage_user_id', SandboxUsage.user_id)
 Index('idx_usage_sandbox', SandboxUsage.sandbox_id)
-Index('idx_usage_user_account', SandboxUsage.user_account_id)
 Index('idx_usage_start_time', SandboxUsage.start_time)
 Index('idx_usage_end_time', SandboxUsage.end_time)
 
@@ -474,7 +575,7 @@ Index('idx_metrics_sandbox', SandboxMetrics.sandbox_id)
 Index('idx_metrics_timestamp', SandboxMetrics.timestamp)
 
 # Billing indexes
-Index('idx_billing_user_account', BillingRecord.user_account_id)
+Index('idx_billing_user_id', BillingRecord.user_id)
 Index('idx_billing_project', BillingRecord.project_id)
 Index('idx_billing_sandbox', BillingRecord.sandbox_id)
 Index('idx_billing_date', BillingRecord.billing_date)

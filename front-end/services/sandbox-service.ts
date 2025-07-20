@@ -23,6 +23,15 @@ const getAuthHeaders = () => {
 
 // Helper function to handle API responses
 const handleResponse = async (response: Response) => {
+  if (response.status === 401) {
+    // Clear any existing auth token
+    localStorage.removeItem('auth-token');
+    // Set auth state to signin by dispatching a custom event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth-required'));
+    }
+    throw new Error('Authentication required. Please log in.');
+  }
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
@@ -184,7 +193,7 @@ export class SandboxService {
   // Admin endpoints
   static async getAllSandboxes(params?: {
     status?: string
-    owner_account_id?: string
+    owner_user_id?: string
     project_id?: string
     search?: string
     sort_by?: string
@@ -314,7 +323,7 @@ export class SandboxService {
       name: apiData.name,
       description: apiData.description || '',
       status: apiData.status,
-      user_account_id: apiData.user_account_id,
+      user_account_id: apiData.user_id, // Backend returns user_id, but frontend interface still uses user_account_id
       userName: apiData.user_name,
       userEmail: apiData.user_email,
       region: apiData.region,

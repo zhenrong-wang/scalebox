@@ -13,6 +13,7 @@ import { useLanguage } from "../../contexts/language-context"
 import { useEffect, useState } from "react"
 import { templateService, Template } from "../../services/template-service"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
+import { CopyButton } from "@/components/ui/copy-button"
 
 interface SandboxDetailsModalProps {
   sandbox: Sandbox
@@ -93,6 +94,13 @@ export function SandboxDetailsModal({ sandbox, isOpen, onClose }: SandboxDetails
                     <button className="underline text-blue-600 hover:text-blue-800" onClick={() => setShowTemplateDialog(true)}>
                       {template ? template.name : t("sandbox.deletedTemplate")}
                     </button>
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <div className="text-xs text-muted-foreground">{t("admin.id") || "ID"}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">{sandbox.id}</span>
+                    <CopyButton value={sandbox.id} size="sm" variant="ghost" />
                   </div>
                 </div>
               </div>

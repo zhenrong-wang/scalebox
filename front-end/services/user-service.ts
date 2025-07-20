@@ -104,6 +104,12 @@ export class UserService {
     const res = await fetch(`${this.API_BASE}/api/users/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (res.status === 401) {
+      // Clear invalid token
+      localStorage.removeItem("auth-token");
+      localStorage.removeItem("user-data");
+      return null;
+    }
     if (!res.ok) return null;
     const data = await res.json();
     // Store user data for admin detection

@@ -234,7 +234,11 @@ export function AccountSettings({ isOpen, onClose, onLogout }: AccountSettingsPr
               <div>
                 <Label className="text-sm font-medium">Role</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge className={userData?.role === "admin" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}>
+                  <Badge className={
+                    userData?.role === "admin" ? "bg-purple-100 text-purple-800" :
+                    userData?.role === "root-user" ? "bg-orange-100 text-orange-800" :
+                    "bg-blue-100 text-blue-800"
+                  }>
                     {userData?.role || 'user'}
                   </Badge>
                 </div>

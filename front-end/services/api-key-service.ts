@@ -49,6 +49,23 @@ export class ApiKeyService {
     };
   }
 
+  private static async handleResponse(response: Response) {
+    if (response.status === 401) {
+      // Clear any existing auth token
+      localStorage.removeItem('auth-token');
+      // Set auth state to signin by dispatching a custom event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth-required'));
+      }
+      throw new Error('Authentication required. Please log in.');
+    }
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  }
+
   static async createApiKey(request: CreateApiKeyRequest): Promise<{ message: string; api_key: string; key_id: string; prefix: string }> {
     const response = await fetch(`${this.API_BASE}/api/api-keys/`, {
       method: "POST",
@@ -56,12 +73,7 @@ export class ApiKeyService {
       body: JSON.stringify(request),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to create API key");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async listApiKeys(): Promise<ApiKey[]> {
@@ -69,12 +81,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to fetch API keys");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async getApiKey(keyId: string): Promise<ApiKey> {
@@ -82,12 +89,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to fetch API key");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async updateApiKey(keyId: string, request: UpdateApiKeyRequest): Promise<ApiKey> {
@@ -97,12 +99,7 @@ export class ApiKeyService {
       body: JSON.stringify(request),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to update API key");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async deleteApiKey(keyId: string): Promise<{ message: string }> {
@@ -111,12 +108,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to delete API key");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async toggleApiKeyStatus(keyId: string): Promise<{ message: string }> {
@@ -125,12 +117,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to toggle API key status");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
 
@@ -140,12 +127,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to fetch API key usage");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   // Admin endpoints
@@ -154,12 +136,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to fetch all API keys");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async getApiKeyStats(): Promise<ApiKeyStats> {
@@ -167,12 +144,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to fetch API key stats");
-    }
-
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   static async adminApiKeyAction(keyId: string, action: "enable" | "disable" | "delete", reason?: string): Promise<{ message: string }> {
@@ -181,11 +153,7 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ action, reason }),
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || `Failed to ${action} API key`);
-    }
-    return await response.json();
+    return await this.handleResponse(response);
   }
 
   // Utility functions

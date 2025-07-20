@@ -138,7 +138,7 @@ alembic.ini
 
 # Temporary files
 *.tmp
-*.temp
+*.temp 
 
 # Test files with sensitive data
 test-*.html

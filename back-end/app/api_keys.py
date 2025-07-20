@@ -18,11 +18,73 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from .users import User, verify_admin_token
 from .database import get_db
-from .models import ApiKey
+from .models import ApiKey, Project, Sandbox, Template
 import aiosmtplib
 from email.message import EmailMessage
 
 router = APIRouter(tags=["api-keys"])
+
+# Permission checking functions
+def check_root_user_permissions(current_user: User, target_user: User) -> bool:
+    """Check if current user has permission to access target user's resources"""
+    # Root users can access any resource in their account
+    if getattr(current_user, 'is_root_user', False) and getattr(current_user, 'account_id', None) == getattr(target_user, 'account_id', None):
+        return True
+    # Users can only access their own resources
+    if getattr(current_user, 'user_id', None) == getattr(target_user, 'user_id', None):
+        return True
+    return False
+
+def check_project_access(current_user: User, project: Project) -> bool:
+    """Check if current user has access to a project"""
+    # Root users can access any project in their account
+    if getattr(current_user, 'is_root_user', False) and getattr(current_user, 'account_id', None) == getattr(project.owner, 'account_id', None):
+        return True
+    # Users can only access their own projects
+    if getattr(current_user, 'user_id', None) == getattr(project, 'owner_user_id', None):
+        return True
+    return False
+
+def check_sandbox_access(current_user: User, sandbox: Sandbox) -> bool:
+    """Check if current user has access to a sandbox"""
+    # Root users can access any sandbox in their account
+    if getattr(current_user, 'is_root_user', False) and getattr(current_user, 'account_id', None) == getattr(sandbox.owner, 'account_id', None):
+        return True
+    # Users can only access their own sandboxes
+    if getattr(current_user, 'user_id', None) == getattr(sandbox, 'owner_user_id', None):
+        return True
+    return False
+
+def check_template_access(current_user: User, template: Template) -> bool:
+    """Check if current user has access to a template"""
+    # Official and public templates are accessible to everyone
+    if getattr(template, 'is_official', False) or getattr(template, 'is_public', False):
+        return True
+    # Root users can access any template in their account
+    if getattr(current_user, 'is_root_user', False) and template.owner and getattr(current_user, 'account_id', None) == getattr(template.owner, 'account_id', None):
+        return True
+    # Users can only access their own templates
+    if getattr(template, 'owner_user_id', None) == getattr(current_user, 'user_id', None):
+        return True
+    return False
+
+def get_user_projects_query(current_user: User, db: Session):
+    """Get projects query based on user permissions"""
+    if getattr(current_user, 'is_root_user', False):
+        # Root users can see all projects in their account
+        return db.query(Project).join(User).filter(User.account_id == getattr(current_user, 'account_id', None))
+    else:
+        # Non-root users can only see their own projects
+        return db.query(Project).filter(Project.owner_user_id == getattr(current_user, 'user_id', None))
+
+def get_user_sandboxes_query(current_user: User, db: Session):
+    """Get sandboxes query based on user permissions"""
+    if getattr(current_user, 'is_root_user', False):
+        # Root users can see all sandboxes in their account
+        return db.query(Sandbox).join(User).filter(User.account_id == getattr(current_user, 'account_id', None))
+    else:
+        # Non-root users can only see their own sandboxes
+        return db.query(Sandbox).filter(Sandbox.owner_user_id == getattr(current_user, 'user_id', None))
 
 # Models
 
@@ -100,19 +162,39 @@ def get_api_key_from_header(credentials: HTTPAuthorizationCredentials = Depends(
 
 def get_api_key_user(api_key: str = Depends(get_api_key_from_header), db: Session = Depends(get_db)) -> User:
     """Get user from API key"""
-    # Find the API key
-    db_api_key = db.query(ApiKey).filter(
-        ApiKey.key_hash == hashlib.sha256(api_key.encode()).hexdigest(),
-        ApiKey.is_active.is_(True)
-    ).first()
-    
+    # Find the API key in the database
+    db_api_key = db.query(ApiKey).filter(ApiKey.api_key == api_key).first()
     if not db_api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # Get user using account_id
-    user = db.query(User).filter(User.account_id == db_api_key.user_account_id).first()
-    if not user or not getattr(user, 'is_active', False):
-        raise HTTPException(status_code=401, detail="User not found or inactive")
+    # Check if the API key is active
+    if not getattr(db_api_key, 'is_active', False):
+        raise HTTPException(
+            status_code=401,
+            detail="API key is disabled",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Get the user associated with this API key
+    user = db.query(User).filter(User.user_id == db_api_key.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if the user is active
+    if not getattr(user, 'is_active', False):
+        raise HTTPException(
+            status_code=401,
+            detail="User account is disabled",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     # Update last used timestamp
     setattr(db_api_key, 'last_used_at', datetime.datetime.utcnow())
@@ -257,30 +339,36 @@ def create_api_key(
 ):
     # Enforce max 5 keys per user
     existing_keys = db.query(ApiKey).filter(
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.user_id == current_user.user_id
     ).count()
     if existing_keys >= 5:
         raise HTTPException(status_code=400, detail="Maximum 5 API keys allowed per user")
     
+    # Validate name length (2-255 characters)
+    if len(request.name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="API key name must be at least 2 characters")
+    if len(request.name.strip()) > 255:
+        raise HTTPException(status_code=400, detail="API key name must be 255 characters or less")
+    
     # Enforce unique name per user
     if db.query(ApiKey).filter(
-        ApiKey.user_account_id == current_user.account_id, 
-        ApiKey.name == request.name
+        ApiKey.user_id == current_user.user_id, 
+        ApiKey.name == request.name.strip()
     ).first():
         raise HTTPException(status_code=400, detail="API key name must be unique for your account")
     
     full_key, key_hash, prefix = generate_api_key()
     api_key = ApiKey(
         api_key=full_key,
-        user_account_id=current_user.account_id,
-        name=request.name,
+        user_id=current_user.user_id,
+        name=request.name.strip(),
         description=request.description,
         key_hash=key_hash,
         is_active=True
     )
     db.add(api_key)
     db.commit()
-    return {"api_key": full_key, "key_id": api_key.api_key, "prefix": prefix}
+    return {"api_key": full_key, "key_id": api_key.key_id, "prefix": prefix}
 
 @router.get("/", response_model=List[ApiKeyResponse])
 def list_api_keys(
@@ -288,13 +376,13 @@ def list_api_keys(
     db: Session = Depends(get_db)
 ):
     """List API keys for the current user"""
-    api_keys = db.query(ApiKey).filter(ApiKey.user_account_id == current_user.account_id).all()
+    api_keys = db.query(ApiKey).filter(ApiKey.user_id == current_user.user_id).all()
     
     response_keys = []
     for key in api_keys:
         response_keys.append(ApiKeyResponse(
             id=str(getattr(key, 'id')),
-            key_id=getattr(key, 'api_key'),
+            key_id=getattr(key, 'key_id'),
             name=getattr(key, 'name'),
             description=getattr(key, 'description'),
             prefix=getattr(key, 'api_key')[:16] if getattr(key, 'api_key') else '',
@@ -314,7 +402,7 @@ def test_api_key_auth(
     """Test endpoint for API key authentication"""
     return {
         "message": "API key authentication successful",
-        "user_account_id": current_user.account_id,
+        "user_id": current_user.user_id,
         "user_email": current_user.email,
         "user_role": current_user.role
     }
@@ -327,8 +415,8 @@ def get_api_key(
 ):
     """Get a specific API key for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.api_key == key_id,
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.user_id
     ).first()
     
     if not api_key:
@@ -336,7 +424,7 @@ def get_api_key(
     
     return ApiKeyResponse(
         id=str(getattr(api_key, 'id')),
-        key_id=getattr(api_key, 'api_key'),
+        key_id=getattr(api_key, 'key_id'),
         name=getattr(api_key, 'name'),
         description=getattr(api_key, 'description'),
         prefix=getattr(api_key, 'api_key')[:16] if getattr(api_key, 'api_key') else '',
@@ -355,8 +443,8 @@ def update_api_key(
 ):
     """Update an API key for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.api_key == key_id,
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.user_id
     ).first()
     
     if not api_key:
@@ -364,9 +452,15 @@ def update_api_key(
     
     # Enforce unique name per user if updating name
     if request.name is not None and request.name != api_key.name:
-        if db.query(ApiKey).filter(ApiKey.user_account_id == current_user.account_id, ApiKey.name == request.name).first():
+        # Validate name length (2-255 characters)
+        if len(request.name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="API key name must be at least 2 characters")
+        if len(request.name.strip()) > 255:
+            raise HTTPException(status_code=400, detail="API key name must be 255 characters or less")
+        
+        if db.query(ApiKey).filter(ApiKey.user_id == current_user.user_id, ApiKey.name == request.name.strip()).first():
             raise HTTPException(status_code=400, detail="API key name must be unique for your account.")
-        setattr(api_key, 'name', request.name)
+        setattr(api_key, 'name', request.name.strip())
     
     if request.description is not None:
         setattr(api_key, 'description', request.description)
@@ -376,7 +470,7 @@ def update_api_key(
     
     return ApiKeyResponse(
         id=str(getattr(api_key, 'id')),
-        key_id=getattr(api_key, 'api_key'),
+        key_id=getattr(api_key, 'key_id'),
         name=getattr(api_key, 'name'),
         description=getattr(api_key, 'description'),
         prefix=getattr(api_key, 'api_key')[:16] if getattr(api_key, 'api_key') else '',
@@ -393,8 +487,8 @@ def delete_api_key(
 ):
     """Delete an API key for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.api_key == key_id,
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.user_id
     ).first()
     
     if not api_key:
@@ -415,8 +509,8 @@ def toggle_api_key_status(
 ):
     """Toggle API key status (enable/disable) for the current user"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.api_key == key_id,
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.user_id
     ).first()
     
     if not api_key:
@@ -439,8 +533,8 @@ def get_full_api_key(
 ):
     """Get the full API key for display (only for newly created keys)"""
     api_key = db.query(ApiKey).filter(
-        ApiKey.api_key == key_id,
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.user_id
     ).first()
     
     if not api_key:
@@ -466,8 +560,8 @@ def get_api_key_usage(
     """Get usage history for an API key"""
     # Verify the API key belongs to the current user
     api_key = db.query(ApiKey).filter(
-        ApiKey.api_key == key_id,
-        ApiKey.user_account_id == current_user.account_id
+        ApiKey.key_id == key_id,
+        ApiKey.user_id == current_user.user_id
     ).first()
     
     if not api_key:
@@ -505,22 +599,22 @@ def get_all_api_keys(
     
     # Get user emails for display
     user_emails = {}
-    user_account_ids = list(set(key.user_account_id for key in api_keys))
-    users = db.query(User).filter(User.account_id.in_(user_account_ids)).all()
+    user_ids = list(set(key.user_id for key in api_keys))
+    users = db.query(User).filter(User.user_id.in_(user_ids)).all()
     for user in users:
-        user_emails[user.account_id] = user.email
+        user_emails[user.user_id] = user.email
     
     return [
         ApiKeyResponse(
             id=str(getattr(key, 'id')),
-            key_id=getattr(key, 'api_key'),
+            key_id=getattr(key, 'key_id'),
             name=getattr(key, 'name'),
             description=getattr(key, 'description'),
             prefix=getattr(key, 'api_key')[:16],
             is_active=getattr(key, 'is_active'),
             last_used_at=getattr(key, 'last_used_at'),
             created_at=getattr(key, 'created_at'),
-            user_email=user_emails.get(getattr(key, 'user_account_id'), None),
+            user_email=user_emails.get(getattr(key, 'user_id'), None),
         )
         for key in api_keys
     ]
@@ -561,12 +655,12 @@ async def admin_api_key_action(
     db: Session = Depends(get_db)
 ):
     """Admin action on API key (disable/delete) with notification"""
-    api_key = db.query(ApiKey).filter(ApiKey.api_key == key_id).first()
+    api_key = db.query(ApiKey).filter(ApiKey.key_id == key_id).first()
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
     
     # Get the user who owns this key
-    user = db.query(User).filter(User.account_id == api_key.user_account_id).first()
+    user = db.query(User).filter(User.user_id == api_key.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Key owner not found")
     

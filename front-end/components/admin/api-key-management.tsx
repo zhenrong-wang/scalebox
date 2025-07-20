@@ -17,6 +17,9 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { ApiKeyService } from "../../services/api-key-service"
 import type { ApiKey } from "../../services/api-key-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CopyButton } from "@/components/ui/copy-button"
+import { EditableDescription } from "@/components/ui/editable-description"
+import { EditableName } from "@/components/ui/editable-name"
 
 export function AdminApiKeyManagement() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
@@ -69,6 +72,49 @@ export function AdminApiKeyManagement() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const updateApiKeyDescription = async (keyId: string, newDescription: string) => {
+    setError("")
+    try {
+      await ApiKeyService.updateApiKey(keyId, { description: newDescription })
+      setApiKeys((prev) =>
+        prev.map((key) =>
+          key.key_id === keyId ? { ...key, description: newDescription } : key
+        )
+      )
+      setSuccess(t("action.updated") || "Updated!")
+      setTimeout(() => setSuccess(""), 1500)
+    } catch (e: unknown) {
+      const error = e as Error
+      setError(error.message || "Failed to update API key description")
+      throw error // Re-throw to keep editing mode active
+    }
+  }
+
+  const updateApiKeyName = async (keyId: string, newName: string) => {
+    setError("")
+    try {
+      await ApiKeyService.updateApiKey(keyId, { name: newName })
+      setApiKeys((prev) =>
+        prev.map((key) =>
+          key.key_id === keyId ? { ...key, name: newName } : key
+        )
+      )
+      setSuccess(t("action.updated") || "Updated!")
+      setTimeout(() => setSuccess(""), 1500)
+    } catch (e: unknown) {
+      const error = e as Error
+      setError(error.message || "Failed to update API key name")
+      throw error // Re-throw to keep editing mode active
+    }
+  }
+
+  const validateApiKeyNameDuplicate = (newName: string, currentName: string): boolean => {
+    if (newName.toLowerCase() === currentName.toLowerCase()) {
+      return false // Not a duplicate if it's the same name
+    }
+    return apiKeys.some(key => key.name.toLowerCase() === newName.toLowerCase())
   }
 
   const fetchStats = async () => {
@@ -517,8 +563,24 @@ export function AdminApiKeyManagement() {
               <TableBody>
                 {filteredApiKeys.map((key) => (
                   <TableRow key={key.key_id}>
-                    <ResizableTableCell>{key.name}</ResizableTableCell>
-                    <ResizableTableCell className="break-words">{key.description || "-"}</ResizableTableCell>
+                    <ResizableTableCell>
+                    <EditableName
+                      value={key.name}
+                      onSave={(newName) => updateApiKeyName(key.key_id, newName)}
+                      onValidateDuplicate={validateApiKeyNameDuplicate}
+                      placeholder={t("apiKey.keyName") || "Enter key name"}
+                      resourceType="API key"
+                      className="text-sm"
+                    />
+                  </ResizableTableCell>
+                    <ResizableTableCell>
+                    <EditableDescription
+                      value={key.description || ""}
+                      onSave={(newDescription) => updateApiKeyDescription(key.key_id, newDescription)}
+                      placeholder={t("apiKey.keyDescription") || "Enter description"}
+                      className="text-sm"
+                    />
+                  </ResizableTableCell>
                     <ResizableTableCell>
                       <Badge variant={key.is_active ? "default" : "destructive"}>
                         {key.is_active ? "Active" : "Disabled"}
@@ -533,6 +595,7 @@ export function AdminApiKeyManagement() {
                         <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
                           {key.prefix}...
                         </div>
+                        <CopyButton value={key.key_id} size="sm" variant="ghost" />
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         {t("apiKey.adminViewNote") || "Full key not available in admin view"}

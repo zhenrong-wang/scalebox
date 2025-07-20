@@ -15,9 +15,11 @@ const handleResponse = async (response: Response) => {
   if (!response.ok) {
     // Handle authentication errors specifically
     if (response.status === 401) {
-      // Clear invalid token and redirect to login
+      // Clear invalid token and set auth state to signin
       localStorage.removeItem('auth-token')
-      window.location.href = '/login'
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth-required'));
+      }
       throw new Error('Authentication required. Please log in again.')
     }
     
@@ -53,7 +55,6 @@ export interface TemplateCreateRequest {
   memory_spec: number;
   is_official?: boolean;
   is_public?: boolean;
-  repository_url: string;
   tags?: string[];
 }
 
@@ -205,4 +206,4 @@ export class TemplateService {
   }
 }
 
-export const templateService = new TemplateService(); 
+export const templateService = new TemplateService();

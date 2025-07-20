@@ -33,6 +33,7 @@ interface SidebarProps {
   sidebarWidth: number
   onLogout: () => void
   isAdmin: boolean
+  isRootUser: boolean
 }
 
 export function Sidebar({
@@ -43,6 +44,7 @@ export function Sidebar({
   sidebarWidth,
   onLogout,
   isAdmin,
+  isRootUser,
 }: SidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const { t } = useLanguage()
@@ -65,7 +67,22 @@ export function Sidebar({
     { id: "admin-api-keys", label: t("nav.apiKeys"), icon: Key },
   ]
 
-  const menuItems = isAdmin ? adminMenuItems : userMenuItems
+  const rootUserMenuItems = [
+    { id: "projects", label: t("nav.projects"), icon: FolderOpen },
+    { id: "sandboxes", label: t("nav.sandboxes"), icon: Code },
+    { id: "templates", label: t("nav.templates"), icon: FileText },
+    { id: "users", label: t("nav.users"), icon: Users },
+    { id: "api-key", label: t("nav.apiKeys"), icon: Key },
+    { id: "budget", label: t("nav.budget"), icon: CreditCard },
+    { id: "billings", label: t("nav.billings"), icon: Receipt },
+  ]
+
+  let menuItems = userMenuItems;
+  if (isAdmin) {
+    menuItems = adminMenuItems;
+  } else if (isRootUser) {
+    menuItems = rootUserMenuItems;
+  }
 
   const MenuItem = ({ item }: { item: any }) => {
     const isActive = currentPage === item.id

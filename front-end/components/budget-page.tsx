@@ -17,9 +17,12 @@ import { useLanguage } from "../contexts/language-context"
 import { tReplace } from "../lib/i18n"
 import { PageLayout } from "@/components/ui/page-layout"
 import { SearchFilters } from "@/components/ui/search-filters"
+import { EditableName } from "@/components/ui/editable-name"
+import { CopyButton } from "@/components/ui/copy-button"
 
 interface Budget {
   id: string
+  budget_id: string // Resource ID for display
   name: string
   limit: number
   spent: number
@@ -32,6 +35,7 @@ interface Budget {
 const mockBudgets: Budget[] = [
   {
     id: "budget-001",
+    budget_id: "bud-abc123def456789",
     name: "Monthly Sandbox Budget",
     limit: 200,
     spent: 145.5,
@@ -42,6 +46,7 @@ const mockBudgets: Budget[] = [
   },
   {
     id: "budget-002",
+    budget_id: "bud-def456ghi789012",
     name: "API Usage Budget",
     limit: 100,
     spent: 45.2,
@@ -52,6 +57,7 @@ const mockBudgets: Budget[] = [
   },
   {
     id: "budget-003",
+    budget_id: "bud-ghi789jkl012345",
     name: "Development Budget",
     limit: 50,
     spent: 65.8,
@@ -130,6 +136,7 @@ export function BudgetPage() {
     } else {
       const newBudget: Budget = {
         id: `budget-${Date.now()}`,
+        budget_id: `bud-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         ...budgetData,
       }
       setBudgets((prev) => [newBudget, ...prev])
@@ -169,6 +176,22 @@ export function BudgetPage() {
       default:
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
     }
+  }
+
+  const updateBudgetName = async (budgetId: string, newName: string) => {
+    // In a real implementation, this would call the backend API
+    setBudgets((prev) =>
+      prev.map((budget) =>
+        budget.id === budgetId ? { ...budget, name: newName } : budget
+      )
+    )
+  }
+
+  const validateBudgetNameDuplicate = (newName: string, currentName: string): boolean => {
+    if (newName.toLowerCase() === currentName.toLowerCase()) {
+      return false // Not a duplicate if it's the same name
+    }
+    return budgets.some(budget => budget.name.toLowerCase() === newName.toLowerCase())
   }
 
   const totalBudget = budgets.reduce((sum, budget) => sum + budget.limit, 0)
@@ -320,7 +343,7 @@ export function BudgetPage() {
             >
               <TableHeader>
                 <TableRow>
-                  <ResizableTableHead columnId="name" defaultWidth={150}>
+                  <ResizableTableHead columnId="name" defaultWidth={200}>
                     {t("table.name")}
                   </ResizableTableHead>
                   <ResizableTableHead columnId="limit" defaultWidth={100}>
@@ -351,7 +374,22 @@ export function BudgetPage() {
                   const percentage = (budget.spent / budget.limit) * 100
                   return (
                     <TableRow key={budget.id}>
-                      <ResizableTableCell className="font-medium">{budget.name}</ResizableTableCell>
+                      <ResizableTableCell>
+                        <div>
+                          <EditableName
+                            value={budget.name}
+                            onSave={(newName) => updateBudgetName(budget.id, newName)}
+                            onValidateDuplicate={validateBudgetNameDuplicate}
+                            placeholder={t("budget.namePlaceholder") || "Enter budget name"}
+                            resourceType="budget"
+                            className="text-sm"
+                          />
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <span className="font-mono">{budget.budget_id}</span>
+                            <CopyButton value={budget.budget_id} size="sm" variant="ghost" />
+                          </div>
+                        </div>
+                      </ResizableTableCell>
                       <ResizableTableCell>${budget.limit.toFixed(2)}</ResizableTableCell>
                       <ResizableTableCell>${budget.spent.toFixed(2)}</ResizableTableCell>
                       <ResizableTableCell>

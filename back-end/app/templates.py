@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 
 from .database import get_db
-from .models import Template, Notification, User
+from .models import Template, Notification, User, generate_template_id
 from .auth import get_current_user, get_current_user_required, get_current_admin_user
 from .schemas import (
     TemplateCreate, TemplateUpdate, TemplateResponse,
@@ -57,7 +57,7 @@ async def get_templates(
     is_official: Optional[bool] = None,
     is_public: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Get templates with filtering - users can see official/public templates and their own private templates"""
     query = db.query(Template)
@@ -73,11 +73,11 @@ async def get_templates(
         query = query.filter(Template.is_public.is_(is_public))
 
     # Permission filtering: users can see official templates, public templates, and their own private templates
-    if not current_user or getattr(current_user, 'role', 'user') != 'admin':
+    if getattr(current_user, 'role', 'user') != 'admin':
         query = query.filter(
             (Template.is_official.is_(True))
             | (Template.is_public.is_(True))
-            | (current_user and Template.owner_account_id == current_user.account_id)
+            | (Template.owner_user_id == current_user.user_id)
         )
 
     templates = query.offset(skip).limit(limit).all()
@@ -92,7 +92,7 @@ async def get_templates(
 async def get_template(
     template_id: str,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_required)
 ):
     """Get a specific template by ID"""
     template = db.query(Template).filter(Template.template_id == template_id).first()
@@ -100,8 +100,8 @@ async def get_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Check permissions
-    if not current_user or getattr(current_user, 'role', 'user') != 'admin':
-        if not getattr(template, 'is_official', False) and not getattr(template, 'is_public', False) and getattr(template, 'owner_account_id', None) != getattr(current_user, 'account_id', None):
+    if getattr(current_user, 'role', 'user') != 'admin':
+        if not getattr(template, 'is_official', False) and not getattr(template, 'is_public', False) and getattr(template, 'owner_user_id', None) != getattr(current_user, 'user_id', None):
             raise HTTPException(status_code=403, detail="Access denied")
 
     return template_to_response(template)
@@ -117,21 +117,27 @@ async def create_template(
     if template_data.is_official and getattr(current_user, 'role', 'user') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can create official templates")
 
+    # Validate name length (2-255 characters)
+    if len(template_data.name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Template name must be at least 2 characters")
+    if len(template_data.name.strip()) > 255:
+        raise HTTPException(status_code=400, detail="Template name must be 255 characters or less")
+
     # Generate template ID and repository URL
-    template_id = str(uuid.uuid4())
+    template_id = generate_template_id()
     repository_url = generate_repository_url(template_id, template_data.is_official)
 
     # Check for duplicate name per owner
     existing_template = db.query(Template).filter(
-        Template.name == template_data.name,
-        Template.owner_account_id == current_user.account_id
+        Template.name == template_data.name.strip(),
+        Template.owner_user_id == current_user.user_id
     ).first()
     if existing_template:
         raise HTTPException(status_code=400, detail="Template name already exists for this user")
 
     template = Template(
         template_id=template_id,
-        name=template_data.name,
+        name=template_data.name.strip(),
         description=template_data.description,
         category=template_data.category,
         language=template_data.language,
@@ -139,7 +145,7 @@ async def create_template(
         min_memory_required=template_data.memory_spec,
         is_official=template_data.is_official,
         is_public=template_data.is_public,
-        owner_account_id=current_user.account_id if not template_data.is_official else None,
+        owner_user_id=current_user.user_id if not template_data.is_official else None,
         repository_url=repository_url,
         tags=template_data.tags
     )
@@ -164,17 +170,36 @@ async def update_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Check permissions
-    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_account_id', None) != current_user.account_id:
+    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_user_id', None) != current_user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Official templates can only be updated by admins
     if getattr(template, 'is_official', False) and getattr(current_user, 'role', 'user') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can update official templates")
 
+    # Validate name if being updated
+    if template_data.name is not None:
+        # Validate name length (2-255 characters)
+        if len(template_data.name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Template name must be at least 2 characters")
+        if len(template_data.name.strip()) > 255:
+            raise HTTPException(status_code=400, detail="Template name must be 255 characters or less")
+        
+        # Check for duplicate name per owner (excluding current template)
+        existing_template = db.query(Template).filter(
+            Template.name == template_data.name.strip(),
+            Template.owner_user_id == current_user.user_id,
+            Template.template_id != template_id
+        ).first()
+        if existing_template:
+            raise HTTPException(status_code=400, detail="A template with this name already exists")
+
     # Update fields
     update_data = template_data.dict(exclude_unset=True)
     for field, value in update_data.items():
-        if field == 'cpu_spec':
+        if field == 'name':
+            setattr(template, field, value.strip())
+        elif field == 'cpu_spec':
             setattr(template, 'min_cpu_required', value)
         elif field == 'memory_spec':
             setattr(template, 'min_memory_required', value)
@@ -183,8 +208,25 @@ async def update_template(
 
     # Update the updated_at field using setattr to avoid SQLAlchemy column assignment issues
     setattr(template, 'updated_at', datetime.utcnow())
-    db.commit()
-    db.refresh(template)
+    
+    try:
+        db.commit()
+        db.refresh(template)
+    except Exception as e:
+        db.rollback()
+        # Check if it's a duplicate name error from database constraint
+        error_str = str(e).lower()
+        if "unique_template_name_per_owner" in error_str or "duplicate" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="A template with this name already exists"
+            )
+        else:
+            # Re-raise other database errors
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update template. Please try again."
+            )
 
     return template_to_response(template)
 
@@ -201,7 +243,7 @@ async def delete_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     # Check permissions
-    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_account_id', None) != current_user.account_id:
+    if getattr(current_user, 'role', 'user') != 'admin' and getattr(template, 'owner_user_id', None) != current_user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Official and public templates can only be deleted by admins
@@ -214,9 +256,9 @@ async def delete_template(
     # No longer check for sandboxes using this template. Allow deletion.
 
     # Send notification if admin is deleting
-    if getattr(current_user, 'role', 'user') == 'admin' and getattr(template, 'owner_account_id', None):
+    if getattr(current_user, 'role', 'user') == 'admin' and getattr(template, 'owner_user_id', None):
         notification = Notification(
-            user_account_id=template.owner_account_id,
+            user_id=template.owner_user_id,
             title="Template Deleted by Admin",
             message=f"Your template '{template.name}' has been deleted by an administrator.",
             type="warning",
@@ -264,13 +306,13 @@ async def admin_make_template_official(
         raise HTTPException(status_code=400, detail="Template is already official")
 
     setattr(template, 'is_official', True)
-    setattr(template, 'owner_account_id', None)  # Official templates have no owner
+    setattr(template, 'owner_user_id', None)  # Official templates have no owner
     setattr(template, 'updated_at', datetime.utcnow())
 
     # Send notification to original owner if exists
-    if getattr(template, 'owner_account_id', None):
+    if getattr(template, 'owner_user_id', None):
         notification = Notification(
-            user_account_id=template.owner_account_id,
+            user_id=template.owner_user_id,
             title="Template Made Official",
             message=f"Your template '{template.name}' has been made official by an administrator.",
             type="info",
@@ -302,9 +344,9 @@ async def admin_make_template_public(
     setattr(template, 'updated_at', datetime.utcnow())
 
     # Send notification to owner
-    if getattr(template, 'owner_account_id', None):
+    if getattr(template, 'owner_user_id', None):
         notification = Notification(
-            user_account_id=template.owner_account_id,
+            user_id=template.owner_user_id,
             title="Template Made Public",
             message=f"Your template '{template.name}' has been made public by an administrator.",
             type="info",

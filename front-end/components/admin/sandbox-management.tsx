@@ -15,6 +15,7 @@ import type { Sandbox, SandboxFilters } from "../../types/sandbox"
 import { SandboxFiltersPanel } from "./sandbox-filters-panel"
 import { SandboxDetailsModal } from "./sandbox-details-modal"
 import { useLanguage } from "../../contexts/language-context"
+import { CopyButton } from "@/components/ui/copy-button"
 
 export function SandboxManagement() {
   const [sandboxes, setSandboxes] = useState<Sandbox[]>([])
@@ -290,6 +291,7 @@ export function SandboxManagement() {
             <TableHeader>
               <TableRow>
                 <ResizableTableHead columnId="name" defaultWidth={200}>{t("admin.name")}</ResizableTableHead>
+                <ResizableTableHead columnId="id" defaultWidth={180}>{t("admin.id")}</ResizableTableHead>
                 <ResizableTableHead columnId="status" defaultWidth={100}>{t("admin.status")}</ResizableTableHead>
                 <ResizableTableHead columnId="user" defaultWidth={150}>{t("admin.user")}</ResizableTableHead>
                 <ResizableTableHead columnId="resources" defaultWidth={150}>{t("admin.resources")}</ResizableTableHead>
@@ -307,6 +309,12 @@ export function SandboxManagement() {
                       <div className="text-sm text-muted-foreground break-words">
                         {sandbox.description}
                       </div>
+                    </div>
+                  </ResizableTableCell>
+                  <ResizableTableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm">{sandbox.id}</span>
+                      <CopyButton value={sandbox.id} size="sm" variant="ghost" />
                     </div>
                   </ResizableTableCell>
                   <ResizableTableCell>{getStatusBadge(sandbox.status)}</ResizableTableCell>

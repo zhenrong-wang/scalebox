@@ -17,6 +17,9 @@ import { format, parseISO } from "date-fns"
 import { ResizableTable, ResizableTableHead, ResizableTableCell } from "@/components/ui/resizable-table"
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table"
 import { PageLayout } from "@/components/ui/page-layout"
+import { CopyButton } from "@/components/ui/copy-button"
+import { EditableDescription } from "@/components/ui/editable-description"
+import { EditableName } from "@/components/ui/editable-name"
 
 // Extended interface to include the full API key for display
 interface ApiKeyWithFullKey extends ApiKey {
@@ -194,6 +197,49 @@ export function ApiKeyPage() {
   }
   }
 
+  const updateApiKeyDescription = async (keyId: string, newDescription: string) => {
+    setError("")
+    try {
+      await ApiKeyService.updateApiKey(keyId, { description: newDescription })
+      setApiKeys((prev) =>
+        prev.map((key) =>
+          key.key_id === keyId ? { ...key, description: newDescription } : key
+        )
+      )
+      setSuccess(t("action.updated") || "Updated!")
+      setTimeout(() => setSuccess(""), 1500)
+    } catch (e: unknown) {
+      const error = e as Error
+      setError(error.message || "Failed to update API key description")
+      throw error // Re-throw to keep editing mode active
+    }
+  }
+
+  const updateApiKeyName = async (keyId: string, newName: string) => {
+    setError("")
+    try {
+      await ApiKeyService.updateApiKey(keyId, { name: newName })
+      setApiKeys((prev) =>
+        prev.map((key) =>
+          key.key_id === keyId ? { ...key, name: newName } : key
+        )
+      )
+      setSuccess(t("action.updated") || "Updated!")
+      setTimeout(() => setSuccess(""), 1500)
+    } catch (e: unknown) {
+      const error = e as Error
+      setError(error.message || "Failed to update API key name")
+      throw error // Re-throw to keep editing mode active
+    }
+  }
+
+  const validateApiKeyNameDuplicate = (newName: string, currentName: string): boolean => {
+    if (newName.toLowerCase() === currentName.toLowerCase()) {
+      return false // Not a duplicate if it's the same name
+    }
+    return apiKeys.some(key => key.name.toLowerCase() === newName.toLowerCase())
+  }
+
   const createNewKey = async () => {
     setDialogError("");
     setSuccess("");
@@ -353,16 +399,16 @@ export function ApiKeyPage() {
       {/* Table */}
       <Card>
         <CardContent>
-          <ResizableTable
-            defaultColumnWidths={{
-              name: 120,
-              description: 120,
-              status: 80,
-              keyValue: 200,
-              created: 100,
-              actions: 120
-            }}
-          >
+                      <ResizableTable
+              defaultColumnWidths={{
+                name: 200,
+                description: 150,
+                status: 90,
+                keyValue: 320,
+                created: 110,
+                actions: 140
+              }}
+            >
             <TableHeader>
               <TableRow>
                 <ResizableTableHead columnId="name" defaultWidth={140}>{t("table.name") || "Name"}</ResizableTableHead>
@@ -377,9 +423,29 @@ export function ApiKeyPage() {
               {filteredApiKeys.map((apiKey) => (
                 <TableRow key={apiKey.key_id}>
                   <ResizableTableCell>
-                    <div className="font-medium break-words">{apiKey.name}</div>
+                    <div>
+                      <EditableName
+                        value={apiKey.name}
+                        onSave={(newName) => updateApiKeyName(apiKey.key_id, newName)}
+                        onValidateDuplicate={validateApiKeyNameDuplicate}
+                        placeholder={t("apiKey.keyName") || "Enter key name"}
+                        resourceType="API key"
+                        className="text-sm"
+                      />
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                        <span className="font-mono">{apiKey.key_id}</span>
+                        <CopyButton value={apiKey.key_id} size="sm" variant="ghost" />
+                      </div>
+                    </div>
                   </ResizableTableCell>
-                  <ResizableTableCell className="break-words">{apiKey.description || "-"}</ResizableTableCell>
+                  <ResizableTableCell>
+                    <EditableDescription
+                      value={apiKey.description || ""}
+                      onSave={(newDescription) => updateApiKeyDescription(apiKey.key_id, newDescription)}
+                      placeholder={t("apiKey.keyDescription") || "Enter description"}
+                      className="text-sm"
+                    />
+                  </ResizableTableCell>
                   <ResizableTableCell>
                     <Badge variant={apiKey.is_active ? "default" : "secondary"}>
                       {apiKey.is_active ? (t("table.active") || "Active") : (t("table.disabled") || "Disabled")}

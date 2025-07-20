@@ -11,6 +11,7 @@ from .sandboxes import router as sandboxes_router
 from .api_keys import router as api_keys_router
 from .notifications import router as notifications_router
 from .projects import router as projects_router
+from .user_management import router as user_management_router
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -47,6 +48,7 @@ app.include_router(sandboxes_router, prefix="/api/sandboxes")
 app.include_router(api_keys_router, prefix="/api/api-keys")
 app.include_router(notifications_router, prefix="/api/notifications")
 app.include_router(projects_router, prefix="/api/projects")
+app.include_router(user_management_router)
 
 @app.get("/")
 async def root():

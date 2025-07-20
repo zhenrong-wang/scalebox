@@ -12,6 +12,15 @@ const getAuthHeaders = () => {
 
 // Helper function to handle API responses
 const handleResponse = async (response: Response) => {
+  if (response.status === 401) {
+    // Clear any existing auth token
+    localStorage.removeItem('auth-token');
+    // Set auth state to signin by dispatching a custom event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth-required'));
+    }
+    throw new Error('Authentication required. Please log in.');
+  }
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
@@ -21,7 +30,7 @@ const handleResponse = async (response: Response) => {
 
 export interface Notification {
   id: string;
-  user_account_id: string;
+  user_id: string;
   title: string;
   message: string;
   type: 'info' | 'warning' | 'error' | 'success';

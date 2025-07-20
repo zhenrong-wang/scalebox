@@ -8,6 +8,7 @@ from .database import get_db
 from .models import Base, User, Project, Sandbox, BillingRecord
 from .auth import get_current_user, get_current_user_required
 from .schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse, SandboxResponse
+from .api_keys import get_user_projects_query, check_project_access
 
 # Import helper functions from sandboxes module
 def safe_datetime(val, default=None):
@@ -67,7 +68,7 @@ def calculate_project_stats(db: Session, project_id: str) -> dict:
 def ensure_default_project(db: Session, user: User):
     """Ensure user has a default project, create one if not exists"""
     default_project = db.query(Project).filter(
-        Project.owner_account_id == user.account_id,
+        Project.owner_user_id == user.user_id,
         Project.is_default  # type: ignore
     ).first()
     
@@ -76,7 +77,7 @@ def ensure_default_project(db: Session, user: User):
         default_project = Project(
             name="Default Project",
             description="Your default project for organizing sandboxes and resources.",
-            owner_account_id=user.account_id,
+            owner_user_id=user.user_id,
             is_default=True
         )
         db.add(default_project)
@@ -93,11 +94,12 @@ async def list_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_required)
 ):
-    """List projects for the current user"""
+    """List projects for the current user based on permissions"""
     # Ensure user has a default project
     ensure_default_project(db, current_user)
     
-    query = db.query(Project).filter(Project.owner_account_id == current_user.account_id)
+    # Use permission-based query
+    query = get_user_projects_query(current_user, db)
     
     if status:
         query = query.filter(Project.status == status)
@@ -113,7 +115,7 @@ async def list_projects(
             "project_id": project.project_id,
             "name": project.name,
             "description": project.description,
-            "owner_account_id": project.owner_account_id,
+            "owner_account_id": project.owner_user_id,
             "status": project.status,
             "is_default": bool(project.is_default),
             "created_at": project.created_at,
@@ -138,10 +140,16 @@ async def create_project(
     # Ensure user has a default project first
     ensure_default_project(db, current_user)
     
+    # Validate name length (2-255 characters)
+    if len(project.name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Project name must be at least 2 characters")
+    if len(project.name.strip()) > 255:
+        raise HTTPException(status_code=400, detail="Project name must be 255 characters or less")
+    
     db_project = Project(
-        name=project.name,
+        name=project.name.strip(),
         description=project.description,
-        owner_account_id=current_user.account_id,
+        owner_user_id=current_user.user_id,
         is_default=False  # New projects are never default
     )
     
@@ -171,7 +179,7 @@ async def create_project(
         "project_id": db_project.project_id,
         "name": db_project.name,
         "description": db_project.description,
-        "owner_account_id": db_project.owner_account_id,
+        "owner_account_id": db_project.owner_user_id,
         "status": db_project.status,
         "is_default": bool(db_project.is_default),
         "created_at": db_project.created_at,
@@ -188,22 +196,23 @@ async def get_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_required)
 ):
-    """Get a specific project"""
-    project = db.query(Project).filter(
-        Project.project_id == project_id,
-        Project.owner_account_id == current_user.account_id
-    ).first()
+    """Get a specific project based on permissions"""
+    project = db.query(Project).filter(Project.project_id == project_id).first()
     
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
+    # Check permissions
+    if not check_project_access(current_user, project):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     # Calculate stats for the project
-    stats = calculate_project_stats(db, project_id)
+    stats = calculate_project_stats(db, str(project.project_id))
     project_dict = {
         "project_id": project.project_id,
         "name": project.name,
         "description": project.description,
-        "owner_account_id": project.owner_account_id,
+        "owner_account_id": project.owner_user_id,
         "status": project.status,
         "is_default": bool(project.is_default),
         "created_at": project.created_at,
@@ -224,7 +233,7 @@ async def update_project(
     """Update a project"""
     project = db.query(Project).filter(
         Project.project_id == project_id,
-        Project.owner_account_id == current_user.account_id
+        Project.owner_user_id == current_user.user_id
     ).first()
     
     if not project:
@@ -237,16 +246,50 @@ async def update_project(
             detail="Cannot rename the default project"
         )
     
+    # Validate name if being updated
     if project_update.name is not None:
-        setattr(project, 'name', project_update.name)
+        # Validate name length (2-255 characters)
+        if len(project_update.name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Project name must be at least 2 characters")
+        if len(project_update.name.strip()) > 255:
+            raise HTTPException(status_code=400, detail="Project name must be 255 characters or less")
+        
+        # Check for duplicate name per owner (excluding current project)
+        existing_project = db.query(Project).filter(
+            Project.name == project_update.name.strip(),
+            Project.owner_user_id == current_user.user_id,
+            Project.project_id != project_id
+        ).first()
+        if existing_project:
+            raise HTTPException(status_code=400, detail="A project with this name already exists")
+    
+    if project_update.name is not None:
+        setattr(project, 'name', project_update.name.strip())
     if project_update.description is not None:
         setattr(project, 'description', project_update.description)
     if project_update.status is not None:
         setattr(project, 'status', project_update.status)
     
     setattr(project, 'updated_at', datetime.now(timezone.utc))
-    db.commit()
-    db.refresh(project)
+    
+    try:
+        db.commit()
+        db.refresh(project)
+    except Exception as e:
+        db.rollback()
+        # Check if it's a duplicate name error from database constraint
+        error_str = str(e).lower()
+        if "unique_project_name_per_account" in error_str or "duplicate" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="A project with this name already exists"
+            )
+        else:
+            # Re-raise other database errors
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update project. Please try again."
+            )
     
     # Calculate stats for the updated project
     stats = calculate_project_stats(db, project_id)
@@ -254,7 +297,7 @@ async def update_project(
         "project_id": project.project_id,
         "name": project.name,
         "description": project.description,
-        "owner_account_id": project.owner_account_id,
+        "owner_account_id": project.owner_user_id,
         "status": project.status,
         "is_default": bool(project.is_default),
         "created_at": project.created_at,
@@ -278,7 +321,7 @@ async def list_project_sandboxes(
     # Verify project exists and user has access
     project = db.query(Project).filter(
         Project.project_id == project_id,
-        Project.owner_account_id == current_user.account_id
+        Project.owner_user_id == current_user.user_id
     ).first()
     
     if not project:
@@ -296,7 +339,7 @@ async def list_project_sandboxes(
     sandbox_responses = []
     for sandbox in sandboxes:
         # Get user info for the sandbox
-        user = db.query(User).filter(User.account_id == sandbox.owner_account_id).first()
+        user = db.query(User).filter(User.user_id == sandbox.owner_user_id).first()
         user_name = (
             user.full_name or user.username or user.email.split('@')[0]
             if user is not None else "Unknown"
@@ -322,7 +365,7 @@ async def list_project_sandboxes(
             "name": str(sandbox.name),
             "description": str(sandbox.description) if sandbox.description is not None else None,
             "status": sandbox.status,
-            "user_account_id": str(sandbox.owner_account_id),
+            "user_account_id": str(sandbox.owner_user_id),
             "user_name": str(user_name),
             "user_email": str(user_email),
             "project_id": str(sandbox.project_id) if sandbox.project_id is not None else None,
@@ -361,7 +404,7 @@ async def evict_sandbox_from_project(
     # Verify project exists and user has access
     project = db.query(Project).filter(
         Project.project_id == project_id,
-        Project.owner_account_id == current_user.account_id
+        Project.owner_user_id == current_user.user_id
     ).first()
     
     if not project:
@@ -407,7 +450,7 @@ async def add_sandbox_to_project(
     # Verify project exists and user has access
     project = db.query(Project).filter(
         Project.project_id == project_id,
-        Project.owner_account_id == current_user.account_id
+        Project.owner_user_id == current_user.user_id
     ).first()
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -415,7 +458,7 @@ async def add_sandbox_to_project(
     # Find the sandbox (must belong to the same user)
     sandbox = db.query(Sandbox).filter(
         Sandbox.sandbox_id == sandbox_id,
-        Sandbox.owner_account_id == current_user.account_id
+        Sandbox.owner_user_id == current_user.user_id
     ).first()
     if sandbox is None:
         raise HTTPException(status_code=404, detail="Sandbox not found")
@@ -449,7 +492,7 @@ async def delete_project(
     """Delete a project - move all sandboxes to default project first"""
     project = db.query(Project).filter(
         Project.project_id == project_id,
-        Project.owner_account_id == current_user.account_id
+        Project.owner_user_id == current_user.user_id
     ).first()
     
     if not project:
