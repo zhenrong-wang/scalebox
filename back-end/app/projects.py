@@ -341,7 +341,7 @@ async def list_project_sandboxes(
         # Get user info for the sandbox
         user = db.query(User).filter(User.user_id == sandbox.owner_user_id).first()
         user_name = (
-            user.full_name or user.username or user.email.split('@')[0]
+            user.display_name or user.username or user.email.split('@')[0]
             if user is not None else "Unknown"
         )
         user_email = user.email if user is not None else "unknown@example.com"

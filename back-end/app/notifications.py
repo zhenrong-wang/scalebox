@@ -1,3 +1,4 @@
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -50,7 +51,7 @@ async def get_notifications(
                 is_read=bool(notification.is_read),
                 related_entity_type=str(notification.related_entity_type) if notification.related_entity_type is not None else None,
                 related_entity_id=str(notification.related_entity_id) if notification.related_entity_id is not None else None,
-                created_at=datetime.fromisoformat(str(notification.created_at)) if notification.created_at is not None else datetime.utcnow()
+                created_at=datetime.fromisoformat(str(notification.created_at)) if notification.created_at is not None else datetime.now(timezone.utc)
             ) for notification in notifications
         ],
         total=total,
@@ -179,7 +180,7 @@ async def get_notification(
         is_read=bool(notification.is_read),
         related_entity_type=str(notification.related_entity_type) if notification.related_entity_type is not None else None,
         related_entity_id=str(notification.related_entity_id) if notification.related_entity_id is not None else None,
-        created_at=datetime.fromisoformat(str(notification.created_at)) if notification.created_at is not None else datetime.utcnow()
+        created_at=datetime.fromisoformat(str(notification.created_at)) if notification.created_at is not None else datetime.now(timezone.utc)
     )
 
 
@@ -344,7 +345,7 @@ async def admin_get_user_notifications(
                 is_read=bool(notification.is_read),
                 related_entity_type=str(notification.related_entity_type) if notification.related_entity_type is not None else None,
                 related_entity_id=str(notification.related_entity_id) if notification.related_entity_id is not None else None,
-                created_at=datetime.fromisoformat(str(notification.created_at)) if notification.created_at is not None else datetime.utcnow()
+                created_at=datetime.fromisoformat(str(notification.created_at)) if notification.created_at is not None else datetime.now(timezone.utc)
             ) for notification in notifications
         ],
         total=total,

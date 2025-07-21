@@ -1,3 +1,4 @@
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -207,7 +208,7 @@ async def update_template(
             setattr(template, field, value)
 
     # Update the updated_at field using setattr to avoid SQLAlchemy column assignment issues
-    setattr(template, 'updated_at', datetime.utcnow())
+    setattr(template, 'updated_at', datetime.now(timezone.utc))
     
     try:
         db.commit()
@@ -307,7 +308,7 @@ async def admin_make_template_official(
 
     setattr(template, 'is_official', True)
     setattr(template, 'owner_user_id', None)  # Official templates have no owner
-    setattr(template, 'updated_at', datetime.utcnow())
+    setattr(template, 'updated_at', datetime.now(timezone.utc))
 
     # Send notification to original owner if exists
     if getattr(template, 'owner_user_id', None):
@@ -341,7 +342,7 @@ async def admin_make_template_public(
         raise HTTPException(status_code=400, detail="Template is already public")
 
     setattr(template, 'is_public', True)
-    setattr(template, 'updated_at', datetime.utcnow())
+    setattr(template, 'updated_at', datetime.now(timezone.utc))
 
     # Send notification to owner
     if getattr(template, 'owner_user_id', None):

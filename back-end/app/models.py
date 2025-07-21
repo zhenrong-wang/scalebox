@@ -1,13 +1,17 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, JSON, ForeignKey, Index, BigInteger, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import string
 import hashlib
 import base64
 
 Base = declarative_base()
+
+def utc_now():
+    """Get current UTC datetime"""
+    return datetime.now(timezone.utc)
 
 def generate_account_id():
     """Generate a 12-digit numeric account ID"""
@@ -116,6 +120,8 @@ class Account(Base):
     
     # Account details
     name = Column(String(255), nullable=False)  # Account/Organization name
+    email = Column(String(255), nullable=True)  # Account contact email
+    display_name = Column(String(255), nullable=True)  # Display name for the account
     description = Column(Text, nullable=True)
     
     # Account status
@@ -127,8 +133,8 @@ class Account(Base):
     subscription_status = Column(String(50), default="active", nullable=False)
     
     # Audit timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Relationships
     users = relationship("User", back_populates="account", foreign_keys="User.account_id")
@@ -151,7 +157,7 @@ class User(Base):
     email = Column(String(255), nullable=False, index=True)
     username = Column(String(100), nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(255), nullable=True)
+    display_name = Column(String(255), nullable=True)  # User's display name (changeable)
     role = Column(String(50), default="user", nullable=False)  # user, admin
     
     # User status within account
@@ -174,8 +180,8 @@ class User(Base):
     last_password_reset_request = Column(DateTime, nullable=True)
     
     # Audit timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Relationships
     account = relationship("Account", back_populates="users", foreign_keys=[account_id])
@@ -214,8 +220,8 @@ class Project(Base):
     is_default = Column(Boolean, default=False, nullable=False)  # Default project that cannot be deleted
     
     # Audit timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Relationships
     owner = relationship("User", back_populates="projects", foreign_keys=[owner_user_id])
@@ -255,8 +261,8 @@ class Template(Base):
     tags = Column(JSON, nullable=True)
     
     # Audit timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Relationships
     owner = relationship("User", back_populates="private_templates", foreign_keys=[owner_user_id])
@@ -317,8 +323,8 @@ class ApiKey(Base):
     last_used_at = Column(DateTime, nullable=True)
     
     # Audit timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="api_keys", foreign_keys=[user_id])
@@ -353,7 +359,7 @@ class Notification(Base):
     related_entity_id = Column(String(255), nullable=True)
     
     # Audit timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
@@ -389,8 +395,8 @@ class Sandbox(Base):
     snapshot_expires_at = Column(DateTime, nullable=True)  # When snapshot will be deleted
     
     # Lifecycle timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     started_at = Column(DateTime, nullable=True)
     stopped_at = Column(DateTime, nullable=True)
     timeout_at = Column(DateTime, nullable=True)
@@ -434,7 +440,7 @@ class SandboxUsage(Base):
     cost = Column(Float, default=0.0)
     
     # Audit timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     
     # Relationships
     sandbox = relationship("Sandbox", back_populates="usage_records", foreign_keys=[sandbox_id])
@@ -461,7 +467,7 @@ class SandboxMetrics(Base):
     storage_utilization = Column(Float, default=0.0)  # Percentage
     
     # Audit timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     
     # Relationships
     sandbox = relationship("Sandbox", back_populates="metrics", foreign_keys=[sandbox_id])
@@ -491,7 +497,7 @@ class BillingRecord(Base):
     description = Column(Text, nullable=True)
     
     # Audit timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="billing_records", foreign_keys=[user_id])
@@ -508,13 +514,46 @@ class PendingSignup(Base):
     # Signup details
     email = Column(String(255), nullable=False, index=True)
     username = Column(String(100), nullable=False)
-    full_name = Column(String(255), nullable=True)
     verification_token = Column(String(255), nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)  # Store hashed password for verification
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
+
+class AccountEmailChange(Base):
+    __tablename__ = "account_email_changes"
+    
+    # Internal primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Business identifier
+    change_id = Column(String(25), unique=True, nullable=False, index=True, default=generate_resource_id("emc", 17))
+    
+    # Account relationship
+    account_id = Column(String(12), ForeignKey("accounts.account_id"), nullable=False, index=True)
+    
+    # Email change details
+    current_email = Column(String(255), nullable=False)
+    new_email = Column(String(255), nullable=False)
+    
+    # Confirmation tokens - one for each email
+    current_email_token = Column(String(255), nullable=False, index=True)
+    new_email_token = Column(String(255), nullable=False, index=True)
+    
+    # Confirmation status
+    current_email_confirmed = Column(Boolean, default=False, nullable=False)
+    new_email_confirmed = Column(Boolean, default=False, nullable=False)
+    
+    # Expiration
+    expires_at = Column(DateTime, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    account = relationship("Account", foreign_keys=[account_id])
 
 # Comprehensive indexing for performance and data integrity
 # Account-level indexes for multi-tenancy

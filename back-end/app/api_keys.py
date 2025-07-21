@@ -1,3 +1,4 @@
+from datetime import timezone
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -197,7 +198,7 @@ def get_api_key_user(api_key: str = Depends(get_api_key_from_header), db: Sessio
         )
     
     # Update last used timestamp
-    setattr(db_api_key, 'last_used_at', datetime.datetime.utcnow())
+    setattr(db_api_key, 'last_used_at', datetime.datetime.now(timezone.utc))
     db.commit()
     
     return user
@@ -543,7 +544,7 @@ def get_full_api_key(
     # Only return full key if it was created recently (within last 5 minutes)
     # This is a security measure - full keys are only shown immediately after creation
     created_time = getattr(api_key, 'created_at')
-    if created_time and (datetime.datetime.utcnow() - created_time).total_seconds() > 300:  # 5 minutes
+    if created_time and (datetime.datetime.now(timezone.utc) - created_time).total_seconds() > 300:  # 5 minutes
         raise HTTPException(status_code=403, detail="Full API key is only available immediately after creation")
     
     # For security, we don't store the full key, so we can't return it
@@ -631,7 +632,7 @@ def get_api_key_stats(
     expired_keys = 0
     
     # Get usage in last 30 days
-    thirty_days_ago = datetime.datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.datetime.now(timezone.utc) - timedelta(days=30)
     # ApiKeyUsage and ApiRateLimit are no longer imported, so this will cause an error.
     # Assuming ApiKeyUsage and ApiRateLimit are meant to be re-added or this function is deprecated.
     # For now, we'll keep it as is, but it will cause an error.
@@ -668,9 +669,9 @@ async def admin_api_key_action(
         # Check if the key is expired
         expires_in_days = getattr(api_key, 'expires_in_days', None)
         if expires_in_days is not None:
-            created_at = getattr(api_key, 'created_at', datetime.datetime.utcnow())
+            created_at = getattr(api_key, 'created_at', datetime.datetime.now(timezone.utc))
             expiration_date = created_at + datetime.timedelta(days=expires_in_days)
-            if datetime.datetime.utcnow() > expiration_date:
+            if datetime.datetime.now(timezone.utc) > expiration_date:
                 raise HTTPException(status_code=400, detail="Cannot enable an expired API key. Please extend the expiration first.")
         
         setattr(api_key, 'is_active', True)

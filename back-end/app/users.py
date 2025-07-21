@@ -1,3 +1,4 @@
+from datetime import timezone
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,6 +20,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .database import get_db
 from .models import User, PendingSignup
+from .models import Account, Notification
 
 router = APIRouter(tags=["users"])
 
@@ -101,7 +103,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
 def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
     to_encode = data.copy()
-    expire = datetime.datetime.utcnow() + expires_delta
+    expire = datetime.datetime.now(timezone.utc) + expires_delta
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -117,11 +119,11 @@ def signup(data: SignupRequest, background_tasks: BackgroundTasks, db: Session =
     # Generate 6-digit verification code
     verification_code = str(random.randint(100000, 999999))
     # Set expiration time (24 hours from now)
-    expires_at = datetime.datetime.utcnow() + timedelta(hours=24)
+    expires_at = datetime.datetime.now(timezone.utc) + timedelta(hours=24)
     # Check if pending signup exists
     pending = db.query(PendingSignup).filter(PendingSignup.email == data.email).first()
     if pending:
-        pending.full_name = data.name  # type: ignore
+        pending.display_name = data.name  # type: ignore
         pending.verification_token = verification_code  # type: ignore
         pending.expires_at = expires_at  # type: ignore
         pending.username = data.email.split('@')[0]  # type: ignore
@@ -130,7 +132,7 @@ def signup(data: SignupRequest, background_tasks: BackgroundTasks, db: Session =
         pending = PendingSignup(
             email=data.email,
             username=data.email.split('@')[0],
-            full_name=data.name,
+            display_name=data.name,
             verification_token=verification_code,
             password_hash=hashed_password,
             expires_at=expires_at
@@ -165,7 +167,7 @@ def verify_email(data: VerifyEmailRequest, db: Session = Depends(get_db)):
     new_user = User(
         email=pending.email,
         password_hash=pending.password_hash,  # Use the stored hashed password
-        full_name=pending.full_name,
+        display_name=pending.display_name,
         is_active=True,
         is_verified=True,
         verification_token=None,
@@ -174,6 +176,19 @@ def verify_email(data: VerifyEmailRequest, db: Session = Depends(get_db)):
     db.add(new_user)
     db.delete(pending)
     db.commit()
+    
+    # Create welcome notification for the new user
+    welcome_notification = Notification(
+        user_id=getattr(new_user, 'user_id', None),
+        title="Welcome to ScaleBox! 🎉",
+        message=f"Hello {pending.display_name or pending.email.split('@')[0]}! Welcome to ScaleBox. Your account has been successfully created and verified. You can now sign in and start using our platform. We're excited to have you on board!",
+        type="info",
+        related_entity_type="user",
+        related_entity_id=getattr(new_user, 'user_id', None)
+    )
+    db.add(welcome_notification)
+    db.commit()
+    
     return {"msg": "Email verified successfully. You can now sign in."}
 
 @router.post("/resend-verification")
@@ -195,12 +210,12 @@ def reset_password(data: PasswordResetRequest, background_tasks: BackgroundTasks
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         return {"error": "email_not_found", "msg": "No account found with this email address."}
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(timezone.utc)
     last_req = getattr(user, 'last_password_reset_request', None)
     if last_req and (now - last_req).total_seconds() < 30:
         raise HTTPException(status_code=429, detail="Please wait 30 seconds before requesting another password reset.")
     reset_token = str(uuid.uuid4())
-    expiry = datetime.datetime.utcnow() + timedelta(hours=1)
+    expiry = datetime.datetime.now(timezone.utc) + timedelta(hours=1)
     setattr(user, 'reset_token', reset_token)
     setattr(user, 'reset_token_expiry', expiry)
     setattr(user, 'last_password_reset_request', now)
@@ -213,7 +228,7 @@ def validate_reset_token(token: str, db: Session = Depends(get_db)):
     """Validate reset token and return user email if valid"""
     user = db.query(User).filter(User.reset_token == token).first()
     expiry = getattr(user, 'reset_token_expiry', None)
-    if user is None or expiry is None or expiry < datetime.datetime.utcnow():
+    if user is None or expiry is None or expiry < datetime.datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
     return {"email": user.email, "valid": True}
 
@@ -221,7 +236,7 @@ def validate_reset_token(token: str, db: Session = Depends(get_db)):
 def reset_password_confirm(data: PasswordResetConfirmRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.reset_token == data.token).first()
     expiry = getattr(user, 'reset_token_expiry', None)
-    if user is None or expiry is None or expiry < datetime.datetime.utcnow():
+    if user is None or expiry is None or expiry < datetime.datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
     setattr(user, 'password_hash', get_password_hash(data.new_password))
     setattr(user, 'reset_token', None)
@@ -241,15 +256,20 @@ def get_profile(request: Request, db: Session = Depends(get_db), credentials: HT
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Get account information
+    account = db.query(Account).filter(Account.account_id == user.account_id).first()
+    
     # Determine the role to return
     role = "root-user" if getattr(user, 'is_root_user', False) else user.role
     
-    return {
+    response_data = {
         "id": user.id,
         "account_id": user.account_id,
+        "username": user.username,
         "email": user.email,
         "role": role,
-        "full_name": user.full_name,
+        "display_name": user.display_name,
+        "display_name": getattr(user, 'display_name', None),
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "is_root_user": user.is_root_user,
@@ -257,6 +277,13 @@ def get_profile(request: Request, db: Session = Depends(get_db), credentials: HT
         "last_login": user.last_login,
         "totalSpent": 0.0,
     }
+    
+    # Add account information for non-root users
+    if account and not getattr(user, 'is_root_user', False):
+        response_data["account_email"] = getattr(account, 'email', None)
+        response_data["account_name"] = getattr(account, 'name', None)
+    
+    return response_data
 
 @router.put("/me")
 def update_profile(data: UpdateProfileRequest):
@@ -272,7 +299,7 @@ def verify_admin_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPB
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
     user = db.query(User).filter(User.id == user_id).first()
-    if user is None or user.role != "admin":  # type: ignore
+    if user is None or (getattr(user, 'role', None) != 'admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
@@ -284,13 +311,13 @@ def get_all_users(admin_user: User = Depends(verify_admin_token), db: Session = 
             "account_id": user.account_id,
             "email": user.email,
             "username": user.username,
-            "full_name": user.full_name,
+            "display_name": user.display_name,
             "role": user.role,
             "is_active": user.is_active,
             "is_verified": user.is_verified,
             "created_at": user.created_at,
             "last_login": user.last_login,
-            "name": user.full_name or user.username or user.email.split('@')[0],
+            "name": user.display_name or user.username or user.email.split('@')[0],
             "status": "active" if user.is_active is True else "disabled",
             "currentUsage": {"projects": 0, "sandboxes": 0},
             "totalSpent": 0.0,

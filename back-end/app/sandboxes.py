@@ -1,3 +1,4 @@
+from datetime import timezone
 import sys
 import os
 
@@ -89,7 +90,7 @@ class SwitchProjectRequest(BaseModel):
 def calculate_uptime(started_at: Optional[datetime]) -> int:
     if not started_at:
         return 0
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     delta = now - started_at
     return int(delta.total_seconds() / 60)  # Return minutes
 
@@ -187,16 +188,16 @@ def list_sandboxes(
         uptime = calculate_uptime(started_at_val)
 
         created_at_val = safe_datetime(
-            getattr(sandbox, 'created_at', None), datetime.utcnow()
+            getattr(sandbox, 'created_at', None), datetime.now(timezone.utc)
         )
         updated_at_val = safe_datetime(
-            getattr(sandbox, 'updated_at', None), datetime.utcnow()
+            getattr(sandbox, 'updated_at', None), datetime.now(timezone.utc)
         )
         last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
         # Get user display name
         user_name = (
-            str(current_user.full_name) if current_user.full_name is not None
+            str(current_user.display_name) if current_user.display_name is not None
             else str(current_user.username) if current_user.username is not None
             else str(current_user.email.split('@')[0])
         )
@@ -360,16 +361,16 @@ def create_sandbox(
     uptime = calculate_uptime(started_at_val)
 
     created_at_val = safe_datetime(
-        getattr(new_sandbox, 'created_at', None), datetime.utcnow()
+        getattr(new_sandbox, 'created_at', None), datetime.now(timezone.utc)
     )
     updated_at_val = safe_datetime(
-        getattr(new_sandbox, 'updated_at', None), datetime.utcnow()
+        getattr(new_sandbox, 'updated_at', None), datetime.now(timezone.utc)
     )
     last_accessed_at_val = safe_datetime(getattr(new_sandbox, 'last_accessed_at', None))
 
     # Get user display name
     user_name = (
-        str(current_user.full_name) if current_user.full_name is not None
+        str(current_user.display_name) if current_user.display_name is not None
         else str(current_user.username) if current_user.username is not None
         else str(current_user.email.split('@')[0])
     )
@@ -424,16 +425,16 @@ def get_sandbox(
     uptime = calculate_uptime(started_at_val)
 
     created_at_val = safe_datetime(
-        getattr(sandbox, 'created_at', None), datetime.utcnow()
+        getattr(sandbox, 'created_at', None), datetime.now(timezone.utc)
     )
     updated_at_val = safe_datetime(
-        getattr(sandbox, 'updated_at', None), datetime.utcnow()
+        getattr(sandbox, 'updated_at', None), datetime.now(timezone.utc)
     )
     last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
     # Get user display name
     user_name = (
-        str(current_user.full_name) if current_user.full_name is not None
+        str(current_user.display_name) if current_user.display_name is not None
         else str(current_user.username) if current_user.username is not None
         else str(current_user.email.split('@')[0])
     )
@@ -542,16 +543,16 @@ def update_sandbox(
     uptime = calculate_uptime(started_at_val)
 
     created_at_val = safe_datetime(
-        getattr(sandbox, 'created_at', None), datetime.utcnow()
+        getattr(sandbox, 'created_at', None), datetime.now(timezone.utc)
     )
     updated_at_val = safe_datetime(
-        getattr(sandbox, 'updated_at', None), datetime.utcnow()
+        getattr(sandbox, 'updated_at', None), datetime.now(timezone.utc)
     )
     last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
     # Get user display name
     user_name = (
-        str(current_user.full_name) if current_user.full_name is not None
+        str(current_user.display_name) if current_user.display_name is not None
         else str(current_user.username) if current_user.username is not None
         else str(current_user.email.split('@')[0])
     )
@@ -613,7 +614,7 @@ def archive_sandbox(
 
     # Mark as archived and set archived timestamp
     setattr(sandbox, 'status', SandboxStatus.ARCHIVED.value)
-    setattr(sandbox, 'archived_at', datetime.utcnow())
+    setattr(sandbox, 'archived_at', datetime.now(timezone.utc))
     db.commit()
 
     return {"message": "Sandbox archived successfully"}
@@ -642,8 +643,8 @@ def start_sandbox(
 
     # Update status and timestamps
     setattr(sandbox, 'status', SandboxStatus.RUNNING.value)
-    setattr(sandbox, 'last_accessed_at', datetime.utcnow())
-    setattr(sandbox, 'started_at', datetime.utcnow())
+    setattr(sandbox, 'last_accessed_at', datetime.now(timezone.utc))
+    setattr(sandbox, 'started_at', datetime.now(timezone.utc))
     db.commit()
 
     return {"message": "Sandbox started successfully"}
@@ -681,7 +682,7 @@ def stop_sandbox(
 
     # Update status and timestamps
     setattr(sandbox, 'status', SandboxStatus.STOPPED.value)
-    setattr(sandbox, 'last_accessed_at', datetime.utcnow())
+    setattr(sandbox, 'last_accessed_at', datetime.now(timezone.utc))
     setattr(sandbox, 'started_at', None)
     db.commit()
 
@@ -771,7 +772,7 @@ def get_all_sandboxes_admin(
         # Get user info
         user = db.query(User).filter(User.user_id == sandbox.owner_user_id).first()
         user_name = (
-            user.full_name or user.username or user.email.split('@')[0]
+            user.display_name or user.username or user.email.split('@')[0]
             if user is not None else "Unknown"
         )
         user_email = user.email if user is not None else "unknown@example.com"
@@ -780,10 +781,10 @@ def get_all_sandboxes_admin(
         uptime = calculate_uptime(started_at_val)
 
         created_at_val = safe_datetime(
-            getattr(sandbox, 'created_at', None), datetime.utcnow()
+            getattr(sandbox, 'created_at', None), datetime.now(timezone.utc)
         )
         updated_at_val = safe_datetime(
-            getattr(sandbox, 'updated_at', None), datetime.utcnow()
+            getattr(sandbox, 'updated_at', None), datetime.now(timezone.utc)
         )
         last_accessed_at_val = safe_datetime(getattr(sandbox, 'last_accessed_at', None))
 
@@ -896,8 +897,8 @@ def admin_sandbox_action(
         if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.RUNNING.value:
             raise HTTPException(status_code=400, detail="Sandbox is already running")
         setattr(sandbox, 'status', SandboxStatus.RUNNING.value)
-        setattr(sandbox, 'last_accessed_at', datetime.utcnow())
-        setattr(sandbox, 'started_at', datetime.utcnow())
+        setattr(sandbox, 'last_accessed_at', datetime.now(timezone.utc))
+        setattr(sandbox, 'started_at', datetime.now(timezone.utc))
         message = "Sandbox started by admin"
     elif action == "stop":
         if str(getattr(sandbox, 'status', SandboxStatus.STOPPED.value)) == SandboxStatus.STOPPED.value:
@@ -911,12 +912,12 @@ def admin_sandbox_action(
             current_total_cost = float(getattr(sandbox, 'total_cost', 0.0))
             setattr(sandbox, 'total_cost', current_total_cost + cost_increment)
         setattr(sandbox, 'status', SandboxStatus.STOPPED.value)
-        setattr(sandbox, 'last_accessed_at', datetime.utcnow())
+        setattr(sandbox, 'last_accessed_at', datetime.now(timezone.utc))
         setattr(sandbox, 'started_at', None)
         message = "Sandbox stopped by admin"
     elif action == "archive":
         setattr(sandbox, 'status', SandboxStatus.ARCHIVED.value)
-        setattr(sandbox, 'archived_at', datetime.utcnow())
+        setattr(sandbox, 'archived_at', datetime.now(timezone.utc))
         message = "Sandbox archived by admin"
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -962,7 +963,7 @@ def switch_sandbox_project(
     
     # Move sandbox to the new project
     setattr(sandbox, 'project_id', req.project_id)
-    setattr(sandbox, 'updated_at', datetime.utcnow())
+    setattr(sandbox, 'updated_at', datetime.now(timezone.utc))
 
     db.commit()
     db.refresh(sandbox)
