@@ -1100,6 +1100,15 @@ async def confirm_account_email_change(
     if not email_change:
         raise HTTPException(status_code=404, detail="Invalid or expired token")
     
+    # Check if already completed
+    if getattr(email_change, 'completed_at', None) is not None:
+        return {
+            "status": "completed",
+            "message": "Email change has already been completed successfully.",
+            "current_email": email_change.current_email,
+            "new_email": email_change.new_email
+        }
+    
     # Check if expired
     expires_at = getattr(email_change, 'expires_at', None)
     if expires_at is None or expires_at < datetime.datetime.now(timezone.utc):
@@ -1112,27 +1121,38 @@ async def confirm_account_email_change(
     is_current_email = current_token == request.token
     is_new_email = new_token == request.token
     
+    # Mark the appropriate email as confirmed
     if is_current_email:
         setattr(email_change, 'current_email_confirmed', True)
+        confirmed_email = email_change.current_email
+        pending_email = email_change.new_email
     elif is_new_email:
         setattr(email_change, 'new_email_confirmed', True)
+        confirmed_email = email_change.new_email
+        pending_email = email_change.current_email
+    else:
+        raise HTTPException(status_code=400, detail="Invalid token")
     
     # Check if both emails are confirmed
-    if getattr(email_change, 'current_email_confirmed', False) and getattr(email_change, 'new_email_confirmed', False):
-        # Update account email
-        account = db.query(Account).filter(Account.account_id == email_change.account_id).first()
-        if account:
-            setattr(account, 'email', email_change.new_email)
-            setattr(email_change, 'completed_at', datetime.datetime.now(timezone.utc))
-            
-            # Update all users in the account with the new email
-            users = db.query(User).filter(User.account_id == email_change.account_id).all()
-            for user in users:
-                # Generate new internal email for each user
-                new_internal_email = f"{getattr(user, 'username', '')}_{secrets.token_hex(4)}@{email_change.new_email.split('@')[1]}"
-                setattr(user, 'email', new_internal_email)
-            
-            try:
+    current_confirmed = getattr(email_change, 'current_email_confirmed', False)
+    new_confirmed = getattr(email_change, 'new_email_confirmed', False)
+    
+    if current_confirmed and new_confirmed:
+        # Both confirmed - complete the email change
+        try:
+            # Update account email
+            account = db.query(Account).filter(Account.account_id == email_change.account_id).first()
+            if account:
+                setattr(account, 'email', email_change.new_email)
+                setattr(email_change, 'completed_at', datetime.datetime.now(timezone.utc))
+                
+                # Update all users in the account with the new email
+                users = db.query(User).filter(User.account_id == email_change.account_id).all()
+                for user in users:
+                    # Generate new internal email for each user
+                    new_internal_email = f"{getattr(user, 'username', '')}_{secrets.token_hex(4)}@{email_change.new_email.split('@')[1]}"
+                    setattr(user, 'email', new_internal_email)
+                
                 db.commit()
                 
                 # Create notification for root user
@@ -1153,20 +1173,45 @@ async def confirm_account_email_change(
                     db.add(notification)
                     db.commit()
                 
-                return {"message": "Account email changed successfully"}
-            except Exception as e:
+                return {
+                    "status": "completed",
+                    "message": "Account email changed successfully! Both confirmation links have been verified.",
+                    "current_email": email_change.current_email,
+                    "new_email": email_change.new_email
+                }
+            else:
                 db.rollback()
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to update account email"
-                )
-    else:
-        # Just mark as confirmed
-        try:
-            db.commit()
-            return {"message": "Email confirmed. Please check the other email address for the second confirmation link."}
+                raise HTTPException(status_code=404, detail="Account not found")
         except Exception as e:
             db.rollback()
+            print(f"Error completing email change: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update account email"
+            )
+    else:
+        # Only one email confirmed - wait for the other
+        try:
+            db.commit()
+            
+            # Determine which email is still pending
+            if not current_confirmed:
+                pending_email = email_change.current_email
+                confirmed_email = email_change.new_email
+            else:
+                pending_email = email_change.new_email
+                confirmed_email = email_change.current_email
+            
+            return {
+                "status": "pending",
+                "message": f"Email confirmed successfully. Please check {pending_email} for the second confirmation link to complete the change.",
+                "confirmed_email": confirmed_email,
+                "pending_email": pending_email,
+                "expires_at": expires_at.isoformat()
+            }
+        except Exception as e:
+            db.rollback()
+            print(f"Error confirming email: {e}")
             raise HTTPException(
                 status_code=500,
                 detail="Failed to confirm email"
@@ -1252,3 +1297,83 @@ async def cleanup_expired_email_changes(
             status_code=500,
             detail="Failed to cleanup expired email changes"
         ) 
+
+@router.get("/account/email-change-status")
+async def get_email_change_status(
+    current_user: User = Depends(get_current_user_required),
+    db: Session = Depends(get_db)
+):
+    """Get the status of pending email change requests for the current user's account"""
+    # Check if current user is root user
+    if not getattr(current_user, 'is_root_user', False):
+        raise HTTPException(
+            status_code=403,
+            detail="Only root users can check email change status"
+        )
+    
+    # Get the most recent email change request for this account
+    email_change = db.query(AccountEmailChange).filter(
+        AccountEmailChange.account_id == getattr(current_user, 'account_id', None)
+    ).order_by(AccountEmailChange.created_at.desc()).first()
+    
+    if not email_change:
+        return {
+            "has_pending_request": False,
+            "message": "No pending email change requests"
+        }
+    
+    # Check if expired
+    expires_at = getattr(email_change, 'expires_at', None)
+    is_expired = expires_at is None or expires_at < datetime.datetime.now(timezone.utc)
+    
+    if is_expired:
+        return {
+            "has_pending_request": False,
+            "message": "Previous email change request has expired"
+        }
+    
+    # Check if completed
+    completed_at = getattr(email_change, 'completed_at', None)
+    if completed_at is not None:
+        return {
+            "has_pending_request": False,
+            "message": "Email change completed successfully",
+            "current_email": email_change.current_email,
+            "new_email": email_change.new_email,
+            "completed_at": completed_at.isoformat() if completed_at else None
+        }
+    
+    # Get confirmation status
+    current_confirmed = getattr(email_change, 'current_email_confirmed', False)
+    new_confirmed = getattr(email_change, 'new_email_confirmed', False)
+    
+    if current_confirmed and new_confirmed:
+        return {
+            "has_pending_request": True,
+            "status": "both_confirmed",
+            "message": "Both emails confirmed. Processing email change...",
+            "current_email": email_change.current_email,
+            "new_email": email_change.new_email,
+            "expires_at": expires_at.isoformat() if expires_at else None
+        }
+    elif current_confirmed or new_confirmed:
+        confirmed_email = email_change.current_email if current_confirmed else email_change.new_email
+        pending_email = email_change.new_email if current_confirmed else email_change.current_email
+        
+        return {
+            "has_pending_request": True,
+            "status": "partial_confirmed",
+            "message": f"One email confirmed. Waiting for confirmation from {pending_email}",
+            "confirmed_email": confirmed_email,
+            "pending_email": pending_email,
+            "expires_at": expires_at.isoformat() if expires_at else None
+        }
+    else:
+        return {
+            "has_pending_request": True,
+            "status": "none_confirmed",
+            "message": "Email change request created. Please check both email addresses for confirmation links.",
+            "current_email": email_change.current_email,
+            "new_email": email_change.new_email,
+            "expires_at": expires_at.isoformat() if expires_at else None
+        } 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Mail, Lock, Copy, Check, LogOut, Eye, EyeOff } from "lucide-react"
+import { User, Mail, Lock, Copy, Check, LogOut, Eye, EyeOff, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -64,6 +64,7 @@ interface ApiUser {
 
 export function AccountSettings({ isOpen, onClose, onLogout, onUserUpdate }: AccountSettingsProps) {
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [emailChangeStatus, setEmailChangeStatus] = useState<any>(null);
   const [isEditing, setIsEditing] = useState({
     displayName: false,
     accountEmail: false,
@@ -110,12 +111,39 @@ export function AccountSettings({ isOpen, onClose, onLogout, onUserUpdate }: Acc
           is_active: Boolean(user.is_active)
         });
         setFormData(prev => ({ ...prev, displayName: userData?.display_name || "" }));
+        
+        // Fetch email change status for root users
+        if (user.is_root_user) {
+          await fetchEmailChangeStatus();
+        }
       } else {
         setUserData(null);
       }
     }
     fetchUser();
   }, []);
+
+  const fetchEmailChangeStatus = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = localStorage.getItem('auth-token');
+      
+      if (!token) return;
+
+      const response = await fetch(`${apiUrl}/api/user-management/account/email-change-status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const status = await response.json();
+        setEmailChangeStatus(status);
+      }
+    } catch (error) {
+      console.error('Failed to fetch email change status:', error);
+    }
+  };
 
   const copyAccountId = async () => {
     await navigator.clipboard.writeText(userData?.account_id || "N/A");
@@ -274,6 +302,9 @@ export function AccountSettings({ isOpen, onClose, onLogout, onUserUpdate }: Acc
         setFormData({ ...formData, currentEmail: "", newEmail: "" });
         setAlerts({ ...alerts, accountEmail: "Account email change request sent. Please check your emails." });
         setTimeout(() => setAlerts({ ...alerts, accountEmail: "" }), 5000);
+        
+        // Refresh email change status
+        await fetchEmailChangeStatus();
       } else {
         const errorData = await response.json();
         setAlerts({ ...alerts, accountEmail: errorData.detail || "Failed to request account email change." });
@@ -534,6 +565,88 @@ export function AccountSettings({ isOpen, onClose, onLogout, onUserUpdate }: Acc
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Email Change Status - Only for Root Users */}
+            {userData?.is_root_user && emailChangeStatus?.has_pending_request && (
+              <div className="space-y-3 p-4 bg-orange-50/50 rounded-lg border border-orange-200">
+                <h3 className="text-sm font-semibold text-orange-700 mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Email Change in Progress
+                </h3>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="text-orange-700">
+                    {emailChangeStatus.message}
+                  </div>
+                  
+                  {emailChangeStatus.status === 'partial_confirmed' && (
+                    <div className="space-y-2 p-3 bg-orange-100 rounded border border-orange-300">
+                      <div>
+                        <span className="text-orange-800 font-medium">Confirmed:</span>
+                        <span className="ml-2 text-orange-900 font-mono">{emailChangeStatus.confirmed_email}</span>
+                      </div>
+                      <div>
+                        <span className="text-orange-800 font-medium">Waiting for:</span>
+                        <span className="ml-2 text-orange-900 font-mono">{emailChangeStatus.pending_email}</span>
+                      </div>
+                      {emailChangeStatus.expires_at && (
+                        <div>
+                          <span className="text-orange-800 font-medium">Expires in:</span>
+                          <span className="ml-2 text-orange-900">
+                            {(() => {
+                              const expiry = new Date(emailChangeStatus.expires_at);
+                              const now = new Date();
+                              const diffMs = expiry.getTime() - now.getTime();
+                              const diffMins = Math.floor(diffMs / (1000 * 60));
+                              
+                              if (diffMins <= 0) return 'Expired';
+                              if (diffMins < 60) return `${diffMins} minutes`;
+                              const diffHours = Math.floor(diffMins / 60);
+                              return `${diffHours} hours ${diffMins % 60} minutes`;
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {emailChangeStatus.status === 'none_confirmed' && (
+                    <div className="space-y-2 p-3 bg-orange-100 rounded border border-orange-300">
+                      <div>
+                        <span className="text-orange-800 font-medium">Current:</span>
+                        <span className="ml-2 text-orange-900 font-mono">{emailChangeStatus.current_email}</span>
+                      </div>
+                      <div>
+                        <span className="text-orange-800 font-medium">New:</span>
+                        <span className="ml-2 text-orange-900 font-mono">{emailChangeStatus.new_email}</span>
+                      </div>
+                      {emailChangeStatus.expires_at && (
+                        <div>
+                          <span className="text-orange-800 font-medium">Expires in:</span>
+                          <span className="ml-2 text-orange-900">
+                            {(() => {
+                              const expiry = new Date(emailChangeStatus.expires_at);
+                              const now = new Date();
+                              const diffMs = expiry.getTime() - now.getTime();
+                              const diffMins = Math.floor(diffMs / (1000 * 60));
+                              
+                              if (diffMins <= 0) return 'Expired';
+                              if (diffMins < 60) return `${diffMins} minutes`;
+                              const diffHours = Math.floor(diffMins / 60);
+                              return `${diffHours} hours ${diffMins % 60} minutes`;
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-orange-600">
+                    Please check both email addresses for confirmation links. The email change will only take effect when both links are clicked.
+                  </div>
+                </div>
               </div>
             )}
 
