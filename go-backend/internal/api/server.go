@@ -3,6 +3,7 @@ package api
 import (
 	"scalebox-backend/internal/config"
 	"scalebox-backend/internal/database"
+	"scalebox-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,6 +12,9 @@ type Server struct {
 	config *config.Config
 	db     *database.Database
 	router *gin.Engine
+	emailService *services.EmailService
+	sandboxService *services.SandboxService
+	notificationService *services.NotificationService
 }
 
 func NewServer(cfg *config.Config, db *database.Database) *Server {
@@ -22,6 +26,9 @@ func NewServer(cfg *config.Config, db *database.Database) *Server {
 		config: cfg,
 		db:     db,
 		router: gin.Default(),
+		emailService: services.NewEmailService(cfg.SMTP),
+		sandboxService: services.NewSandboxService(db),
+		notificationService: services.NewNotificationService(db),
 	}
 
 	server.setupRoutes()

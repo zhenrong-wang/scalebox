@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: scalebox-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: scalebox_password
+      MYSQL_DATABASE: scalebox
+      MYSQL_USER: scalebox_user
+      MYSQL_PASSWORD: scalebox_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - scalebox-network
+
+  scalebox-backend:
+    build: .
+    container_name: scalebox-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=scalebox_user
+      - DB_PASSWORD=scalebox_password
+      - DB_NAME=scalebox
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_EXPIRE_HOURS=24
+      - PORT=8000
+      - ENVIRONMENT=development
+      - APP_BASE_URL=http://localhost:3000
+    depends_on:
+      - mysql
+    networks:
+      - scalebox-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  scalebox-network:
+    driver: bridge 
