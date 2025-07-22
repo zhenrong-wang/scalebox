@@ -25,19 +25,59 @@ export function NotificationButton() {
   const { t } = useLanguage();
 
   const fetchNotifications = async () => {
+    // Check if user is authenticated before fetching
+    const token = localStorage.getItem('auth-token');
+    if (!token) {
+      console.log("No auth token found, skipping notification fetch");
+      return;
+    }
+
     try {
       const response = await notificationService.getNotifications({ limit: 50 });
       setNotifications(response.notifications);
       setUnreadCount(response.unread_count);
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
+      // Don't show error toast for auth issues, just log them
+      if (error instanceof Error && error.message.includes('Authentication required')) {
+        console.log("Authentication required for notifications");
+      }
     }
   };
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
-    return () => clearInterval(interval);
+    // Only start fetching if we have an auth token
+    const token = localStorage.getItem('auth-token');
+    if (token) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  // Listen for authentication state changes
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const token = localStorage.getItem('auth-token');
+      if (token) {
+        fetchNotifications();
+      } else {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    };
+
+    // Listen for custom auth events
+    window.addEventListener('auth-required', handleAuthChange);
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'auth-token') {
+        handleAuthChange();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('auth-required', handleAuthChange);
+    };
   }, []);
 
   const handleSelectAll = () => {
@@ -236,9 +276,9 @@ export function NotificationButton() {
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
     if (diffInMinutes < 1) return t("notifications.justNow");
-    if (diffInMinutes < 60) return t("notifications.minutesAgo", { minutes: diffInMinutes });
-    if (diffInMinutes < 1440) return t("notifications.hoursAgo", { hours: Math.floor(diffInMinutes / 60) });
-    return t("notifications.daysAgo", { days: Math.floor(diffInMinutes / 1440) });
+    if (diffInMinutes < 60) return t("notifications.minutesAgo", { minutes: diffInMinutes.toString() });
+    if (diffInMinutes < 1440) return t("notifications.hoursAgo", { hours: Math.floor(diffInMinutes / 60).toString() });
+    return t("notifications.daysAgo", { days: Math.floor(diffInMinutes / 1440).toString() });
   };
 
   // --- Icon redesign ---

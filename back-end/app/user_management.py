@@ -1201,8 +1201,25 @@ async def send_email_change_confirmation(
     ScaleBox Team
     """
     
-    # TODO: Implement actual email sending
-    print(f"Email change confirmation sent to {email}: {confirmation_url}")
+    try:
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = settings.SMTP_FROM
+        message["To"] = email
+        message.set_content(body)
+        
+        await aiosmtplib.send(
+            message,
+            hostname=settings.SMTP_HOST,
+            port=settings.SMTP_PORT,
+            username=settings.SMTP_USER,
+            password=settings.SMTP_PASS,
+            use_tls=settings.SMTP_PORT == 465
+        )
+        print(f"Email change confirmation sent to {email}: {confirmation_url}")
+    except Exception as e:
+        print(f"Failed to send email change confirmation to {email}: {e}")
+        # Don't raise exception to avoid breaking the background task
 
 # Cleanup expired email change requests (can be called periodically)
 @router.post("/account/cleanup-expired-email-changes")

@@ -28,12 +28,12 @@ export function AccountUserManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isRegenerateUrlDialogOpen, setIsRegenerateUrlDialogOpen] = useState(false)
-  const [newUser, setNewUser] = useState<CreateUserRequest>({
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
+  const [newUser, setNewUser] = useState({
     username: "",
-    full_name: "",
+    display_name: "",
     description: ""
-  })
+  });
   const [editUser, setEditUser] = useState<UpdateUserRequest>({})
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -90,7 +90,7 @@ export function AccountUserManagement() {
     if (searchTerm.trim()) {
       filtered = filtered.filter(
         (user) =>
-          (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (user.display_name && user.display_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (user.username && user.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (user.description && user.description.toLowerCase().includes(searchTerm.toLowerCase())),
       )
@@ -113,13 +113,51 @@ export function AccountUserManagement() {
 
   const handleCreateUser = async () => {
     try {
+      // Validate username format
+      const username = newUser.username.trim();
+      if (!username) {
+        toast({
+          title: "Error",
+          description: "Username is required",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (username.length < 3) {
+        toast({
+          title: "Error",
+          description: "Username must be at least 3 characters long",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!username[0].match(/[a-z]/)) {
+        toast({
+          title: "Error",
+          description: "Username must start with a lowercase letter",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!username.match(/^[a-z0-9_-]+$/)) {
+        toast({
+          title: "Error",
+          description: "Username can only contain lowercase letters, numbers, underscores, and hyphens",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       await userManagementService.createUser(newUser)
       toast({
         title: "Success",
         description: "User created successfully. Check your email for credentials.",
       })
       setIsCreateDialogOpen(false)
-      setNewUser({ username: "", full_name: "", description: "" })
+      setNewUser({ username: "", display_name: "", description: "" })
       await loadUsers()
     } catch (error: any) {
       toast({
@@ -173,22 +211,22 @@ export function AccountUserManagement() {
     }
   }
 
-  const handleRegenerateSigninUrl = async () => {
+  const handleResetPassword = async () => {
     if (!selectedUser) return
     
     try {
-      const result = await userManagementService.regenerateSigninUrl(selectedUser.user_id)
+      await userManagementService.resetUserPassword(selectedUser.user_id)
       toast({
         title: "Success",
-        description: "Signin URL regenerated successfully",
+        description: "Password reset successfully. New credentials have been sent to your email.",
       })
-      setIsRegenerateUrlDialogOpen(false)
+      setIsResetPasswordDialogOpen(false)
       setSelectedUser(null)
       await loadUsers()
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to regenerate signin URL",
+        description: error.message || "Failed to reset password",
         variant: "destructive",
       })
     }
@@ -268,17 +306,20 @@ export function AccountUserManagement() {
                     <Input
                       id="username"
                       value={newUser.username}
-                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                      placeholder="Enter username"
+                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase() })}
+                      placeholder="Enter username (lowercase letters, numbers, _, -)"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Must start with lowercase letter, 3+ characters, only a-z, 0-9, _, -
+                    </p>
                   </div>
                   <div>
-                    <Label htmlFor="full_name">Full Name</Label>
+                    <Label htmlFor="display_name">Display Name</Label>
                     <Input
-                      id="full_name"
-                      value={newUser.full_name || ""}
-                      onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
-                      placeholder="Enter full name"
+                      id="display_name"
+                      value={newUser.display_name || ""}
+                      onChange={(e) => setNewUser({ ...newUser, display_name: e.target.value })}
+                      placeholder="Enter display name"
                     />
                   </div>
                   <div>
@@ -366,8 +407,8 @@ export function AccountUserManagement() {
                     <TableCell>
                       <div>
                         <div className="font-medium">{user.username}</div>
-                        {user.full_name && (
-                          <div className="text-sm text-muted-foreground">{user.full_name}</div>
+                        {user.display_name && (
+                          <div className="text-sm text-muted-foreground">{user.display_name}</div>
                         )}
                         {user.description && (
                           <div className="text-sm text-muted-foreground">{user.description}</div>
@@ -402,7 +443,7 @@ export function AccountUserManagement() {
                           <DropdownMenuItem onClick={() => {
                             setSelectedUser(user);
                             setEditUser({
-                              full_name: user.full_name || "",
+                              display_name: user.display_name || "",
                               description: user.description || ""
                             });
                             setIsEditDialogOpen(true);
@@ -410,13 +451,15 @@ export function AccountUserManagement() {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedUser(user);
-                            setIsRegenerateUrlDialogOpen(true);
-                          }}>
-                            <Key className="mr-2 h-4 w-4" />
-                            Regenerate Signin URL
-                          </DropdownMenuItem>
+                          {!user.is_root_user && (
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedUser(user);
+                              setIsResetPasswordDialogOpen(true);
+                            }}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Reset Password
+                            </DropdownMenuItem>
+                          )}
                           {!user.is_root_user && (
                             <DropdownMenuItem onClick={() => {
                               setSelectedUser(user);
@@ -448,12 +491,12 @@ export function AccountUserManagement() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit_full_name">Full Name</Label>
+              <Label htmlFor="edit_display_name">Display Name</Label>
               <Input
-                id="edit_full_name"
-                value={editUser.full_name || ""}
-                onChange={(e) => setEditUser({ ...editUser, full_name: e.target.value })}
-                placeholder="Enter full name"
+                id="edit_display_name"
+                value={editUser.display_name || ""}
+                onChange={(e) => setEditUser({ ...editUser, display_name: e.target.value })}
+                placeholder="Enter display name"
               />
             </div>
             <div>
@@ -470,8 +513,11 @@ export function AccountUserManagement() {
                 id="edit_is_active"
                 checked={editUser.is_active ?? true}
                 onCheckedChange={(checked) => setEditUser({ ...editUser, is_active: checked })}
+                disabled={selectedUser?.is_root_user}
               />
-              <Label htmlFor="edit_is_active">Active</Label>
+              <Label htmlFor="edit_is_active">
+                Active {selectedUser?.is_root_user && "(Root users cannot be disabled)"}
+              </Label>
             </div>
           </div>
           <DialogFooter>
@@ -505,21 +551,21 @@ export function AccountUserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Regenerate Signin URL Dialog */}
-      <Dialog open={isRegenerateUrlDialogOpen} onOpenChange={setIsRegenerateUrlDialogOpen}>
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Regenerate Signin URL</DialogTitle>
+            <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              This will generate a new signin URL for the user. The old URL will no longer work.
+              Are you sure you want to reset the password for this user? This will generate a new password and send it to the user's email.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRegenerateUrlDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRegenerateSigninUrl}>
-              Regenerate URL
+            <Button variant="destructive" onClick={handleResetPassword}>
+              Reset Password
             </Button>
           </DialogFooter>
         </DialogContent>

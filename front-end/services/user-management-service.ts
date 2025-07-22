@@ -3,7 +3,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export interface User {
   user_id: string;
   username: string;
-  full_name?: string;
+  display_name?: string;
   description?: string;
   is_active: boolean;
   is_root_user: boolean;
@@ -17,12 +17,12 @@ export interface User {
 
 export interface CreateUserRequest {
   username: string;
-  full_name?: string;
+  display_name?: string;
   description?: string;
 }
 
 export interface UpdateUserRequest {
-  full_name?: string;
+  display_name?: string;
   description?: string;
   is_active?: boolean;
 }
@@ -135,24 +135,6 @@ class UserManagementService {
     }
   }
 
-  async regenerateSigninUrl(userId: string): Promise<{ message: string; new_signin_url: string }> {
-    const response = await fetch(`${API_BASE}/api/user-management/users/${userId}/regenerate-signin-url`, {
-      method: 'POST',
-      headers: this.getAuthHeaders()
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        window.dispatchEvent(new CustomEvent('auth-required'));
-        throw new Error('Authentication required');
-      }
-      const errorData = await response.json();
-      throw new Error(errorData.detail || `Failed to regenerate signin URL: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
   async changePassword(passwordData: ChangePasswordRequest): Promise<{ message: string }> {
     const response = await fetch(`${API_BASE}/api/user-management/change-password`, {
       method: 'POST',
@@ -167,6 +149,24 @@ class UserManagementService {
       }
       const errorData = await response.json();
       throw new Error(errorData.detail || `Failed to change password: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async resetUserPassword(userId: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE}/api/user-management/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        window.dispatchEvent(new CustomEvent('auth-required'));
+        throw new Error('Authentication required');
+      }
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `Failed to reset user password: ${response.statusText}`);
     }
 
     return response.json();

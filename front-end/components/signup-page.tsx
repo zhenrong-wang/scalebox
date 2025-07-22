@@ -15,6 +15,7 @@ import { TermsModal } from "@/components/ui/terms-modal"
 // import type { CheckedState } from "@/components/ui/checkbox"
 import { useLanguage } from "../contexts/language-context"
 import { LanguageToggle } from "./language-toggle"
+import { ThemeToggle } from "./theme-toggle"
 import { UserService } from "../services/user-service"
 
 interface SignUpPageProps {
@@ -200,6 +201,10 @@ export const SignUpPage = React.forwardRef<{ resetCaptcha: () => void }, SignUpP
 
           <div className="absolute top-4 right-4">
             <LanguageToggle />
+          </div>
+
+          <div className="absolute top-4 right-20">
+            <ThemeToggle />
           </div>
 
           <div className="flex items-center justify-center gap-2 mb-4">

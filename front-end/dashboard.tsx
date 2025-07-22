@@ -32,6 +32,7 @@ import { useLanguage } from "./contexts/language-context"
 import { LanguageToggle } from "./components/language-toggle"
 import { AdminApiKeyManagement } from "./components/admin/api-key-management"
 import { NotificationButton } from "./components/notification-button"
+import { Badge } from "./components/ui/badge"
 
 export type PageType =
   | "sandboxes"
@@ -238,6 +239,10 @@ function DashboardContent() {
     setCurrentUser(null)
     setCurrentPage("projects") // Reset to default page
     setAuthState("landing")
+  }
+
+  const handleUserUpdate = (updatedUserData: any) => {
+    setCurrentUser(updatedUserData)
   }
 
   const handlePageChange = (page: PageType) => {
@@ -476,7 +481,33 @@ function DashboardContent() {
             {/* Header - Match sidebar header height */}
             <header className="bg-card border-b border-border px-6 py-4 h-[73px] flex items-center">
               <div className="flex items-center justify-between w-full">
-                <h1 className="text-2xl font-bold text-foreground">{getPageTitle()}</h1>
+                {/* Page Title */}
+                <div className="flex-1">
+                  <h1 className="text-2xl font-bold text-foreground">{getPageTitle()}</h1>
+                </div>
+                
+                {/* User Indicator */}
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-50 border mx-4 h-10">
+                  <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                  <div className="flex flex-col justify-center min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700 truncate">
+                        {currentUser?.display_name || currentUser?.username || currentUser?.email?.split('@')[0] || 'User'}
+                      </span>
+                      {isRootUser && (
+                        <span className="text-xs font-semibold text-orange-700">Root</span>
+                      )}
+                      {!isRootUser && currentUser?.role && (
+                        <span className="text-xs font-semibold text-blue-700">{currentUser.role}</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 truncate">
+                      Account ID: {currentUser?.account_id || currentUser?.id || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
                 <div className="flex items-center gap-3">
                   <LanguageToggle />
                   <ThemeToggle />
@@ -503,6 +534,7 @@ function DashboardContent() {
             isOpen={isAccountSettingsOpen} 
             onClose={() => setIsAccountSettingsOpen(false)}
             onLogout={handleLogout}
+            onUserUpdate={handleUserUpdate}
           />
 
           {/* Resize cursor overlay */}
