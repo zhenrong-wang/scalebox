@@ -110,8 +110,26 @@ function DashboardContent() {
       const loadUserData = async () => {
         try {
           console.log("=== LOADING USER DATA ===");
-          const userData = await UserService.getCurrentUser();
+          const userData = await UserService.getCurrentUser(false); // No auto-redirect for dashboard loading
           console.log("User data loaded:", userData);
+          
+          // Check if user data indicates suspended account
+          if (!userData) {
+            const cachedUserData = localStorage.getItem("user-data");
+            if (cachedUserData) {
+              try {
+                const parsed = JSON.parse(cachedUserData);
+                if (parsed.account_suspended) {
+                  // Redirect to suspended page
+                  window.location.replace("/account-suspended");
+                  return;
+                }
+              } catch (error) {
+                console.error("Failed to parse cached user data:", error);
+              }
+            }
+          }
+          
           setCurrentUser(userData);
           
           console.log("User type determination:");
@@ -190,7 +208,7 @@ function DashboardContent() {
       }
       
       // Fetch user profile for active accounts
-      const user = await UserService.getCurrentUser();
+      const user = await UserService.getCurrentUser(true); // Enable auto-redirect for active signin
       if (user) {
         setCurrentUser(user);
         setAuthState("authenticated");

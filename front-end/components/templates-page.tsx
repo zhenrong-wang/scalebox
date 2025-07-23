@@ -77,7 +77,7 @@ export function TemplatesPage() {
 
   const fetchCurrentUser = async () => {
     try {
-      const userData = await UserService.getCurrentUser()
+      const userData = await UserService.getCurrentUser(false) // No auto-redirect for component loading
       if (userData) {
         setCurrentUser({
           id: userData.id,

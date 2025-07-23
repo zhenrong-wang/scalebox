@@ -27,7 +27,7 @@ export default function LandingPageRoute() {
     
     // Check if user is already authenticated
     if (localStorage.getItem("auth-token")) {
-      // Check if account is suspended
+      // Check if account is suspended from cached data first
       const userData = localStorage.getItem("user-data")
       if (userData) {
         try {

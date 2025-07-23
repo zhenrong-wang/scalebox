@@ -90,7 +90,7 @@ export function AccountSettings({ isOpen, onClose, onLogout, onUserUpdate }: Acc
 
   useEffect(() => {
     async function fetchUser() {
-      const user = await UserService.getCurrentUser() as ApiUser | null;
+      const user = await UserService.getCurrentUser(false) as ApiUser | null; // No auto-redirect for settings loading
       if (user) {
         // Handle both account_id (from backend) and accountId (fallback)
         const accountId = user.account_id || user.accountId || user.id || 'N/A';

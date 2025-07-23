@@ -118,7 +118,7 @@ export class UserService {
   }
 
   // Optionally, implement getCurrentUser by calling a /users/me endpoint with the JWT
-  static async getCurrentUser() {
+  static async getCurrentUser(autoRedirect: boolean = false) {
     const token = localStorage.getItem("auth-token");
     if (!token) return null;
     const res = await fetch(`${this.API_BASE}/api/users/me`, {
@@ -139,8 +139,8 @@ export class UserService {
           account_suspended: true,
           account_name: errorData.account_name || "Unknown Account"
         }));
-        // Dispatch account suspended event
-        if (typeof window !== "undefined") {
+        // Only redirect if autoRedirect is true (for active signin flows)
+        if (autoRedirect && typeof window !== "undefined") {
           window.location.replace("/account-suspended");
         }
         return null;

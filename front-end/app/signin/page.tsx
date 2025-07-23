@@ -52,7 +52,7 @@ export default function SignInRoute() {
       }
       
       // Fetch user profile for active accounts
-      const user = await UserService.getCurrentUser()
+      const user = await UserService.getCurrentUser(true) // Enable auto-redirect for active signin
       if (user) {
         setCurrentUser(user)
         setAuthState("authenticated")
