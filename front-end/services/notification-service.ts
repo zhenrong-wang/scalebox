@@ -67,7 +67,19 @@ export class NotificationService {
       headers: getAuthHeaders(),
     });
 
-    return handleResponse(response);
+    const data = await handleResponse(response);
+    
+    // Map backend response to frontend format
+    const mappedNotifications = (data.notifications || []).map((notification: any) => ({
+      ...notification,
+      id: notification.notification_id || notification.id, // Map notification_id to id
+    }));
+
+    return {
+      notifications: mappedNotifications,
+      total: data.total || mappedNotifications.length,
+      unread_count: data.unread_count || mappedNotifications.filter((n: any) => !n.is_read).length,
+    };
   }
 
   async getNotification(id: string): Promise<Notification> {
@@ -76,7 +88,13 @@ export class NotificationService {
       headers: getAuthHeaders(),
     });
 
-    return handleResponse(response);
+    const data = await handleResponse(response);
+    
+    // Map backend response to frontend format
+    return {
+      ...data,
+      id: data.notification_id || data.id, // Map notification_id to id
+    };
   }
 
   async markAsRead(id: string): Promise<{ message: string }> {

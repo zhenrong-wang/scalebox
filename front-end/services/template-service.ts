@@ -4,10 +4,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 // Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth-token')
-  return {
+  
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : '',
   }
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  return headers
 }
 
 // Helper function to handle API responses
@@ -30,7 +36,7 @@ const handleResponse = async (response: Response) => {
 }
 
 export interface Template {
-  id: string;
+  template_id: string;
   name: string;
   description?: string;
   category: string;
@@ -85,7 +91,7 @@ export interface TemplateFilters {
 }
 
 export class TemplateService {
-  private baseUrl = `${API_BASE_URL}/api/templates`;
+  private baseUrl = `${API_BASE_URL}/api/templates/`;
 
   async getTemplates(filters: TemplateFilters = {}): Promise<TemplateListResponse> {
     const params = new URLSearchParams();
@@ -97,7 +103,9 @@ export class TemplateService {
     if (filters.skip) params.append('skip', filters.skip.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
+    const url = params.toString() ? `${this.baseUrl}?${params.toString()}` : this.baseUrl;
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -105,8 +113,8 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async getTemplate(id: string): Promise<Template> {
-    const response = await fetch(`${this.baseUrl}/${id}`, {
+  async getTemplate(templateId: string): Promise<Template> {
+    const response = await fetch(`${this.baseUrl}${templateId}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -124,8 +132,8 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async updateTemplate(id: string, template: TemplateUpdateRequest): Promise<Template> {
-    const response = await fetch(`${this.baseUrl}/${id}`, {
+  async updateTemplate(templateId: string, template: TemplateUpdateRequest): Promise<Template> {
+    const response = await fetch(`${this.baseUrl}${templateId}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(template),
@@ -134,8 +142,8 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async deleteTemplate(id: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/${id}`, {
+  async deleteTemplate(templateId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}${templateId}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -150,7 +158,7 @@ export class TemplateService {
     if (filters.skip) params.append('skip', filters.skip.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const response = await fetch(`${this.baseUrl}/admin/all?${params.toString()}`, {
+    const response = await fetch(`${this.baseUrl}admin/all?${params.toString()}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -158,8 +166,8 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async makeTemplateOfficial(id: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.baseUrl}/admin/${id}/make-official`, {
+  async makeTemplateOfficial(templateId: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseUrl}admin/${templateId}/make-official`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -167,8 +175,8 @@ export class TemplateService {
     return handleResponse(response);
   }
 
-  async makeTemplatePublic(id: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.baseUrl}/admin/${id}/make-public`, {
+  async makeTemplatePublic(templateId: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseUrl}admin/${templateId}/make-public`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });

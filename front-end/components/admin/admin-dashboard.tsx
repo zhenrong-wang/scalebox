@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { UserManagement } from "./user-management"
+import { AccountManagement } from "./account-management"
 import { UsageAnalytics } from "./usage-analytics"
 import { BillingOverview } from "./billing-overview"
 import { SystemHealth } from "./system-health"
@@ -59,7 +59,7 @@ export function AdminDashboard() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">{t("admin.overview")}</TabsTrigger>
-          <TabsTrigger value="users">{t("admin.userManagement")}</TabsTrigger>
+          <TabsTrigger value="users">{t("admin.accountManagement")}</TabsTrigger>
           <TabsTrigger value="analytics">{t("admin.usageAnalytics")}</TabsTrigger>
           <TabsTrigger value="billing">{t("admin.billingOverview")}</TabsTrigger>
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
@@ -70,7 +70,7 @@ export function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
-          <UserManagement />
+          <AccountManagement />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">

@@ -81,7 +81,8 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    return await this.handleResponse(response);
+    const data = await this.handleResponse(response);
+    return data.api_keys || [];
   }
 
   static async getApiKey(keyId: string): Promise<ApiKey> {
@@ -111,14 +112,29 @@ export class ApiKeyService {
     return await this.handleResponse(response);
   }
 
-  static async toggleApiKeyStatus(keyId: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}/toggle`, {
-      method: "POST",
-      headers: this.getAuthHeaders(),
+  static async updateApiKeyStatus(keyId: string, isActive: boolean): Promise<{ message: string; is_active: boolean }> {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/${keyId}/status`, {
+      method: "PATCH",
+      headers: {
+        ...this.getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ is_active: isActive }),
     });
 
     return await this.handleResponse(response);
   }
+
+  // Convenience methods for enable/disable
+  static async enableApiKey(keyId: string): Promise<{ message: string; is_active: boolean }> {
+    return this.updateApiKeyStatus(keyId, true);
+  }
+
+  static async disableApiKey(keyId: string): Promise<{ message: string; is_active: boolean }> {
+    return this.updateApiKeyStatus(keyId, false);
+  }
+
+
 
 
 

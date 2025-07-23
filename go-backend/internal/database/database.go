@@ -32,12 +32,9 @@ func Init(cfg config.DatabaseConfig) (*Database, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Auto migrate models
-	if err := autoMigrate(db); err != nil {
-		return nil, fmt.Errorf("failed to auto migrate: %w", err)
-	}
-
-	log.Println("Database connected and migrated successfully")
+	// Skip auto migration for now since existing database schema is incompatible
+	// TODO: Create proper migration scripts for production
+	log.Println("Database connected successfully (auto-migration skipped)")
 	return &Database{DB: db}, nil
 }
 
@@ -55,10 +52,11 @@ func autoMigrate(db *gorm.DB) error {
 		&models.BillingRecord{},
 		&models.PendingSignup{},
 		&models.AccountEmailChange{},
+		&models.TokenBlacklist{},
 	)
 }
 
 // GetDB returns the underlying GORM DB instance
 func (d *Database) GetDB() *gorm.DB {
 	return d.DB
-} 
+}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"scalebox-backend/internal/config"
@@ -80,13 +79,13 @@ func (s *Server) handleSignup(c *gin.Context) {
 	} else {
 		// Create new pending signup
 		pendingSignup = models.PendingSignup{
-			SignupID:         utils.GenerateResourceID("sup", 17),
-			Email:            req.Email,
-			Username:         req.Email[:len(req.Email)-len("@example.com")],
-			DisplayName:      &req.Name,
+			SignupID:          utils.GenerateResourceID("sup", 17),
+			Email:             req.Email,
+			Username:          req.Email[:len(req.Email)-len("@example.com")],
+			DisplayName:       &req.Name,
 			VerificationToken: verificationCode,
-			PasswordHash:     string(hashedPassword),
-			ExpiresAt:        expiresAt,
+			PasswordHash:      string(hashedPassword),
+			ExpiresAt:         expiresAt,
 		}
 		s.db.DB.Create(&pendingSignup)
 	}
@@ -94,7 +93,7 @@ func (s *Server) handleSignup(c *gin.Context) {
 	// TODO: Send verification email
 	// For now, just return the code
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Signup successful. Please check your email for the verification code.",
+		"message":           "Signup successful. Please check your email for the verification code.",
 		"verification_code": verificationCode, // Remove this in production
 	})
 }
@@ -122,10 +121,42 @@ func (s *Server) handleSignin(c *gin.Context) {
 		return
 	}
 
+	// Get account information to check if it's suspended
+	var account models.Account
+	if err := s.db.DB.Where("account_id = ?", user.AccountID).First(&account).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch account information"})
+		return
+	}
+
+	// Update last login time
+	user.LastLogin = &time.Time{}
+	*user.LastLogin = time.Now()
+	if err := s.db.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last login"})
+		return
+	}
+
 	// Generate JWT token
 	token, err := s.generateJWT(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	// Check if account is suspended and return special flag
+	if !account.IsActive {
+		c.JSON(http.StatusOK, gin.H{
+			"access_token":      token,
+			"token_type":        "bearer",
+			"account_suspended": true,
+			"account_name":      account.Name,
+			"user": gin.H{
+				"id":    user.UserID,
+				"email": user.Email,
+				"name":  user.DisplayName,
+			},
+			"message": "Account is suspended. You will be redirected to the suspension page.",
+		})
 		return
 	}
 
@@ -157,10 +188,10 @@ func (s *Server) handleVerifyEmail(c *gin.Context) {
 
 	// Create account and user
 	account := models.Account{
-		AccountID: utils.GenerateAccountID(),
-		Name:      "My Account",
-		Email:     &pendingSignup.Email,
-		IsActive:  true,
+		AccountID:  utils.GenerateAccountID(),
+		Name:       "My Account",
+		Email:      &pendingSignup.Email,
+		IsActive:   true,
 		IsVerified: true,
 	}
 
@@ -170,16 +201,16 @@ func (s *Server) handleVerifyEmail(c *gin.Context) {
 	}
 
 	user := models.User{
-		UserID:           utils.GenerateUserID(),
-		AccountID:        account.AccountID,
-		Email:            pendingSignup.Email,
-		Username:         pendingSignup.Username,
-		PasswordHash:     pendingSignup.PasswordHash,
-		DisplayName:      pendingSignup.DisplayName,
-		IsActive:         true,
-		IsVerified:       true,
-		IsRootUser:       true,
-		DedicatedSigninURL: utils.GenerateDedicatedSigninURL(),
+		UserID:             utils.GenerateUserID(),
+		AccountID:          account.AccountID,
+		Email:              pendingSignup.Email,
+		Username:           pendingSignup.Username,
+		PasswordHash:       pendingSignup.PasswordHash,
+		DisplayName:        pendingSignup.DisplayName,
+		IsActive:           true,
+		IsVerified:         true,
+		IsRootUser:         true,
+		DedicatedSigninURL: utils.StringPtr(utils.GenerateDedicatedSigninURL(account.AccountID)),
 	}
 
 	if err := s.db.DB.Create(&user).Error; err != nil {
@@ -207,12 +238,12 @@ func (s *Server) handleVerifyEmail(c *gin.Context) {
 
 func (s *Server) generateJWT(user models.User) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":         user.ID,
-		"email":       user.Email,
-		"user_id":     user.UserID,
-		"account_id":  user.AccountID,
+		"sub":          user.ID,
+		"email":        user.Email,
+		"user_id":      user.UserID,
+		"account_id":   user.AccountID,
 		"is_root_user": user.IsRootUser,
-		"exp":         time.Now().Add(time.Duration(s.config.JWT.ExpireHours) * time.Hour).Unix(),
+		"exp":          time.Now().Add(time.Duration(s.config.JWT.ExpireHours) * time.Hour).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -246,6 +277,15 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Check if token is blacklisted
+		tokenHash := utils.HashString(tokenString)
+		var blacklistedToken models.TokenBlacklist
+		if err := s.db.DB.Where("token_hash = ?", tokenHash).First(&blacklistedToken).Error; err == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has been invalidated"})
+			c.Abort()
+			return
+		}
+
 		userID := uint(claims["sub"].(float64))
 		var user models.User
 		if err := s.db.DB.First(&user, userID).Error; err != nil {
@@ -254,7 +294,25 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Check if account is disabled
+		var account models.Account
+		if err := s.db.DB.Where("account_id = ?", user.AccountID).First(&account).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch account information"})
+			c.Abort()
+			return
+		}
+
+		if !account.IsActive {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":             "Account is suspended",
+				"message":           "Your account has been suspended. Please contact support for assistance.",
+				"account_suspended": true,
+			})
+			c.Abort()
+			return
+		}
+
 		c.Set("user", user)
 		c.Next()
 	}
-} 
+}

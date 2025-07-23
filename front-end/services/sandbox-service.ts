@@ -68,7 +68,7 @@ export class SandboxService {
       })
 
       const data = await handleResponse(response)
-      return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+      return (data.sandboxes || data).map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
     } catch (error) {
       console.error('Failed to fetch sandboxes:', error)
       // Return empty array if the request fails
@@ -217,7 +217,7 @@ export class SandboxService {
       })
 
       const data = await handleResponse(response)
-      return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+      return (data.sandboxes || data).map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
     } catch (error) {
       console.error('Failed to fetch all sandboxes:', error)
       return []
@@ -296,7 +296,7 @@ export class SandboxService {
     })
 
     const data = await handleResponse(response)
-    return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+    return (data.sandboxes || data).map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
   }
 
   // Get all sandboxes for a specific project
@@ -309,7 +309,7 @@ export class SandboxService {
         headers: getAuthHeaders(),
       })
       const data = await handleResponse(response)
-      return data.map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
+      return (data.sandboxes || data).map((sandbox: any) => this.mapApiResponseToSandbox(sandbox))
     } catch (error) {
       console.error('Failed to fetch sandboxes by project:', error)
       return []
@@ -319,34 +319,34 @@ export class SandboxService {
   // Helper function to map API response to Sandbox interface
   private static mapApiResponseToSandbox(apiData: any): Sandbox {
     return {
-      id: apiData.id,
+      id: apiData.sandbox_id || apiData.id,
       name: apiData.name,
       description: apiData.description || '',
       status: apiData.status,
-      user_account_id: apiData.user_id, // Backend returns user_id, but frontend interface still uses user_account_id
-      userName: apiData.user_name,
-      userEmail: apiData.user_email,
-      region: apiData.region,
-      visibility: apiData.visibility,
+      user_account_id: apiData.owner_user_id || apiData.user_id, // Backend returns owner_user_id
+      userName: apiData.user_name || '',
+      userEmail: apiData.user_email || '',
+      region: apiData.region || '',
+      visibility: apiData.visibility || 'private',
       template_id: apiData.template_id || '',
       template_name: apiData.template_name || '',
       project_id: apiData.project_id || '',
       project_name: apiData.project_name || '',
       resources: {
-        cpu: apiData.resources.cpu || 0,
-        memory: apiData.resources.memory || 0,
-        storage: apiData.resources.storage || 0,
-        bandwidth: apiData.resources.bandwidth || 0,
+        cpu: apiData.resources?.cpu || apiData.cpu_spec || 0,
+        memory: apiData.resources?.memory || apiData.memory_spec || 0,
+        storage: apiData.resources?.storage || 0,
+        bandwidth: apiData.resources?.bandwidth || 0,
       },
-      cpu_spec: apiData.cpu_spec,
-      memory_spec: apiData.memory_spec,
+      cpu_spec: apiData.cpu_spec || 0,
+      memory_spec: apiData.memory_spec || 0,
       cost: {
-        hourlyRate: apiData.cost.hourlyRate || 0,
-        totalCost: apiData.cost.totalCost || 0,
+        hourlyRate: apiData.cost?.hourlyRate || 0,
+        totalCost: apiData.cost?.totalCost || 0,
       },
       createdAt: apiData.created_at,
       updatedAt: apiData.updated_at,
-      lastAccessedAt: apiData.last_accessed_at,
+      lastAccessedAt: apiData.last_accessed_at || apiData.updated_at,
       uptime: apiData.uptime || 0,
     }
   }

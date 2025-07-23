@@ -12,7 +12,7 @@ const nextConfig = {
   env: {
     // Update this URL when your public IP address changes
     // Format: http://YOUR_NEW_PUBLIC_IP:8000
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://43.198.218.173:8000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
   experimental: {
     // Update this array when your public IP address changes

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Plus, MoreHorizontal, RefreshCw, Copy, Eye, Edit, Trash2, Key, Users } from "lucide-react"
+import { Search, Plus, MoreHorizontal, RefreshCw, Copy, Eye, Edit, Trash2, Key, Users, Power, PowerOff } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -29,11 +29,16 @@ export function AccountUserManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
+  const [isToggleStatusDialogOpen, setIsToggleStatusDialogOpen] = useState(false)
   const [newUser, setNewUser] = useState({
     username: "",
     display_name: "",
-    description: ""
+    description: "",
+    role: "user",
+    is_active: true
   });
+  const [usernameError, setUsernameError] = useState("");
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const [editUser, setEditUser] = useState<UpdateUserRequest>({})
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -151,20 +156,38 @@ export function AccountUserManagement() {
         return;
       }
       
-      await userManagementService.createUser(newUser)
+      // Prepare user data with defaults
+      const userData = {
+        ...newUser,
+        display_name: newUser.display_name.trim() || newUser.username,
+        description: newUser.description.trim() || newUser.username
+      };
+      
+      await userManagementService.createUser(userData)
       toast({
         title: "Success",
         description: "User created successfully. Check your email for credentials.",
       })
       setIsCreateDialogOpen(false)
-      setNewUser({ username: "", display_name: "", description: "" })
+      setNewUser({ username: "", display_name: "", description: "", role: "user", is_active: true })
+      setUsernameError("")
       await loadUsers()
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create user",
-        variant: "destructive",
-      })
+      // Handle specific backend validation errors
+      if (error.message && error.message.includes("already exists")) {
+        setUsernameError("Username already exists");
+        toast({
+          title: "Error",
+          description: "Username already exists. Please choose a different username.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create user",
+          variant: "destructive",
+        });
+      }
     }
   }
 
@@ -227,6 +250,28 @@ export function AccountUserManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to reset password",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleStatus = async () => {
+    if (!selectedUser) return
+
+    try {
+      const newStatus = !selectedUser.is_active
+      await userManagementService.updateUser(selectedUser.user_id, { is_active: newStatus })
+      toast({
+        title: "Success",
+        description: `User ${newStatus ? 'enabled' : 'disabled'} successfully.`,
+      })
+      setIsToggleStatusDialogOpen(false)
+      setSelectedUser(null)
+      await loadUsers()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
         variant: "destructive",
       })
     }
@@ -303,15 +348,57 @@ export function AccountUserManagement() {
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="username">Username *</Label>
-                    <Input
-                      id="username"
-                      value={newUser.username}
-                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase() })}
-                      placeholder="Enter username (lowercase letters, numbers, _, -)"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Must start with lowercase letter, 3+ characters, only a-z, 0-9, _, -
-                    </p>
+                    <div className="relative">
+                      <Input
+                        id="username"
+                        value={newUser.username}
+                        onChange={(e) => {
+                          const value = e.target.value.toLowerCase();
+                          setNewUser({ ...newUser, username: value });
+                          
+                          // Real-time validation
+                          if (!value.trim()) {
+                            setUsernameError("Username is required");
+                          } else if (value.length < 3) {
+                            setUsernameError("Username must be at least 3 characters long");
+                          } else if (!value[0].match(/[a-z]/)) {
+                            setUsernameError("Username must start with a lowercase letter");
+                          } else if (!value.match(/^[a-z0-9_-]+$/)) {
+                            setUsernameError("Username can only contain lowercase letters, numbers, underscores, and hyphens");
+                          } else {
+                            // Check for duplicate username
+                            const existingUser = users.find(user => 
+                              user.username.toLowerCase() === value.toLowerCase()
+                            );
+                            
+                            if (existingUser) {
+                              setUsernameError("Username already exists");
+                            } else {
+                              setUsernameError("");
+                            }
+                          }
+                        }}
+                        placeholder="Enter username (lowercase letters, numbers, _, -)"
+                        className={usernameError ? "border-red-500" : ""}
+                      />
+                      {isCheckingDuplicate && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                        </div>
+                      )}
+                      {!usernameError && newUser.username.trim() && !isCheckingDuplicate && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="text-green-500">✓</div>
+                        </div>
+                      )}
+                    </div>
+                    {usernameError ? (
+                      <p className="text-xs text-red-500 mt-1">{usernameError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Must start with lowercase letter, 3+ characters, only a-z, 0-9, _, -
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="display_name">Display Name</Label>
@@ -319,8 +406,11 @@ export function AccountUserManagement() {
                       id="display_name"
                       value={newUser.display_name || ""}
                       onChange={(e) => setNewUser({ ...newUser, display_name: e.target.value })}
-                      placeholder="Enter display name"
+                      placeholder="Enter display name (will default to username if empty)"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional. Will use username if left empty.
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="description">Description</Label>
@@ -328,15 +418,18 @@ export function AccountUserManagement() {
                       id="description"
                       value={newUser.description || ""}
                       onChange={(e) => setNewUser({ ...newUser, description: e.target.value })}
-                      placeholder="Enter description"
+                      placeholder="Enter description (will default to username if empty)"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional. Will use username if left empty.
+                    </p>
                   </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreateUser} disabled={!newUser.username.trim()}>
+                  <Button onClick={handleCreateUser} disabled={!newUser.username.trim() || !!usernameError}>
                     Create User
                   </Button>
                 </DialogFooter>
@@ -385,19 +478,20 @@ export function AccountUserManagement() {
                 <TableHead>Status</TableHead>
                 <TableHead>Last Login</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableHead>Signin URL</TableHead>
+                <TableHead className="w-12">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Loading users...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No users found
                   </TableCell>
                 </TableRow>
@@ -432,6 +526,56 @@ export function AccountUserManagement() {
                       {formatDate(user.created_at)}
                     </TableCell>
                     <TableCell>
+                      {!user.is_root_user && user.dedicated_signin_url ? (
+                        <div className="flex items-center gap-2">
+                          {user.is_active ? (
+                            <>
+                              <div className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md border border-blue-200 transition-colors">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <a
+                                  href={`http://localhost:3000/signin/${user.dedicated_signin_url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-700 hover:text-blue-900 text-xs font-medium"
+                                >
+                                  Signin Link
+                                </a>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => copyToClipboard(`http://localhost:3000/signin/${user.dedicated_signin_url}`)}
+                                className="h-6 w-6 p-0 hover:bg-blue-50"
+                                title="Copy signin link"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md border border-gray-200 opacity-60">
+                                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                <span className="text-gray-500 text-xs font-medium line-through">
+                                  Signin Link
+                                </span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled
+                                className="h-6 w-6 p-0 opacity-50 cursor-not-allowed"
+                                title="Link disabled - user is inactive"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -451,6 +595,19 @@ export function AccountUserManagement() {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
+                          {!user.is_root_user && (
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedUser(user);
+                              setIsToggleStatusDialogOpen(true);
+                            }}>
+                              {user.is_active ? (
+                                <PowerOff className="mr-2 h-4 w-4" />
+                              ) : (
+                                <Power className="mr-2 h-4 w-4" />
+                              )}
+                              {user.is_active ? 'Disable' : 'Enable'} User
+                            </DropdownMenuItem>
+                          )}
                           {!user.is_root_user && (
                             <DropdownMenuItem onClick={() => {
                               setSelectedUser(user);
@@ -508,17 +665,6 @@ export function AccountUserManagement() {
                 placeholder="Enter description"
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="edit_is_active"
-                checked={editUser.is_active ?? true}
-                onCheckedChange={(checked) => setEditUser({ ...editUser, is_active: checked })}
-                disabled={selectedUser?.is_root_user}
-              />
-              <Label htmlFor="edit_is_active">
-                Active {selectedUser?.is_root_user && "(Root users cannot be disabled)"}
-              </Label>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
@@ -546,6 +692,32 @@ export function AccountUserManagement() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteUser}>
               Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toggle Status Dialog */}
+      <Dialog open={isToggleStatusDialogOpen} onOpenChange={setIsToggleStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedUser?.is_active ? 'Disable' : 'Enable'} User</DialogTitle>
+            <DialogDescription>
+              {selectedUser?.is_active 
+                ? `Are you sure you want to disable ${selectedUser?.display_name || selectedUser?.username}? This user will no longer be able to sign in using their dedicated link.`
+                : `Are you sure you want to enable ${selectedUser?.display_name || selectedUser?.username}? This user will be able to sign in using their dedicated link.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsToggleStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant={selectedUser?.is_active ? "destructive" : "default"} 
+              onClick={handleToggleStatus}
+            >
+              {selectedUser?.is_active ? 'Disable' : 'Enable'} User
             </Button>
           </DialogFooter>
         </DialogContent>

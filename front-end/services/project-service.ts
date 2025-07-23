@@ -23,6 +23,22 @@ const handleResponse = async (response: Response) => {
     }
     throw new Error('Authentication required. Please log in.');
   }
+  if (response.status === 403) {
+    // Check if it's an account suspension
+    const errorData = await response.json().catch(() => ({}));
+          if (errorData.account_suspended) {
+        // Store suspended account info
+        localStorage.setItem("user-data", JSON.stringify({
+          account_suspended: true,
+          account_name: errorData.account_name || "Unknown Account"
+        }));
+        // Redirect to suspension page and replace history
+        if (typeof window !== "undefined") {
+          window.location.replace("/account-suspended");
+        }
+        throw new Error('Account is suspended');
+      }
+  }
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)

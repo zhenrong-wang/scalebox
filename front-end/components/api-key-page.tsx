@@ -129,7 +129,7 @@ export function ApiKeyPage() {
     setError("");
     setSuccess("");
     try {
-      await ApiKeyService.toggleApiKeyStatus(keyId);
+      await ApiKeyService.enableApiKey(keyId);
       toggleKeyStatus(keyId);
       setSuccess(t("apiKey.statusUpdated") || "API key status updated successfully!");
     } catch (e: unknown) {
@@ -172,7 +172,7 @@ export function ApiKeyPage() {
     setError("")
     setSuccess("")
     try {
-      await ApiKeyService.toggleApiKeyStatus(disableDialog.keyId);
+      await ApiKeyService.disableApiKey(disableDialog.keyId);
       toggleKeyStatus(disableDialog.keyId);
       setSuccess(t("apiKey.statusUpdated") || "API key status updated successfully!");
       closeDisableDialog();

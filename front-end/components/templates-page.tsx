@@ -53,7 +53,7 @@ export function TemplatesPage() {
   });
 
   const [editTemplate, setEditTemplate] = useState({
-    id: '',
+    template_id: '',
     name: '',
     description: '',
     category: '',
@@ -240,7 +240,7 @@ export function TemplatesPage() {
 
   const handleEditTemplate = (template: Template) => {
     setEditTemplate({
-      id: template.id,
+              template_id: template.template_id,
       name: template.name,
       description: template.description || '',
       category: template.category,
@@ -265,7 +265,7 @@ export function TemplatesPage() {
         is_public: editDialog.template?.is_public || false
       }
       
-      await templateService.updateTemplate(editDialog.template.id, templateData)
+      await templateService.updateTemplate(editDialog.template.template_id, templateData)
       setEditDialog({ open: false, template: null })
       fetchTemplates()
       toast({
@@ -284,14 +284,14 @@ export function TemplatesPage() {
 
   const updateTemplateDescription = async (templateId: string, newDescription: string) => {
     try {
-      const template = templates.find(t => t.id === templateId);
+      const template = templates.find(t => t.template_id === templateId);
       if (!template) throw new Error("Template not found");
       
       const updatedTemplate = { ...template, description: newDescription };
       await templateService.updateTemplate(templateId, updatedTemplate);
       
       setTemplates(prev => prev.map(t => 
-        t.id === templateId ? updatedTemplate : t
+        t.template_id === templateId ? updatedTemplate : t
       ));
       toast({
         title: "Success",
@@ -311,14 +311,14 @@ export function TemplatesPage() {
 
   const updateTemplateName = async (templateId: string, newName: string) => {
     try {
-      const template = templates.find(t => t.id === templateId);
+      const template = templates.find(t => t.template_id === templateId);
       if (!template) throw new Error("Template not found");
       
       const updatedTemplate = { ...template, name: newName };
       await templateService.updateTemplate(templateId, updatedTemplate);
       
       setTemplates(prev => prev.map(t => 
-        t.id === templateId ? updatedTemplate : t
+        t.template_id === templateId ? updatedTemplate : t
       ));
       toast({
         title: "Success",
@@ -351,7 +351,7 @@ export function TemplatesPage() {
     if (!deleteDialog.template) return
     
     try {
-      await templateService.deleteTemplate(deleteDialog.template.id)
+      await templateService.deleteTemplate(deleteDialog.template.template_id)
       setDeleteDialog({ open: false, template: null })
       fetchTemplates()
       toast({
@@ -407,7 +407,7 @@ export function TemplatesPage() {
     if (selectedTemplates.length === filteredTemplates.length) {
       setSelectedTemplates([])
     } else {
-      setSelectedTemplates(filteredTemplates.map(t => t.id))
+      setSelectedTemplates(filteredTemplates.map(t => t.template_id))
     }
   }
 
@@ -422,7 +422,7 @@ export function TemplatesPage() {
   const handleBatchDelete = async () => {
     try {
       for (const templateId of selectedTemplates) {
-        const template = templates.find(t => t.id === templateId)
+        const template = templates.find(t => t.template_id === templateId)
         if (template && templateService.canDelete(template, currentUser.id, currentUser.role === 'admin')) {
           await templateService.deleteTemplate(templateId)
         }
@@ -678,11 +678,11 @@ export function TemplatesPage() {
               </TableHeader>
               <TableBody>
                 {filteredTemplates.map((template) => (
-                  <TableRow key={template.id}>
+                  <TableRow key={template.template_id}>
                     <ResizableTableCell>
                       <Checkbox
-                        checked={selectedTemplates.includes(template.id)}
-                        onCheckedChange={() => handleSelectTemplate(template.id)}
+                        checked={selectedTemplates.includes(template.template_id)}
+                        onCheckedChange={() => handleSelectTemplate(template.template_id)}
                         disabled={!templateService.canDelete(template, currentUser.id, currentUser.role === 'admin')}
                       />
                     </ResizableTableCell>
@@ -690,7 +690,7 @@ export function TemplatesPage() {
                       <div>
                         <EditableName
                           value={template.name}
-                          onSave={(newName) => updateTemplateName(template.id, newName)}
+                          onSave={(newName) => updateTemplateName(template.template_id, newName)}
                           onValidateDuplicate={validateTemplateNameDuplicate}
                           placeholder={t('templates.name') || "Enter template name"}
                           resourceType="template"
@@ -698,15 +698,15 @@ export function TemplatesPage() {
                           disabled={!templateService.canEdit(template, currentUser.id, currentUser.role === 'admin')}
                         />
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                          <span className="font-mono">{template.id}</span>
-                          <CopyButton value={template.id} size="sm" variant="ghost" />
+                          <span className="font-mono">{template.template_id}</span>
+                          <CopyButton value={template.template_id} size="sm" variant="ghost" />
                         </div>
                       </div>
                     </ResizableTableCell>
                     <ResizableTableCell>
                       <EditableDescription
                         value={template.description || ""}
-                        onSave={(newDescription) => updateTemplateDescription(template.id, newDescription)}
+                        onSave={(newDescription) => updateTemplateDescription(template.template_id, newDescription)}
                         placeholder={t('templates.description_field') || "Enter description"}
                         className="text-sm text-muted-foreground"
                         disabled={!templateService.canEdit(template, currentUser.id, currentUser.role === 'admin')}

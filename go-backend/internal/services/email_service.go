@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"net/smtp"
 
 	"scalebox-backend/internal/config"
 )
@@ -86,19 +85,86 @@ func (e *EmailService) SendWelcomeEmail(email, displayName string) error {
 	return e.sendEmail(email, subject, body)
 }
 
+func (e *EmailService) SendUserCreationEmail(email, username, displayName, initialPassword, dedicatedSigninURL string) error {
+	subject := "Your ScaleBox Account Has Been Created"
+	body := fmt.Sprintf(`
+		<h2>Welcome to ScaleBox! 🎉</h2>
+		<p>Hello %s,</p>
+		<p>Your ScaleBox account has been created by your administrator. Here are your login credentials:</p>
+		
+		<h3>Login Information:</h3>
+		<p><strong>Username:</strong> %s</p>
+		<p><strong>Initial Password:</strong> %s</p>
+		<p><strong>Dedicated Signin URL:</strong> <a href="%s">%s</a></p>
+		
+		<h3>How to Sign In:</h3>
+		<p>You can sign in using either:</p>
+		<ol>
+			<li><strong>Dedicated URL:</strong> Click the link above or visit: %s</li>
+			<li><strong>Regular Login:</strong> Use your username and password on the main login page</li>
+		</ol>
+		
+		<p><strong>Important:</strong> Please change your password after your first login for security.</p>
+		
+		<p>If you have any questions, please contact your administrator.</p>
+		<p>Best regards,<br>The ScaleBox Team</p>
+	`, displayName, username, initialPassword, dedicatedSigninURL, dedicatedSigninURL, dedicatedSigninURL)
+
+	return e.sendEmail(email, subject, body)
+}
+
+func (e *EmailService) SendUserDeletionNotification(rootUserEmail, rootUserName, deletedUserName, deletedUserEmail string, deletedProjectsCount int) error {
+	subject := "User Deletion Notification - ScaleBox"
+
+	projectsInfo := ""
+	if deletedProjectsCount > 0 {
+		projectsInfo = fmt.Sprintf(`
+		<p><strong>Additional Actions:</strong></p>
+		<ul>
+			<li>Deleted %d empty project(s) owned by the user</li>
+		</ul>`, deletedProjectsCount)
+	}
+
+	body := fmt.Sprintf(`
+		<h2>User Deletion Notification</h2>
+		<p>Hello %s,</p>
+		<p>This is to confirm that a user has been successfully deleted from your ScaleBox account.</p>
+		
+		<h3>Deleted User Details:</h3>
+		<ul>
+			<li><strong>Name:</strong> %s</li>
+			<li><strong>Email:</strong> %s</li>
+		</ul>
+		
+		<h3>What was removed:</h3>
+		<ul>
+			<li>User account and all associated data</li>
+			<li>All user notifications</li>
+			<li>User's dedicated signin URL</li>%s
+		</ul>
+		
+		<p><strong>Important:</strong> This action cannot be undone. The user will no longer be able to access the system.</p>
+		
+		<p>If you did not authorize this deletion or have any questions, please contact support immediately.</p>
+		<p>Best regards,<br>The ScaleBox Team</p>
+	`, rootUserName, deletedUserName, deletedUserEmail, projectsInfo)
+
+	return e.sendEmail(rootUserEmail, subject, body)
+}
+
 func (e *EmailService) sendEmail(to, subject, body string) error {
 	// For now, just print the email (remove in production)
 	fmt.Printf("=== EMAIL TO: %s ===\n", to)
 	fmt.Printf("Subject: %s\n", subject)
 	fmt.Printf("Body: %s\n", body)
 	fmt.Println("========================")
-	
+
 	// TODO: Implement actual SMTP sending
 	// auth := smtp.PlainAuth("", e.config.User, e.config.Password, e.config.Host)
 	// mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
 	// msg := fmt.Sprintf("Subject: %s\n%s%s", subject, mime, body)
 	// addr := fmt.Sprintf("%s:%d", e.config.Host, e.config.Port)
 	// return smtp.SendMail(addr, auth, e.config.From, []string{to}, []byte(msg))
-	
+
 	return nil
-} 
+}

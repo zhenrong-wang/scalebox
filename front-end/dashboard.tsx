@@ -23,7 +23,7 @@ import { ResetPasswordConfirm } from "./components/reset-password-confirm"
 import { AdminDashboard } from "./components/admin/admin-dashboard"
 import { ProjectManagement } from "./components/projects/project-management"
 import { AdminBillingAnalytics } from "./components/admin/admin-billing-analytics"
-import { UserManagement } from "./components/admin/user-management"
+import { AccountManagement } from "./components/admin/account-management"
 import { AccountUserManagement } from "./components/account-user-management"
 import { SystemHealth } from "./components/admin/system-health"
 import { SandboxManagement } from "./components/admin/sandbox-management"
@@ -75,10 +75,16 @@ function DashboardContent() {
       setAuthState("signin");
     };
 
+    const handleAccountSuspended = () => {
+      window.location.replace("/account-suspended");
+    };
+
     if (typeof window !== "undefined") {
       window.addEventListener('auth-required', handleAuthRequired);
+      window.addEventListener('account-suspended', handleAccountSuspended);
       return () => {
         window.removeEventListener('auth-required', handleAuthRequired);
+        window.removeEventListener('account-suspended', handleAccountSuspended);
       };
     }
   }, []);
@@ -124,10 +130,18 @@ function DashboardContent() {
   const isAdmin = currentUser?.role === "admin";
   const isRootUser = currentUser?.is_root_user === true || currentUser?.role === "root-user";
 
-  // Set initial page based on user role
+  // Set initial page based on user role and URL hash
   const [currentPage, setCurrentPage] = useState<PageType>(() => {
-    // This will be updated once we know if user is admin
-    return "projects" // Default to projects for regular users
+    // Check URL hash for initial page
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash.replace('#', '')
+      const validPages: PageType[] = ["sandboxes", "templates", "api-key", "billings", "projects", "admin", "users", "admin-billing", "system", "sandbox-management", "admin-api-keys"]
+      if (hash && validPages.includes(hash as PageType)) {
+        return hash as PageType
+      }
+    }
+    // Default to projects for most users
+    return "projects"
   })
 
   // Update default page when user role is determined
@@ -135,11 +149,29 @@ function DashboardContent() {
     if (currentUser) {
       if (isAdmin && (currentPage === "projects" || currentPage === "sandboxes")) {
         setCurrentPage("admin")
+        window.location.hash = "admin"
       } else if (!isAdmin && !isRootUser && (currentPage === "users" || currentPage === "sandbox-management")) {
         setCurrentPage("projects")
+        window.location.hash = "projects"
       }
     }
   }, [currentUser, isAdmin, isRootUser, currentPage])
+
+  // Listen for browser back/forward navigation (hash changes)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '')
+      const validPages: PageType[] = ["sandboxes", "templates", "api-key", "billings", "projects", "admin", "users", "admin-billing", "system", "sandbox-management", "admin-api-keys"]
+      if (hash && validPages.includes(hash as PageType)) {
+        setCurrentPage(hash as PageType)
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener('hashchange', handleHashChange)
+      return () => window.removeEventListener('hashchange', handleHashChange)
+    }
+  }, [])
 
   const handleSignIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -149,11 +181,23 @@ function DashboardContent() {
         signinRef.current?.resetCaptcha();
         return { success: false, error: "Invalid email or password" };
       }
-      // Fetch user profile
+      
+      // Check if account is suspended
+      if (result.account_suspended) {
+        // Don't try to fetch user profile for suspended accounts
+        // The UserService.signin already handles redirection
+        return { success: true };
+      }
+      
+      // Fetch user profile for active accounts
       const user = await UserService.getCurrentUser();
       if (user) {
         setCurrentUser(user);
         setAuthState("authenticated");
+        // Set initial hash if none exists
+        if (typeof window !== "undefined" && !window.location.hash) {
+          window.location.hash = "projects";
+        }
         return { success: true };
       }
       // Reset captcha on profile fetch failure
@@ -201,6 +245,10 @@ function DashboardContent() {
         const signinResult = await handleSignIn(verificationData.email, verificationData.password);
         if (signinResult.success) {
           setVerificationData(null); // Clear verification data
+          // Set initial hash for new users
+          if (typeof window !== "undefined" && !window.location.hash) {
+            window.location.hash = "projects";
+          }
           return { success: true };
         } else {
           return { success: false, error: signinResult.error || "Sign in failed after verification" };
@@ -233,6 +281,8 @@ function DashboardContent() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("auth-token")
       localStorage.removeItem("user-data")
+      // Clear URL hash
+      window.location.hash = ""
     }
 
     // Reset state
@@ -247,6 +297,10 @@ function DashboardContent() {
 
   const handlePageChange = (page: PageType) => {
     setCurrentPage(page);
+    // Update URL hash to reflect current page
+    if (typeof window !== "undefined") {
+      window.location.hash = page;
+    }
   };
 
   const renderPage = () => {
@@ -282,7 +336,7 @@ function DashboardContent() {
         )
       case "users":
         return isAdmin ? (
-          <UserManagement />
+          <AccountManagement />
         ) : isRootUser ? (
           <AccountUserManagement />
         ) : (
@@ -487,21 +541,21 @@ function DashboardContent() {
                 </div>
                 
                 {/* User Indicator */}
-                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-50 border mx-4 h-10">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-muted border mx-4 h-10">
                   <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
                   <div className="flex flex-col justify-center min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700 truncate">
+                      <span className="text-sm font-medium text-foreground truncate">
                         {currentUser?.display_name || currentUser?.username || currentUser?.email?.split('@')[0] || 'User'}
                       </span>
                       {isRootUser && (
-                        <span className="text-xs font-semibold text-orange-700">Root</span>
+                        <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">Root</span>
                       )}
                       {!isRootUser && currentUser?.role && (
-                        <span className="text-xs font-semibold text-blue-700">{currentUser.role}</span>
+                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{currentUser.role}</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-500 truncate">
+                    <span className="text-xs text-muted-foreground truncate">
                       Account ID: {currentUser?.account_id || currentUser?.id || 'N/A'}
                     </span>
                   </div>

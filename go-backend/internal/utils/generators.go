@@ -2,9 +2,9 @@ package utils
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 )
 
@@ -75,9 +75,9 @@ func GenerateSignupID() string {
 }
 
 // GenerateDedicatedSigninURL generates a dedicated signin URL
-func GenerateDedicatedSigninURL() string {
-	randomPart := generateRandomString(6, "0123456789abcdefghijklmnopqrstuvwxyz")
-	return randomPart + "-" + GenerateAccountID()
+func GenerateDedicatedSigninURL(accountID string) string {
+	randomPart := generateRandomString(12, "0123456789abcdefghijklmnopqrstuvwxyz")
+	return accountID + "-" + randomPart
 }
 
 // GenerateInitialPassword generates a secure initial password
@@ -95,12 +95,12 @@ func GenerateRandomCode(length int) string {
 func generateRandomString(length int, charset string) string {
 	result := make([]byte, length)
 	charsetLen := big.NewInt(int64(len(charset)))
-	
+
 	for i := 0; i < length; i++ {
 		randomIndex, _ := rand.Int(rand.Reader, charsetLen)
 		result[i] = charset[randomIndex.Int64()]
 	}
-	
+
 	return string(result)
 }
 
@@ -118,17 +118,23 @@ func TimePtr(t time.Time) *time.Time {
 func FormatExpiryTime(expiresAt time.Time) string {
 	now := time.Now()
 	diff := expiresAt.Sub(now)
-	
+
 	if diff <= 0 {
 		return "Expired"
 	}
-	
+
 	minutes := int(diff.Minutes())
 	if minutes < 60 {
 		return fmt.Sprintf("%d minutes", minutes)
 	}
-	
+
 	hours := minutes / 60
 	remainingMinutes := minutes % 60
 	return fmt.Sprintf("%d hours %d minutes", hours, remainingMinutes)
-} 
+}
+
+// HashString generates a SHA256 hash of a string
+func HashString(s string) string {
+	hash := sha256.Sum256([]byte(s))
+	return fmt.Sprintf("%x", hash)
+}

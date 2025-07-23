@@ -16,9 +16,12 @@ export interface User {
 }
 
 export interface CreateUserRequest {
+  email?: string;
   username: string;
   display_name?: string;
   description?: string;
+  role: string;
+  is_active?: boolean;
 }
 
 export interface UpdateUserRequest {

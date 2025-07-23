@@ -620,7 +620,7 @@ export function ProjectManagement() {
                     <ResizableTableCell>
                       {project.sandbox_count}
                     </ResizableTableCell>
-                    <ResizableTableCell>${project.total_spent.toFixed(2)}</ResizableTableCell>
+                    <ResizableTableCell>${(project.total_spent || 0).toFixed(2)}</ResizableTableCell>
                     <ResizableTableCell>
                       <Badge variant={project.status === "active" ? "default" : "secondary"}>
                         {project.status === "active" ? t("table.active") || "Active" : t("table.archived") || "Archived"}
