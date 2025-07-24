@@ -405,107 +405,111 @@ export function AdminApiKeyManagement() {
       <div className="space-y-4">
         {filteredTreeData?.accounts.map((account) => (
           <Card key={account.account_id} className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CollapsibleTrigger
-                    asChild
-                    onClick={() => toggleAccountExpansion(account.account_id)}
-                  >
-                    <Button variant="ghost" size="sm" className="p-0 h-auto">
-                      {expandedAccounts.has(account.account_id) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <Building2 className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">{account.account_name}</div>
-                    <div className="text-sm text-muted-foreground">{account.account_email}</div>
+            <Collapsible open={expandedAccounts.has(account.account_id)}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CollapsibleTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-0 h-auto"
+                        onClick={() => toggleAccountExpansion(account.account_id)}
+                      >
+                        {expandedAccounts.has(account.account_id) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">{account.account_name}</div>
+                      <div className="text-sm text-muted-foreground">{account.account_email}</div>
+                    </div>
+                    {getStatusBadge(account.is_active)}
                   </div>
-                  {getStatusBadge(account.is_active)}
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-sm font-medium">{account.total_api_keys} keys</div>
-                    <div className="text-xs text-muted-foreground">
-                      {account.active_api_keys} active, {account.disabled_api_keys} disabled
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{account.total_api_keys} keys</div>
+                      <div className="text-xs text-muted-foreground">
+                        {account.active_api_keys} active, {account.disabled_api_keys} disabled
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openActionDialog(
+                          "account",
+                          account.account_id,
+                          account.account_name,
+                          account.is_active ? "disable" : "enable",
+                          account.total_api_keys
+                        )}
+                      >
+                        {account.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openActionDialog(
-                        "account",
-                        account.account_id,
-                        account.account_name,
-                        account.is_active ? "disable" : "enable",
-                        account.total_api_keys
-                      )}
-                    >
-                      {account.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                    </Button>
-                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            
-            <Collapsible open={expandedAccounts.has(account.account_id)}>
+              </CardHeader>
+              
               <CollapsibleContent>
                 <CardContent className="pt-0">
                   <div className="space-y-3">
                     {account.users.map((user) => (
                       <div key={user.user_id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <CollapsibleTrigger
-                              asChild
-                              onClick={() => toggleUserExpansion(user.user_id)}
-                            >
-                              <Button variant="ghost" size="sm" className="p-0 h-auto">
-                                {expandedUsers.has(user.user_id) ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <div className="font-medium">{user.username}</div>
-                              <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <Collapsible open={expandedUsers.has(user.user_id)}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <CollapsibleTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="p-0 h-auto"
+                                  onClick={() => toggleUserExpansion(user.user_id)}
+                                >
+                                  {expandedUsers.has(user.user_id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </CollapsibleTrigger>
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <div>
+                                <div className="font-medium">{user.username}</div>
+                                <div className="text-sm text-muted-foreground">{user.email}</div>
+                              </div>
+                              {getStatusBadge(user.is_active)}
                             </div>
-                            {getStatusBadge(user.is_active)}
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="text-sm font-medium">{user.total_api_keys} keys</div>
-                              <div className="text-xs text-muted-foreground">
-                                {user.active_api_keys} active, {user.disabled_api_keys} disabled
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <div className="text-sm font-medium">{user.total_api_keys} keys</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {user.active_api_keys} active, {user.disabled_api_keys} disabled
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openActionDialog(
+                                    "user",
+                                    user.user_id,
+                                    user.username,
+                                    user.is_active ? "disable" : "enable",
+                                    user.total_api_keys
+                                  )}
+                                >
+                                  {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openActionDialog(
-                                  "user",
-                                  user.user_id,
-                                  user.username,
-                                  user.is_active ? "disable" : "enable",
-                                  user.total_api_keys
-                                )}
-                              >
-                                {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                              </Button>
-                            </div>
                           </div>
-                        </div>
-                        
-                        <Collapsible open={expandedUsers.has(user.user_id)}>
+                          
                           <CollapsibleContent>
                             <div className="space-y-2">
                               {user.api_keys.map((apiKey) => (
