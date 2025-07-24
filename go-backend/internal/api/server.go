@@ -183,6 +183,16 @@ func (s *Server) setupRoutes() {
 			adminSandboxes.GET("/stats", s.handleAdminGetSandboxStats)
 			adminSandboxes.POST("/:sandbox_id/action", s.handleAdminSandboxAction)
 		}
+
+		// Admin API key routes (admin only)
+		adminApiKeys := api.Group("/api-keys/admin")
+		adminApiKeys.Use(s.authMiddleware())
+		adminApiKeys.Use(s.adminMiddleware())
+		{
+			adminApiKeys.GET("/all", s.handleAdminListAllAPIKeys)
+			adminApiKeys.GET("/stats", s.handleAdminGetAPIKeyStats)
+			adminApiKeys.POST("/:key_id/action", s.handleAdminAPIKeyAction)
+		}
 	}
 }
 
