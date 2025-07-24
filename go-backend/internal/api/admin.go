@@ -378,6 +378,8 @@ func (s *Server) handleEnableAccount(c *gin.Context) {
 
 	account.IsActive = true
 	if err := s.db.DB.Save(&account).Error; err != nil {
+		// Log the actual error for debugging
+		fmt.Printf("Error enabling account %s: %v\n", accountID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enable account"})
 		return
 	}

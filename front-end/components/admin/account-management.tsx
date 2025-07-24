@@ -207,7 +207,9 @@ export function AccountManagement() {
       if (response.ok) {
         refreshAll(); // Reload accounts and stats to reflect status change
       } else {
-        console.error('Failed to enable account:', response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to enable account:', response.status, response.statusText, errorData);
+        throw new Error(`Failed to enable account: ${errorData.error || response.statusText}`);
       }
     } catch (error) {
       console.error('Error enabling account:', error);

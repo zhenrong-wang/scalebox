@@ -27,17 +27,20 @@ BEGIN
 END//
 DELIMITER ;
 
--- Add a trigger to prevent admin accounts from being disabled
+-- Add a trigger to prevent admin accounts from being disabled (but allow enabling)
 DELIMITER //
 CREATE TRIGGER prevent_admin_account_disable
 BEFORE UPDATE ON accounts
 FOR EACH ROW
 BEGIN
-    -- If trying to disable an account that has admin users, prevent it
+    -- Only prevent disabling admin accounts, allow enabling them
     IF OLD.is_active = true AND NEW.is_active = false AND 
        EXISTS (SELECT 1 FROM users WHERE users.account_id = NEW.account_id AND users.role = 'admin') THEN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Cannot disable admin accounts. Admin accounts must remain active.';
     END IF;
+    
+    -- Allow enabling any account (including admin accounts)
+    -- This is the default behavior, so no additional logic needed
 END//
 DELIMITER ; 
