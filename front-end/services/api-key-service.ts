@@ -152,7 +152,8 @@ export class ApiKeyService {
       headers: this.getAuthHeaders(),
     });
 
-    return await this.handleResponse(response);
+    const data = await this.handleResponse(response);
+    return data.api_keys || [];
   }
 
   static async getApiKeyStats(): Promise<ApiKeyStats> {
@@ -165,6 +166,24 @@ export class ApiKeyService {
 
   static async adminApiKeyAction(keyId: string, action: "enable" | "disable" | "delete", reason?: string): Promise<{ message: string }> {
     const response = await fetch(`${this.API_BASE}/api/api-keys/admin/${keyId}/action`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ action, reason }),
+    });
+    return await this.handleResponse(response);
+  }
+
+  static async adminAccountAPIKeyAction(accountId: string, action: "enable" | "disable", reason?: string): Promise<{ message: string; affected_keys: number }> {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/admin/account/${accountId}/action`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ action, reason }),
+    });
+    return await this.handleResponse(response);
+  }
+
+  static async adminUserAPIKeyAction(userId: string, action: "enable" | "disable", reason?: string): Promise<{ message: string; affected_keys: number }> {
+    const response = await fetch(`${this.API_BASE}/api/api-keys/admin/user/${userId}/action`, {
       method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ action, reason }),

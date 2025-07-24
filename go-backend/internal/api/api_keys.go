@@ -291,3 +291,123 @@ func (s *Server) handleAdminAPIKeyAction(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action. Supported actions: enable, disable, delete"})
 	}
 }
+
+// Account-level API key management
+func (s *Server) handleAdminAccountAPIKeyAction(c *gin.Context) {
+	accountID := c.Param("account_id")
+
+	var req struct {
+		Action string `json:"action" binding:"required"`
+		Reason string `json:"reason"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get all users in the account
+	var users []models.User
+	if err := s.db.DB.Where("account_id = ?", accountID).Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch account users"})
+		return
+	}
+
+	if len(users) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No users found in account"})
+		return
+	}
+
+	// Get all API keys for users in this account
+	var apiKeys []models.APIKey
+	userIDs := make([]string, len(users))
+	for i, user := range users {
+		userIDs[i] = user.UserID
+	}
+
+	if err := s.db.DB.Where("user_id IN ?", userIDs).Find(&apiKeys).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch API keys"})
+		return
+	}
+
+	// Perform action on all API keys
+	switch req.Action {
+	case "enable":
+		if err := s.db.DB.Model(&models.APIKey{}).Where("user_id IN ?", userIDs).Update("is_active", true).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enable API keys"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "All API keys for account enabled successfully",
+			"affected_keys": len(apiKeys),
+		})
+
+	case "disable":
+		if err := s.db.DB.Model(&models.APIKey{}).Where("user_id IN ?", userIDs).Update("is_active", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to disable API keys"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "All API keys for account disabled successfully",
+			"affected_keys": len(apiKeys),
+		})
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action. Supported actions: enable, disable"})
+	}
+}
+
+// User-level API key management
+func (s *Server) handleAdminUserAPIKeyAction(c *gin.Context) {
+	userID := c.Param("user_id")
+
+	var req struct {
+		Action string `json:"action" binding:"required"`
+		Reason string `json:"reason"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify user exists
+	var user models.User
+	if err := s.db.DB.Where("user_id = ?", userID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Get all API keys for this user
+	var apiKeys []models.APIKey
+	if err := s.db.DB.Where("user_id = ?", userID).Find(&apiKeys).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user API keys"})
+		return
+	}
+
+	// Perform action on all API keys for this user
+	switch req.Action {
+	case "enable":
+		if err := s.db.DB.Model(&models.APIKey{}).Where("user_id = ?", userID).Update("is_active", true).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enable user API keys"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "All API keys for user enabled successfully",
+			"affected_keys": len(apiKeys),
+		})
+
+	case "disable":
+		if err := s.db.DB.Model(&models.APIKey{}).Where("user_id = ?", userID).Update("is_active", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to disable user API keys"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "All API keys for user disabled successfully",
+			"affected_keys": len(apiKeys),
+		})
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action. Supported actions: enable, disable"})
+	}
+}

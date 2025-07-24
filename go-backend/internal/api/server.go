@@ -192,6 +192,8 @@ func (s *Server) setupRoutes() {
 			adminApiKeys.GET("/all", s.handleAdminListAllAPIKeys)
 			adminApiKeys.GET("/stats", s.handleAdminGetAPIKeyStats)
 			adminApiKeys.POST("/:key_id/action", s.handleAdminAPIKeyAction)
+			adminApiKeys.POST("/account/:account_id/action", s.handleAdminAccountAPIKeyAction)
+			adminApiKeys.POST("/user/:user_id/action", s.handleAdminUserAPIKeyAction)
 		}
 	}
 }
