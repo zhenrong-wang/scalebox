@@ -321,6 +321,17 @@ func (s *Server) handleDisableAccount(c *gin.Context) {
 		return
 	}
 
+	// CRITICAL: Admin account should NEVER be disabled
+	// Check if this account has any admin users
+	var adminUser models.User
+	if err := s.db.DB.Where("account_id = ? AND role = ?", accountID, "admin").First(&adminUser).Error; err == nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "Cannot disable admin account",
+			"message": "Admin accounts cannot be disabled. This is a system protection to ensure administrative access is always available.",
+		})
+		return
+	}
+
 	account.IsActive = false
 	if err := s.db.DB.Save(&account).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to disable account"})
