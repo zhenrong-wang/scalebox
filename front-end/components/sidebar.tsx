@@ -21,6 +21,7 @@ import {
   Activity,
   Container,
   Book,
+  Building,
 } from "lucide-react"
 import type { PageType } from "../dashboard"
 import { useLanguage } from "../contexts/language-context"
@@ -60,7 +61,7 @@ export function Sidebar({
 
   const adminMenuItems = [
     { id: "admin", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { id: "users", label: t("nav.users"), icon: Users },
+    { id: "users", label: t("nav.accountManagement"), icon: Building },
     { id: "sandbox-management", label: t("nav.sandboxManagement"), icon: Container },
     { id: "admin-billing", label: t("nav.analytics"), icon: BarChart3 },
     { id: "system", label: t("nav.systemHealth"), icon: Activity },
