@@ -247,8 +247,8 @@ func (s *Server) handleDedicatedSignin(c *gin.Context) {
 	user.LastLogin = &now
 	s.db.DB.Save(&user)
 
-	// Check if account is disabled and return special flag
-	if !account.IsActive {
+	// Check if account is disabled and return special flag (but admin users are never suspended)
+	if !account.IsActive && user.Role != "admin" {
 		c.JSON(http.StatusOK, gin.H{
 			"access_token":      token,
 			"token_type":        "bearer",
@@ -283,8 +283,8 @@ func (s *Server) handleValidateSigninURL(c *gin.Context) {
 		return
 	}
 
-	// Check if account is disabled (affects all users in the account)
-	if !account.IsActive {
+	// Check if account is disabled (affects all users in the account, except admin users)
+	if !account.IsActive && user.Role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error":            "Account is disabled",
 			"message":          "This account has been disabled by the ScaleBox administrator. Please contact ScaleBox support to restore access.",

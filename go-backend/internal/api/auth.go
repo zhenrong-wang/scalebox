@@ -143,8 +143,8 @@ func (s *Server) handleSignin(c *gin.Context) {
 		return
 	}
 
-	// Check if account is suspended and return special flag
-	if !account.IsActive {
+	// Check if account is suspended and return special flag (but admin users are never suspended)
+	if !account.IsActive && user.Role != "admin" {
 		c.JSON(http.StatusOK, gin.H{
 			"access_token":      token,
 			"token_type":        "bearer",
@@ -294,7 +294,7 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Check if account is disabled
+		// Check if account is disabled (but allow admin users to bypass this check)
 		var account models.Account
 		if err := s.db.DB.Where("account_id = ?", user.AccountID).First(&account).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch account information"})
@@ -302,7 +302,8 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if !account.IsActive {
+		// Admin users should never be suspended - they can always access the system
+		if !account.IsActive && user.Role != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error":             "Account is suspended",
 				"message":           "Your account has been suspended. Please contact support for assistance.",
