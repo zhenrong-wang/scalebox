@@ -161,58 +161,62 @@ export function AccountManagement() {
   }, []);
 
   const handleDisableAccount = async (accountId: string) => {
-    try {
-      const token = localStorage.getItem('auth-token');
-      if (!token) {
-        console.error('No access token found');
-        return;
-      }
-
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${API_BASE}/api/admin/accounts/${accountId}/disable`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    if (confirm(t("admin.confirmDisableAccount"))) {
+      try {
+        const token = localStorage.getItem('auth-token');
+        if (!token) {
+          console.error('No access token found');
+          return;
         }
-      });
 
-      if (response.ok) {
-        refreshAll(); // Reload accounts and stats to reflect status change
-      } else {
-        console.error('Failed to disable account:', response.statusText);
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${API_BASE}/api/admin/accounts/${accountId}/disable`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          refreshAll(); // Reload accounts and stats to reflect status change
+        } else {
+          console.error('Failed to disable account:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error disabling account:', error);
       }
-    } catch (error) {
-      console.error('Error disabling account:', error);
     }
   }
 
   const handleEnableAccount = async (accountId: string) => {
-    try {
-      const token = localStorage.getItem('auth-token');
-      if (!token) {
-        console.error('No access token found');
-        return;
-      }
-
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${API_BASE}/api/admin/accounts/${accountId}/enable`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    if (confirm(t("admin.confirmEnableAccount"))) {
+      try {
+        const token = localStorage.getItem('auth-token');
+        if (!token) {
+          console.error('No access token found');
+          return;
         }
-      });
 
-      if (response.ok) {
-        refreshAll(); // Reload accounts and stats to reflect status change
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to enable account:', response.status, response.statusText, errorData);
-        throw new Error(`Failed to enable account: ${errorData.error || response.statusText}`);
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${API_BASE}/api/admin/accounts/${accountId}/enable`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          refreshAll(); // Reload accounts and stats to reflect status change
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to enable account:', response.status, response.statusText, errorData);
+          throw new Error(`Failed to enable account: ${errorData.error || response.statusText}`);
+        }
+      } catch (error) {
+        console.error('Error enabling account:', error);
       }
-    } catch (error) {
-      console.error('Error enabling account:', error);
     }
   }
 

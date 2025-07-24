@@ -43,10 +43,13 @@ export type PageType =
   | "projects"
   | "admin"
   | "users"
+  | "admin-accounts"
+  | "admin-sandbox-management"
   | "admin-billing"
-  | "system"
-  | "sandbox-management"
+  | "admin-system"
   | "admin-api-keys"
+  | "sandbox-management"
+  | "system"
 type AuthState = "landing" | "signin" | "signup" | "verification" | "reset-password-request" | "reset-password-confirm" | "authenticated"
 
 function DashboardContent() {
@@ -153,7 +156,7 @@ function DashboardContent() {
     // Check URL hash for initial page
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace('#', '')
-      const validPages: PageType[] = ["sandboxes", "templates", "api-key", "billings", "projects", "admin", "users", "admin-billing", "system", "sandbox-management", "admin-api-keys"]
+      const validPages: PageType[] = ["sandboxes", "templates", "api-key", "billings", "projects", "admin", "users", "admin-accounts", "admin-sandbox-management", "admin-billing", "admin-system", "admin-api-keys", "sandbox-management", "system"]
       if (hash && validPages.includes(hash as PageType)) {
         return hash as PageType
       }
@@ -179,7 +182,7 @@ function DashboardContent() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '')
-      const validPages: PageType[] = ["sandboxes", "templates", "api-key", "billings", "projects", "admin", "users", "admin-billing", "system", "sandbox-management", "admin-api-keys"]
+      const validPages: PageType[] = ["sandboxes", "templates", "api-key", "billings", "projects", "admin", "users", "admin-accounts", "admin-sandbox-management", "admin-billing", "admin-system", "admin-api-keys", "sandbox-management", "system"]
       if (hash && validPages.includes(hash as PageType)) {
         setCurrentPage(hash as PageType)
       }
@@ -353,9 +356,7 @@ function DashboardContent() {
           </div>
         )
       case "users":
-        return isAdmin ? (
-          <AccountManagement />
-        ) : isRootUser ? (
+        return isRootUser ? (
           <AccountUserManagement />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
@@ -363,7 +364,25 @@ function DashboardContent() {
             <div>{t("dashboard.noPermission")}</div>
           </div>
         )
+      case "admin-accounts":
+        return isAdmin ? (
+          <AccountManagement />
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="text-lg font-medium mb-2">{t("dashboard.accessDenied")}</div>
+            <div>{t("dashboard.noPermission")}</div>
+          </div>
+        )
       case "sandbox-management":
+        return isRootUser ? (
+          <SandboxManagement />
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="text-lg font-medium mb-2">{t("dashboard.accessDenied")}</div>
+            <div>{t("dashboard.noPermission")}</div>
+          </div>
+        )
+      case "admin-sandbox-management":
         return isAdmin ? (
           <SandboxManagement />
         ) : (
@@ -382,6 +401,15 @@ function DashboardContent() {
           </div>
         )
       case "system":
+        return isRootUser ? (
+          <SystemHealth />
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="text-lg font-medium mb-2">{t("dashboard.accessDenied")}</div>
+            <div>{t("dashboard.noPermission")}</div>
+          </div>
+        )
+      case "admin-system":
         return isAdmin ? (
           <SystemHealth />
         ) : (
@@ -415,11 +443,17 @@ function DashboardContent() {
         return t("dashboard.page.admin")
       case "users":
         return t("dashboard.page.users")
+      case "admin-accounts":
+        return t("dashboard.page.accountManagement")
+      case "admin-sandbox-management":
+        return t("dashboard.page.sandboxManagement")
       case "sandbox-management":
         return t("dashboard.page.sandboxManagement")
       case "admin-billing":
         return t("dashboard.page.adminBilling")
       case "system":
+        return t("dashboard.page.system")
+      case "admin-system":
         return t("dashboard.page.system")
       case "api-key":
         return t("dashboard.page.apiKey")
