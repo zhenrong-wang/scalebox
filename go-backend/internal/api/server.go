@@ -173,6 +173,16 @@ func (s *Server) setupRoutes() {
 			admin.POST("/accounts/:account_id/reset-password", s.handleResetAccountPassword)
 			admin.GET("/stats", s.handleGetSystemStats)
 		}
+
+		// Admin sandbox routes (admin only)
+		adminSandboxes := api.Group("/sandboxes/admin")
+		adminSandboxes.Use(s.authMiddleware())
+		adminSandboxes.Use(s.adminMiddleware())
+		{
+			adminSandboxes.GET("/all", s.handleAdminListAllSandboxes)
+			adminSandboxes.GET("/stats", s.handleAdminGetSandboxStats)
+			adminSandboxes.POST("/:sandbox_id/action", s.handleAdminSandboxAction)
+		}
 	}
 }
 

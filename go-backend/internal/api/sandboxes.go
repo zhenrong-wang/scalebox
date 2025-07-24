@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -388,4 +389,185 @@ func (s *Server) handleGetSandboxStats(c *gin.Context) {
 		"avg_memory_usage":   avgMemoryUsage,
 		"total_uptime_hours": totalUptimeHours,
 	})
+}
+
+// Admin sandbox handlers
+
+func (s *Server) handleAdminListAllSandboxes(c *gin.Context) {
+	// Get query parameters for filtering
+	status := c.Query("status")
+	ownerUserID := c.Query("owner_user_id")
+	projectID := c.Query("project_id")
+	search := c.Query("search")
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order")
+	limit := c.Query("limit")
+	offset := c.Query("offset")
+
+	// Build query
+	query := s.db.DB.Model(&models.Sandbox{}).Preload("Owner").Preload("Project")
+
+	// Apply filters
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if ownerUserID != "" {
+		query = query.Where("owner_user_id = ?", ownerUserID)
+	}
+	if projectID != "" {
+		query = query.Where("project_id = ?", projectID)
+	}
+	if search != "" {
+		query = query.Where("name LIKE ?", "%"+search+"%")
+	}
+
+	// Apply sorting
+	if sortBy != "" {
+		order := "ASC"
+		if sortOrder == "desc" {
+			order = "DESC"
+		}
+		query = query.Order(sortBy + " " + order)
+	} else {
+		query = query.Order("created_at DESC")
+	}
+
+	// Apply pagination
+	if limit != "" {
+		if limitInt, err := strconv.Atoi(limit); err == nil {
+			query = query.Limit(limitInt)
+		}
+	}
+	if offset != "" {
+		if offsetInt, err := strconv.Atoi(offset); err == nil {
+			query = query.Offset(offsetInt)
+		}
+	}
+
+	var sandboxes []models.Sandbox
+	if err := query.Find(&sandboxes).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch sandboxes"})
+		return
+	}
+
+	// Transform to response format
+	var response []gin.H
+	for _, sandbox := range sandboxes {
+		response = append(response, gin.H{
+			"sandbox_id":    sandbox.SandboxID,
+			"name":          sandbox.Name,
+			"description":   sandbox.Description,
+			"template_id":   sandbox.TemplateID,
+			"owner_user_id": sandbox.OwnerUserID,
+			"project_id":    sandbox.ProjectID,
+			"cpu_spec":      sandbox.CPUSpec,
+			"memory_spec":   sandbox.MemorySpec,
+			"status":        sandbox.Status,
+			"created_at":    sandbox.CreatedAt,
+			"stopped_at":    sandbox.StoppedAt,
+			"owner_name":    sandbox.Owner.Username,
+			"project_name":  sandbox.Project.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"sandboxes": response})
+}
+
+func (s *Server) handleAdminGetSandboxStats(c *gin.Context) {
+	// Count total sandboxes
+	var totalSandboxes int64
+	s.db.DB.Model(&models.Sandbox{}).Count(&totalSandboxes)
+
+	// Count running sandboxes
+	var runningSandboxes int64
+	s.db.DB.Model(&models.Sandbox{}).Where("status = ?", "running").Count(&runningSandboxes)
+
+	// Count stopped sandboxes
+	var stoppedSandboxes int64
+	s.db.DB.Model(&models.Sandbox{}).Where("status = ?", "stopped").Count(&stoppedSandboxes)
+
+	// Count timeout sandboxes
+	var timeoutSandboxes int64
+	s.db.DB.Model(&models.Sandbox{}).Where("status = ?", "timeout").Count(&timeoutSandboxes)
+
+	// Count archived sandboxes
+	var archivedSandboxes int64
+	s.db.DB.Model(&models.Sandbox{}).Where("status = ?", "archived").Count(&archivedSandboxes)
+
+	// Calculate total cost (placeholder - would need billing integration)
+	totalCost := 0.0
+
+	// Calculate average CPU and memory usage (placeholder)
+	avgCPUUsage := 0.0
+	avgMemoryUsage := 0.0
+
+	// Calculate total uptime hours (placeholder)
+	totalUptimeHours := 0.0
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_sandboxes":    totalSandboxes,
+		"running_sandboxes":  runningSandboxes,
+		"stopped_sandboxes":  stoppedSandboxes,
+		"timeout_sandboxes":  timeoutSandboxes,
+		"archived_sandboxes": archivedSandboxes,
+		"total_cost":         totalCost,
+		"avg_cpu_usage":      avgCPUUsage,
+		"avg_memory_usage":   avgMemoryUsage,
+		"total_uptime_hours": totalUptimeHours,
+	})
+}
+
+func (s *Server) handleAdminSandboxAction(c *gin.Context) {
+	sandboxID := c.Param("sandbox_id")
+
+	var req struct {
+		Action string `json:"action" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify sandbox exists
+	var sandbox models.Sandbox
+	if err := s.db.DB.Where("sandbox_id = ?", sandboxID).First(&sandbox).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Sandbox not found"})
+		return
+	}
+
+	// Perform action based on request
+	switch req.Action {
+	case "start":
+		// TODO: Implement actual sandbox start logic
+		sandbox.Status = "running"
+		if err := s.db.DB.Save(&sandbox).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start sandbox"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Sandbox started successfully"})
+
+	case "stop":
+		// TODO: Implement actual sandbox stop logic
+		now := time.Now()
+		sandbox.Status = "stopped"
+		sandbox.StoppedAt = &now
+		if err := s.db.DB.Save(&sandbox).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stop sandbox"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Sandbox stopped successfully"})
+
+	case "archive":
+		// TODO: Implement actual sandbox archive logic
+		sandbox.Status = "archived"
+		if err := s.db.DB.Save(&sandbox).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive sandbox"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Sandbox archived successfully"})
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action. Supported actions: start, stop, archive"})
+	}
 }
