@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Trash2, Search, AlertTriangle, Shield, Power, PowerOff, X, ChevronDown, ChevronRight, Users, Building2, Key } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -428,7 +428,7 @@ export function AdminApiKeyManagement() {
             </TableHeader>
             <TableBody>
               {filteredTreeData?.accounts.map((account) => (
-                <>
+                <React.Fragment key={`account-fragment-${account.account_id}`}>
                   {/* Account Row */}
                   <TableRow key={`account-${account.account_id}`} className="bg-muted/30">
                     <TableCell>
@@ -486,7 +486,7 @@ export function AdminApiKeyManagement() {
 
                   {/* User Rows (when account expanded) */}
                   {expandedAccounts.has(account.account_id) && account.users.map((user) => (
-                    <>
+                    <React.Fragment key={`user-fragment-${user.user_id}`}>
                       <TableRow key={`user-${user.user_id}`} className="bg-muted/10">
                         <TableCell>
                           <div className="pl-4">
@@ -603,9 +603,9 @@ export function AdminApiKeyManagement() {
                           </TableCell>
                         </TableRow>
                       ))}
-                    </>
+                    </React.Fragment>
                   ))}
-                </>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
