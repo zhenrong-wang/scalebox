@@ -37,8 +37,8 @@ type User struct {
 }
 
 type Account struct {
-	ID                 uint      `json:"id" gorm:"primaryKey"`
-	AccountID          string    `json:"account_id" gorm:"uniqueIndex;not null;size:12"`
+	ID                 uint      `json:"id" gorm:"column:id"`
+	AccountID          string    `json:"account_id" gorm:"primaryKey;not null;size:12"`
 	Name               string    `json:"name" gorm:"not null;size:255"`
 	Email              *string   `json:"email" gorm:"size:255"`
 	DisplayName        *string   `json:"display_name" gorm:"size:255"`
