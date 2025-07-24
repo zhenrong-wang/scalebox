@@ -19,6 +19,7 @@ import { EditableName } from "@/components/ui/editable-name"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface AccountNode {
   account_id: string
@@ -230,28 +231,28 @@ export function AdminApiKeyManagement() {
       
       let message = ""
       
-             switch (targetType) {
-         case "account":
-           // Disable/enable all API keys for all users in the account
-           if (action === "disable") {
-             const result = await ApiKeyService.adminAccountAPIKeyAction(targetId, "disable", reason)
-             message = result.message
-           } else if (action === "enable") {
-             const result = await ApiKeyService.adminAccountAPIKeyAction(targetId, "enable", reason)
-             message = result.message
-           }
-           break
-           
-         case "user":
-           // Disable/enable all API keys for the user
-           if (action === "disable") {
-             const result = await ApiKeyService.adminUserAPIKeyAction(targetId, "disable", reason)
-             message = result.message
-           } else if (action === "enable") {
-             const result = await ApiKeyService.adminUserAPIKeyAction(targetId, "enable", reason)
-             message = result.message
-           }
-           break
+      switch (targetType) {
+        case "account":
+          // Disable/enable all API keys for all users in the account
+          if (action === "disable") {
+            const result = await ApiKeyService.adminAccountAPIKeyAction(targetId, "disable", reason)
+            message = result.message
+          } else if (action === "enable") {
+            const result = await ApiKeyService.adminAccountAPIKeyAction(targetId, "enable", reason)
+            message = result.message
+          }
+          break
+          
+        case "user":
+          // Disable/enable all API keys for the user
+          if (action === "disable") {
+            const result = await ApiKeyService.adminUserAPIKeyAction(targetId, "disable", reason)
+            message = result.message
+          } else if (action === "enable") {
+            const result = await ApiKeyService.adminUserAPIKeyAction(targetId, "enable", reason)
+            message = result.message
+          }
+          break
           
         case "api_key":
           // Individual API key action
@@ -401,19 +402,40 @@ export function AdminApiKeyManagement() {
         </Select>
       </div>
 
-      {/* Tree Structure */}
-      <div className="space-y-4">
-        {filteredTreeData?.accounts.map((account) => (
-          <Card key={account.account_id} className="overflow-hidden">
-            <Collapsible open={expandedAccounts.has(account.account_id)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CollapsibleTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-0 h-auto"
+      {/* Collapsible Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            API Key Management
+          </CardTitle>
+          <CardDescription>
+            Manage API keys across all accounts and users. Click the chevron icons to expand/collapse sections.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Name / Type</TableHead>
+                <TableHead>Email / Description</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>API Keys</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="w-32">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTreeData?.accounts.map((account) => (
+                <>
+                  {/* Account Row */}
+                  <TableRow key={`account-${account.account_id}`} className="bg-muted/30">
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-0 h-6 w-6"
                         onClick={() => toggleAccountExpansion(account.account_id)}
                       >
                         {expandedAccounts.has(account.account_id) ? (
@@ -422,22 +444,30 @@ export function AdminApiKeyManagement() {
                           <ChevronRight className="h-4 w-4" />
                         )}
                       </Button>
-                    </CollapsibleTrigger>
-                    <Building2 className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <div className="font-medium">{account.account_name}</div>
-                      <div className="text-sm text-muted-foreground">{account.account_email}</div>
-                    </div>
-                    {getStatusBadge(account.is_active)}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-sm font-medium">{account.total_api_keys} keys</div>
-                      <div className="text-xs text-muted-foreground">
-                        {account.active_api_keys} active, {account.disabled_api_keys} disabled
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="font-medium">{account.account_name}</div>
+                          <div className="text-xs text-muted-foreground">Account</div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{account.account_email}</div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(account.is_active)}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{account.total_api_keys} total</div>
+                        <div className="text-xs text-muted-foreground">
+                          {account.active_api_keys} active, {account.disabled_api_keys} disabled
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>
                       <Button
                         variant="outline"
                         size="sm"
@@ -451,124 +481,136 @@ export function AdminApiKeyManagement() {
                       >
                         {account.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                       </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CollapsibleContent>
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {account.users.map((user) => (
-                      <div key={user.user_id} className="border rounded-lg p-4">
-                        <Collapsible open={expandedUsers.has(user.user_id)}>
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <CollapsibleTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="p-0 h-auto"
-                                  onClick={() => toggleUserExpansion(user.user_id)}
-                                >
-                                  {expandedUsers.has(user.user_id) ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </CollapsibleTrigger>
-                              <Users className="h-4 w-4 text-muted-foreground" />
-                              <div>
-                                <div className="font-medium">{user.username}</div>
-                                <div className="text-sm text-muted-foreground">{user.email}</div>
-                              </div>
-                              {getStatusBadge(user.is_active)}
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <div className="text-sm font-medium">{user.total_api_keys} keys</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {user.active_api_keys} active, {user.disabled_api_keys} disabled
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openActionDialog(
-                                    "user",
-                                    user.user_id,
-                                    user.username,
-                                    user.is_active ? "disable" : "enable",
-                                    user.total_api_keys
-                                  )}
-                                >
-                                  {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                                </Button>
-                              </div>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* User Rows (when account expanded) */}
+                  {expandedAccounts.has(account.account_id) && account.users.map((user) => (
+                    <>
+                      <TableRow key={`user-${user.user_id}`} className="bg-muted/10">
+                        <TableCell>
+                          <div className="pl-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="p-0 h-6 w-6"
+                              onClick={() => toggleUserExpansion(user.user_id)}
+                            >
+                              {expandedUsers.has(user.user_id) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium">{user.username}</div>
+                              <div className="text-xs text-muted-foreground">User</div>
                             </div>
                           </div>
-                          
-                          <CollapsibleContent>
-                            <div className="space-y-2">
-                              {user.api_keys.map((apiKey) => (
-                                <div key={apiKey.key_id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <Key className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                      <div className="font-medium">{apiKey.name}</div>
-                                      <div className="text-sm text-muted-foreground">
-                                        {apiKey.description || "No description"}
-                                      </div>
-                                    </div>
-                                    {getStatusBadge(apiKey.is_active)}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="text-xs text-muted-foreground">
-                                      Created: {new Date(apiKey.created_at).toLocaleDateString()}
-                                    </div>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openActionDialog(
-                                        "api_key",
-                                        apiKey.key_id,
-                                        apiKey.name,
-                                        apiKey.is_active ? "disable" : "enable",
-                                        1
-                                      )}
-                                    >
-                                      {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openActionDialog(
-                                        "api_key",
-                                        apiKey.key_id,
-                                        apiKey.name,
-                                        "delete",
-                                        1
-                                      )}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">{user.email}</div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(user.is_active)}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{user.total_api_keys} total</div>
+                            <div className="text-xs text-muted-foreground">
+                              {user.active_api_keys} active, {user.disabled_api_keys} disabled
                             </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
-        ))}
-      </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>-</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openActionDialog(
+                              "user",
+                              user.user_id,
+                              user.username,
+                              user.is_active ? "disable" : "enable",
+                              user.total_api_keys
+                            )}
+                          >
+                            {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* API Key Rows (when user expanded) */}
+                      {expandedUsers.has(user.user_id) && user.api_keys.map((apiKey) => (
+                        <TableRow key={`apikey-${apiKey.key_id}`}>
+                          <TableCell>
+                            <div className="pl-8">
+                              <Key className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{apiKey.name}</div>
+                              <div className="text-xs text-muted-foreground">API Key</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{apiKey.description || "No description"}</div>
+                          </TableCell>
+                          <TableCell>{getStatusBadge(apiKey.is_active)}</TableCell>
+                          <TableCell>
+                            <div className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                              {apiKey.prefix}...
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {new Date(apiKey.created_at).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openActionDialog(
+                                  "api_key",
+                                  apiKey.key_id,
+                                  apiKey.name,
+                                  apiKey.is_active ? "disable" : "enable",
+                                  1
+                                )}
+                              >
+                                {apiKey.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openActionDialog(
+                                  "api_key",
+                                  apiKey.key_id,
+                                  apiKey.name,
+                                  "delete",
+                                  1
+                                )}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  ))}
+                </>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Action Confirmation Dialog */}
       <Dialog open={actionDialog.isOpen} onOpenChange={closeActionDialog}>
